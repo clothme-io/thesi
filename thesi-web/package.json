@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "dev:clean": "rm -rf .next && next dev --turbopack",
+    "dev": "next dev --turbopack -p 3000",
+    "dev:clean": "pkill -f 'next dev.*thesi-web' 2>/dev/null || true; lsof -ti :3000,:3001 | xargs kill -9 2>/dev/null || true; rm -rf .next && next dev --turbopack -p 3000",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint"

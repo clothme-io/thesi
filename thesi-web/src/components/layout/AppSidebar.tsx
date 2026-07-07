@@ -6,13 +6,18 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 
 const CREATOR_NAV = [
-  { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
-  { href: "/app/crm", label: "CRM", icon: "◎" },
+  { href: "/app/dashboard", label: "Home", icon: "⌂" },
+  { href: "/app/brands", label: "Brands", icon: "◎" },
+  { href: "/app/pipeline", label: "Pipeline", icon: "▤" },
+  { href: "/app/jobs", label: "Jobs", icon: "▣" },
+  { href: "/app/contracts", label: "Contracts", icon: "📄" },
+  { href: "/app/payments", label: "Payments", icon: "💳" },
+  { href: "/app/calendar", label: "Calendar", icon: "📅" },
+  { href: "/app/tasks", label: "Tasks", icon: "✓" },
+  { href: "/app/inbox", label: "Inbox", icon: "✉" },
+  { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
   { href: "/app/profile", label: "Profile", icon: "◉" },
   { href: "/app/settings", label: "Settings", icon: "⚙" },
-  { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
-  { href: "/app/inbox", label: "Inbox", icon: "✉" },
-  { href: "/app/tools/invoices", label: "Invoices", icon: "🧾", section: "Tools" },
 ];
 
 const BRAND_NAV = [

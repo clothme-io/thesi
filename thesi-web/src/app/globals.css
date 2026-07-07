@@ -4,10 +4,11 @@
 
 :root {
   --ink: #0f4e71;
-  --muted: #6f6a60;
-  --paper: #fbf7ef;
-  --card: #fffdf8;
-  --line: #e5ded1;
+  --muted: #64748b;
+  --paper: #ffffff;
+  --surface: #f8fafc;
+  --card: #ffffff;
+  --line: #e2e8f0;
   --accent: #b7ff59;
   --blue: #1599e3;
   --cta: #f87979;
@@ -35,8 +36,9 @@ a {
 
 .page-white {
   --paper: #ffffff;
-  --card: #fbfbfb;
-  --line: #e6edf2;
+  --surface: #f8fafc;
+  --card: #ffffff;
+  --line: #e2e8f0;
   min-height: 100vh;
   background: #ffffff;
   color: var(--ink);
@@ -53,7 +55,7 @@ a {
   gap: 24px;
   padding: 20px clamp(18px, 5vw, 64px);
   border-bottom: 1px solid var(--line);
-  background: rgba(251, 247, 239, 0.92);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .brand,
