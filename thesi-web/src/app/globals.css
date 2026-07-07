@@ -1,0 +1,154 @@
+@import "tailwindcss";
+@import "./creators.css";
+@import "./styles.css";
+
+:root {
+  --ink: #0f4e71;
+  --muted: #6f6a60;
+  --paper: #fbf7ef;
+  --card: #fffdf8;
+  --line: #e5ded1;
+  --accent: #b7ff59;
+  --blue: #1599e3;
+  --cta: #f87979;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page-white {
+  --paper: #ffffff;
+  --card: #fbfbfb;
+  --line: #e6edf2;
+  min-height: 100vh;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.page-white .site-header {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px clamp(18px, 5vw, 64px);
+  border-bottom: 1px solid var(--line);
+  background: rgba(251, 247, 239, 0.92);
+}
+
+.brand,
+.site-header nav {
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  gap: 10px;
+  font-weight: 900;
+}
+
+.brand-word {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 20px;
+}
+
+.brand-logo {
+  display: block;
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.site-header nav {
+  gap: 22px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.site-header nav a:hover {
+  color: var(--ink);
+}
+
+.site-footer {
+  padding: 32px clamp(18px, 5vw, 64px);
+  background: #ffffff;
+  border-top: 1px solid var(--line);
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.site-footer a {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.thesi-landing-hero {
+  text-align: center;
+  padding: clamp(80px, 12vw, 140px) clamp(18px, 5vw, 64px);
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.thesi-landing-hero .eyebrow {
+  color: var(--blue);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.thesi-landing-hero h1 {
+  font-size: clamp(36px, 6vw, 64px);
+  line-height: 1.1;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0 0 24px;
+}
+
+.thesi-landing-sub {
+  font-size: clamp(17px, 2vw, 20px);
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 0 0 40px;
+}
+
+.thesi-landing .creator-hero-ctas {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.thesi-landing .creator-btn-primary {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.thesi-landing .creator-btn-ghost {
+  color: var(--ink);
+  border-color: var(--line);
+}

@@ -1,0 +1,25 @@
+import { boolean, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const thesiCreatorApplication = pgTable('thesi_creator_applications', {
+  id: text('id').primaryKey(),
+  fullName: text('full_name').notNull(),
+  email: text('email').notNull(),
+  phoneNumber: text('phone_number'),
+  country: text('country').notNull(),
+  city: text('city').notNull(),
+  creatorType: text('creator_type').notNull(),
+  tiktokUrl: text('tiktok_url').notNull(),
+  instagramUrl: text('instagram_url').notNull(),
+  youtubeUrl: text('youtube_url'),
+  otherLinks: text('other_links'),
+  followerCountRange: text('follower_count_range').notNull(),
+  hasUgcExperience: boolean('has_ugc_experience').notNull(),
+  portfolioLink: text('portfolio_link').notNull(),
+  whyClothme: text('why_clothme').notNull(),
+  interestedCreatorStore: text('interested_creator_store').notNull(),
+  interestedAffiliate: text('interested_affiliate').notNull(),
+  status: text('status').notNull().default('applied'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
