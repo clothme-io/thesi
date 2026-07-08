@@ -62,7 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(
     async (input: SignInInput) => {
       if (isAuthDevMode()) {
-        const devSession = createDevSession(input, "creator");
+        const role = input.email.trim().toLowerCase() === "brand@thesi.dev" ? "brand" : "creator";
+        const devSession = createDevSession(input, role);
         persist(devSession);
         return devSession;
       }

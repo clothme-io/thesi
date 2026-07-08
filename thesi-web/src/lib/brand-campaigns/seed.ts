@@ -1,0 +1,89 @@
+import type { BrandCampaignData } from "./types";
+
+export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
+  campaigns: [
+    {
+      id: "campaign-1",
+      name: "Summer Running Campaign",
+      type: "mixed_bundle",
+      status: "active",
+      startDate: "2026-07-15",
+      endDate: "2026-08-30",
+      brief:
+        "Promote the latest summer running collection with authentic creator-led storytelling and workout lifestyle footage.",
+      deliverables: "3 TikToks, 2 Reels, raw b-roll",
+      requirements: {
+        niches: ["Fitness", "Lifestyle"],
+        minFollowersRange: "10k+",
+        location: "US",
+        platforms: ["TikTok", "Instagram"],
+      },
+      files: [
+        { id: "cf-1", name: "creative-brief.pdf", sizeLabel: "1.2 MB" },
+        { id: "cf-2", name: "brand-guidelines.pdf", sizeLabel: "900 KB" },
+      ],
+      payment: {
+        model: "milestone",
+        milestones: [
+          { id: "m1", label: "Concept approval", trigger: "Concept approved", amountCents: 75000 },
+          { id: "m2", label: "Draft delivery", trigger: "Draft content submitted", amountCents: 150000 },
+          { id: "m3", label: "Final delivery", trigger: "Final content approved", amountCents: 225000 },
+        ],
+        notes: "Net 30 terms.",
+      },
+      postToMarketplace: true,
+      createdAt: "2026-07-01T10:00:00.000Z",
+      updatedAt: "2026-07-04T10:00:00.000Z",
+    },
+    {
+      id: "campaign-2",
+      name: "Fall Lookbook UGC",
+      type: "instagram_reels",
+      status: "draft",
+      startDate: "2026-08-05",
+      endDate: "2026-09-10",
+      brief: "Create warm, editorial-style content for our fall collection launch.",
+      deliverables: "4 Reels, 8 photos",
+      requirements: {
+        niches: ["Fashion"],
+        minFollowersRange: "5k+",
+        location: "Los Angeles",
+        platforms: ["Instagram"],
+      },
+      files: [{ id: "cf-3", name: "lookbook-moodboard.png", sizeLabel: "2.1 MB" }],
+      payment: {
+        model: "flat_rate",
+        flatRateCents: 180000,
+      },
+      postToMarketplace: false,
+      createdAt: "2026-07-03T09:00:00.000Z",
+      updatedAt: "2026-07-03T09:00:00.000Z",
+    },
+    {
+      id: "campaign-3",
+      name: "Creator Store Promo Q3",
+      type: "mixed_bundle",
+      status: "paused",
+      startDate: "2026-07-01",
+      endDate: "2026-07-31",
+      brief: "Drive awareness for the ClothME creator store with conversion-focused content.",
+      deliverables: "2 TikToks, 1 Reel, 3 photos",
+      requirements: {
+        niches: ["Fashion", "Lifestyle"],
+        minFollowersRange: "2k+",
+        location: "Remote",
+        platforms: ["TikTok", "Instagram"],
+      },
+      files: [{ id: "cf-4", name: "promo-asset-pack.zip", sizeLabel: "20 MB" }],
+      payment: {
+        model: "hybrid",
+        flatRateCents: 200000,
+        royaltyPercent: 5,
+      },
+      postToMarketplace: true,
+      createdAt: "2026-06-20T10:00:00.000Z",
+      updatedAt: "2026-07-02T12:00:00.000Z",
+    },
+  ],
+};
+

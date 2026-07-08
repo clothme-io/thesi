@@ -13,7 +13,7 @@ export interface CreatorProfile {
   portfolioUrl: string;
 }
 
-export const DEFAULT_PROFILE: CreatorProfile = {
+export const DEFAULT_CREATOR_PROFILE: CreatorProfile = {
   displayName: "",
   headline: "UGC Creator",
   bio: "",
@@ -27,3 +27,13 @@ export const DEFAULT_PROFILE: CreatorProfile = {
   turnaround: "3–5 business days",
   portfolioUrl: "",
 };
+
+export const CREATOR_NICHE_OPTIONS = [
+  "Fashion",
+  "Beauty",
+  "Lifestyle",
+  "Food",
+  "Tech",
+  "Fitness",
+  "Travel",
+];

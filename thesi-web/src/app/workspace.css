@@ -537,6 +537,24 @@
   color: var(--muted);
 }
 
+/* Brand workspace */
+
+.brand-dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.brand-dashboard-header h3 {
+  margin: 0;
+}
+
+.brand-table-wrap {
+  overflow-x: auto;
+}
+
 @media (max-width: 900px) {
   .inbox-layout {
     grid-template-columns: 1fr;
@@ -556,4 +574,77 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .brand-dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.invite-drawer {
+  width: min(560px, 100%);
+}
+
+.invite-drawer-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 0 24px;
+}
+
+.invite-drawer-tab {
+  border: none;
+  background: transparent;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.invite-drawer-tab--active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.invite-creator-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invite-creator-row label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.invite-creator-row input {
+  margin-top: 4px;
+}
+
+.invite-creator-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  font-size: 13px;
+}
+
+.invite-creator-info strong {
+  font-size: 14px;
+}
+
+.invite-creator-meta {
+  color: var(--muted);
+  font-size: 12px;
 }

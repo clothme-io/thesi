@@ -27,7 +27,7 @@ const BRAND_NAV: NavItem[] = [
   { href: "/app/campaigns", label: "Campaigns", icon: "▣" },
   { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
   { href: "/app/inbox", label: "Inbox", icon: "✉" },
-  { href: "/app/profile", label: "Profile", icon: "◉" },
+  { href: "/app/profile", label: "Brand profile", icon: "◉" },
   { href: "/app/settings", label: "Settings", icon: "⚙" },
 ];
 

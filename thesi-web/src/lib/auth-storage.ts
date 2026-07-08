@@ -29,7 +29,8 @@ export function isAuthDevMode(): boolean {
 
 /** Temporary dev auth for UI work without a running database. */
 export function createDevSession(input: SignInInput | SignUpInput, role: "creator" | "brand"): AuthSession {
-  const fullName = "fullName" in input ? input.fullName : "Demo Creator";
+  const fullName = "fullName" in input ? input.fullName : role === "brand" ? "Demo Brand" : "Demo Creator";
+  const companyName = "companyName" in input ? input.companyName : undefined;
   const simulateTempPassword = input.password === "temp123";
 
   return {
@@ -39,6 +40,7 @@ export function createDevSession(input: SignInInput | SignUpInput, role: "creato
       id: "dev-user-1",
       email: input.email,
       fullName,
+      companyName,
       role,
       mustChangePassword: simulateTempPassword,
       onboardingCompleted: false,

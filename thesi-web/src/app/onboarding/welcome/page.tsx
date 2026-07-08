@@ -6,7 +6,8 @@ import { useAuth } from "@/context/AuthProvider";
 
 export default function WelcomePage() {
   const router = useRouter();
-  const { completeWelcome } = useAuth();
+  const { completeWelcome, session } = useAuth();
+  const isBrand = session?.user.role === "brand";
 
   function handleContinue() {
     completeWelcome();
@@ -24,10 +25,17 @@ export default function WelcomePage() {
             />
           </div>
           <h1>Welcome to Thesi</h1>
-          <p>
-            We built Thesi so UGC creators can run their business like a real operation —
-            not a patchwork of DMs, spreadsheets, and overdue invoices.
-          </p>
+          {isBrand ? (
+            <p>
+              We built Thesi so brands can run UGC campaigns like a real operation — not a patchwork of
+              spreadsheets, DMs, and scattered approvals.
+            </p>
+          ) : (
+            <p>
+              We built Thesi so UGC creators can run their business like a real operation — not a patchwork of
+              DMs, spreadsheets, and overdue invoices.
+            </p>
+          )}
 
           <div className="onboarding-founder">
             <div className="onboarding-founder-avatar" aria-hidden="true">
@@ -36,9 +44,17 @@ export default function WelcomePage() {
             <div>
               <strong>From the ClothME founder</strong>
               <p style={{ marginTop: 8 }}>
-                You are joining as a founding creator. We are still shaping the platform,
-                and your feedback will directly influence what we build next. Thank you for
-                being here early.
+                {isBrand ? (
+                  <>
+                    You are joining as a founding brand partner. We are still shaping the platform, and your
+                    feedback will directly influence what we build next. Thank you for being here early.
+                  </>
+                ) : (
+                  <>
+                    You are joining as a founding creator. We are still shaping the platform, and your feedback
+                    will directly influence what we build next. Thank you for being here early.
+                  </>
+                )}
               </p>
             </div>
           </div>

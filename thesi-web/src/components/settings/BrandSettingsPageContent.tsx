@@ -2,34 +2,13 @@
 
 import Link from "next/link";
 import { useAuth } from "@/context/AuthProvider";
-import { useAppSettings } from "@/lib/settings/storage";
-import { DATE_FORMAT_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/settings/types";
+import { useBrandSettings } from "@/lib/settings/brand-storage";
+import { DATE_FORMAT_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/settings/shared-types";
+import { SettingsToggle } from "./SettingsToggle";
 
-function Toggle({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <label className="settings-toggle">
-      <span className="settings-toggle-copy">
-        <strong>{label}</strong>
-        <span>{description}</span>
-      </span>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-    </label>
-  );
-}
-
-export function SettingsPageContent() {
+export function BrandSettingsPageContent() {
   const { session } = useAuth();
-  const { settings, ready, saved, updateSettings, persistSettings } = useAppSettings();
+  const { settings, ready, saved, updateSettings, persistSettings } = useBrandSettings();
 
   if (!ready) return null;
 
@@ -43,7 +22,7 @@ export function SettingsPageContent() {
       <header className="app-topbar">
         <div>
           <h1>Settings</h1>
-          <span className="workspace-subtitle">Account and app preferences</span>
+          <span className="workspace-subtitle">Brand account and campaign preferences</span>
         </div>
         {saved && <span className="workspace-save-notice">Saved</span>}
       </header>
@@ -54,49 +33,55 @@ export function SettingsPageContent() {
             <h3>Account</h3>
             <div className="workspace-grid">
               <label className="workspace-field">
-                <span>Full name</span>
+                <span>Account owner</span>
                 <input type="text" value={session?.user.fullName ?? ""} readOnly />
               </label>
               <label className="workspace-field">
-                <span>Email</span>
+                <span>Work email</span>
                 <input type="email" value={session?.user.email ?? ""} readOnly />
               </label>
               <label className="workspace-field">
                 <span>Role</span>
-                <input type="text" value={session?.user.role ?? ""} readOnly className="workspace-input-readonly" />
+                <input type="text" value="Brand" readOnly className="workspace-input-readonly" />
               </label>
             </div>
-            <p className="workspace-hint">Account details are managed by your login. Profile edits live on the Profile page.</p>
+            <p className="workspace-hint">Company details live on the Brand profile page.</p>
           </section>
 
           <section className="workspace-section">
             <h3>Notifications</h3>
             <div className="settings-toggle-list">
-              <Toggle
+              <SettingsToggle
                 label="Email notifications"
                 description="Receive email alerts for important account activity."
                 checked={settings.emailNotifications}
                 onChange={(v) => updateSettings({ emailNotifications: v })}
               />
-              <Toggle
-                label="Deal updates"
-                description="Get notified when deals move stages or need follow-up."
-                checked={settings.dealUpdates}
-                onChange={(v) => updateSettings({ dealUpdates: v })}
+              <SettingsToggle
+                label="Campaign updates"
+                description="Get notified when campaigns are published, paused, or completed."
+                checked={settings.campaignUpdates}
+                onChange={(v) => updateSettings({ campaignUpdates: v })}
               />
-              <Toggle
+              <SettingsToggle
+                label="Creator applications"
+                description="Alerts when creators respond to invites or apply to campaigns."
+                checked={settings.creatorApplications}
+                onChange={(v) => updateSettings({ creatorApplications: v })}
+              />
+              <SettingsToggle
                 label="Payment reminders"
-                description="Reminders for overdue invoices and upcoming due dates."
+                description="Reminders for creator payouts and upcoming due dates."
                 checked={settings.paymentReminders}
                 onChange={(v) => updateSettings({ paymentReminders: v })}
               />
-              <Toggle
-                label="Task reminders"
-                description="Daily summary of tasks due today."
-                checked={settings.taskReminders}
-                onChange={(v) => updateSettings({ taskReminders: v })}
+              <SettingsToggle
+                label="Marketplace activity"
+                description="Updates when marketplace listings get views or interest."
+                checked={settings.marketplaceActivity}
+                onChange={(v) => updateSettings({ marketplaceActivity: v })}
               />
-              <Toggle
+              <SettingsToggle
                 label="Marketing emails"
                 description="Product updates, tips, and Thesi announcements."
                 checked={settings.marketingEmails}
@@ -151,7 +136,7 @@ export function SettingsPageContent() {
               </label>
             </div>
             <div className="settings-toggle-list" style={{ marginTop: 16 }}>
-              <Toggle
+              <SettingsToggle
                 label="Compact sidebar"
                 description="Start with the sidebar collapsed by default."
                 checked={settings.compactSidebar}

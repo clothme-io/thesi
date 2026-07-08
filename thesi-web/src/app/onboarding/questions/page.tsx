@@ -4,7 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { OnboardingGuard, getOnboardingProgress } from "@/components/auth/OnboardingGuard";
 import { useAuth } from "@/context/AuthProvider";
-import { ONBOARDING_QUESTIONS, type OnboardingAnswers } from "@/lib/auth-types";
+import {
+  BRAND_ONBOARDING_QUESTIONS,
+  CREATOR_ONBOARDING_QUESTIONS,
+  type OnboardingAnswers,
+} from "@/lib/auth-types";
 
 const EMPTY_ANSWERS: OnboardingAnswers = {
   contentType: "",
@@ -12,17 +16,23 @@ const EMPTY_ANSWERS: OnboardingAnswers = {
   preferredPayment: "",
   biggestChallenge: "",
   hearAbout: "",
+  companySize: "",
+  monthlyCampaigns: "",
+  primaryGoal: "",
+  budgetRange: "",
 };
 
 export default function QuestionsPage() {
   const router = useRouter();
-  const { submitOnboarding } = useAuth();
+  const { submitOnboarding, session } = useAuth();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswers>(EMPTY_ANSWERS);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const question = ONBOARDING_QUESTIONS[step];
+  const questions =
+    session?.user.role === "brand" ? BRAND_ONBOARDING_QUESTIONS : CREATOR_ONBOARDING_QUESTIONS;
+  const question = questions[step];
   const currentValue = answers[question.key];
 
   function selectOption(value: string) {
@@ -36,7 +46,7 @@ export default function QuestionsPage() {
     }
     setError("");
 
-    if (step < ONBOARDING_QUESTIONS.length - 1) {
+    if (step < questions.length - 1) {
       setStep((s) => s + 1);
       return;
     }
@@ -63,7 +73,7 @@ export default function QuestionsPage() {
             />
           </div>
           <p className="eyebrow" style={{ marginBottom: 12 }}>
-            Question {step + 1} of {ONBOARDING_QUESTIONS.length}
+            Question {step + 1} of {questions.length}
           </p>
           <h1>{question.label}</h1>
           <p>Help us tailor Thesi to how you actually work.</p>
@@ -107,7 +117,7 @@ export default function QuestionsPage() {
               disabled={loading}
               onClick={handleNext}
             >
-              {loading ? "Saving…" : step === ONBOARDING_QUESTIONS.length - 1 ? "Go to dashboard" : "Next"}
+              {loading ? "Saving…" : step === questions.length - 1 ? "Go to dashboard" : "Next"}
             </button>
           </div>
         </div>

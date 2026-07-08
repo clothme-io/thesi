@@ -6,6 +6,8 @@ export interface InboxContact {
   company?: string;
 }
 
+export type InboxMessageKind = "message" | "invite";
+
 export interface InboxMessage {
   id: string;
   contactId: string;
@@ -14,6 +16,8 @@ export interface InboxMessage {
   createdAt: string;
   read: boolean;
   isFromMe: boolean;
+  kind?: InboxMessageKind;
+  campaignId?: string;
 }
 
 export interface InboxData {

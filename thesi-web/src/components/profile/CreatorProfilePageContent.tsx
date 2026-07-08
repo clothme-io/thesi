@@ -1,11 +1,11 @@
 "use client";
 
 import { useAuth } from "@/context/AuthProvider";
-import { useCreatorProfile, getInitials } from "@/lib/profile/storage";
+import { useCreatorProfile } from "@/lib/profile/creator-storage";
+import { CREATOR_NICHE_OPTIONS } from "@/lib/profile/creator-types";
+import { getInitials } from "@/lib/profile/shared";
 
-const NICHE_OPTIONS = ["Fashion", "Beauty", "Lifestyle", "Food", "Tech", "Fitness", "Travel"];
-
-export function ProfilePageContent() {
+export function CreatorProfilePageContent() {
   const { session } = useAuth();
   const fallbackName = session?.user.fullName ?? "";
   const { profile, ready, saved, updateProfile, persistProfile } = useCreatorProfile(fallbackName);
@@ -40,7 +40,7 @@ export function ProfilePageContent() {
           <div>
             <h2>{profile.displayName || fallbackName}</h2>
             <p>{profile.headline || "UGC Creator"}</p>
-            <span className="profile-role-badge">{session?.user.role ?? "creator"}</span>
+            <span className="profile-role-badge">creator</span>
           </div>
         </div>
 
@@ -162,7 +162,7 @@ export function ProfilePageContent() {
             <div className="profile-niches">
               <span className="workspace-field-label">Content niches</span>
               <div className="profile-niche-list">
-                {NICHE_OPTIONS.map((niche) => (
+                {CREATOR_NICHE_OPTIONS.map((niche) => (
                   <button
                     key={niche}
                     type="button"
