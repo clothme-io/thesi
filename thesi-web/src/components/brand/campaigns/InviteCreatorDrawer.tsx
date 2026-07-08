@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CREATOR_DIRECTORY } from "@/lib/creators/directory";
+import { loadBrandCreatorFavorites, sortCreatorsWithFavoritesFirst } from "@/lib/brand-creators/storage";
 import { matchCreatorsToCampaign } from "@/lib/invites/matching";
 import { sendCampaignInvite } from "@/lib/invites/send-campaign-invite";
 import { getInvitesForCampaign, loadInviteData } from "@/lib/invites/storage";
@@ -53,15 +54,29 @@ export function InviteCreatorDrawer({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [inviteTick, setInviteTick] = useState(0);
 
-  const matched = useMemo(
-    () => matchCreatorsToCampaign(CREATOR_DIRECTORY, criteria),
-    [criteria],
-  );
+  const matched = useMemo(() => {
+    const results = matchCreatorsToCampaign(CREATOR_DIRECTORY, criteria);
+    const favorites = loadBrandCreatorFavorites().favoriteCreatorIds;
+    return sortCreatorsWithFavoritesFirst(results, favorites);
+  }, [criteria, inviteTick]);
 
   const alreadyInvitedEmails = useMemo(() => {
     if (!open) return new Set<string>();
     const data = loadInviteData();
     return new Set(getInvitesForCampaign(data, campaignId).map((i) => i.creatorEmail.toLowerCase()));
+  }, [open, campaignId, inviteTick]);
+
+  const favoriteIds = useMemo(() => {
+    if (!open) return new Set<string>();
+    return new Set(loadBrandCreatorFavorites().favoriteCreatorIds);
+  }, [open, inviteTick]);
+
+  const externalInvites = useMemo(() => {
+    if (!open) return [];
+    const data = loadInviteData();
+    return getInvitesForCampaign(data, campaignId)
+      .filter((invite) => invite.external)
+      .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
   }, [open, campaignId, inviteTick]);
 
   useEffect(() => {
@@ -179,7 +194,7 @@ export function InviteCreatorDrawer({
           {tab === "matched" ? (
             <>
               <p className="workspace-hint" style={{ marginTop: 0 }}>
-                Creators matching your campaign criteria (niche, platform, followers, location).
+                Creators matching your campaign criteria. Favorites appear at the top.
               </p>
               {matched.length === 0 ? (
                 <p>No creators match these criteria yet. Try broadening requirements or use external invites.</p>
@@ -187,8 +202,9 @@ export function InviteCreatorDrawer({
                 <ul className="invite-creator-list">
                   {matched.map((creator) => {
                     const invited = alreadyInvitedEmails.has(creator.email.toLowerCase());
+                    const isFav = favoriteIds.has(creator.id);
                     return (
-                      <li key={creator.id} className="invite-creator-row">
+                      <li key={creator.id} className={`invite-creator-row ${isFav ? "invite-creator-row--fav" : ""}`}>
                         <label>
                           <input
                             type="checkbox"
@@ -197,7 +213,14 @@ export function InviteCreatorDrawer({
                             onChange={() => toggleCreator(creator.id)}
                           />
                           <span className="invite-creator-info">
-                            <strong>{creator.name}</strong>
+                            <strong>
+                              {creator.name}
+                              {isFav && (
+                                <span className="crm-tag" style={{ marginLeft: 8 }}>
+                                  ★ Favorite
+                                </span>
+                              )}
+                            </strong>
                             <span>{creator.email}</span>
                             <span className="invite-creator-meta">
                               {creator.niches.join(", ")} · {creator.platforms.join(", ")} ·{" "}
@@ -220,12 +243,34 @@ export function InviteCreatorDrawer({
               <label className="crm-form-field">
                 <span>Emails</span>
                 <textarea
-                  rows={8}
+                  rows={6}
                   placeholder={"Alex Rivera, alex@creator.dev\njane@example.com"}
                   value={externalRaw}
                   onChange={(e) => setExternalRaw(e.target.value)}
                 />
               </label>
+
+              <div className="invite-external-sent">
+                <div className="invite-external-sent-header">
+                  <span>Invited emails</span>
+                  <span className="workspace-hint">{externalInvites.length}</span>
+                </div>
+                {externalInvites.length === 0 ? (
+                  <p className="workspace-hint invite-external-sent-empty">No external invites sent yet.</p>
+                ) : (
+                  <ul className="invite-external-sent-list">
+                    {externalInvites.map((invite) => (
+                      <li key={invite.id} className="invite-external-sent-row">
+                        <span className="invite-external-sent-email">{invite.creatorEmail}</span>
+                        {invite.creatorName !== invite.creatorEmail.split("@")[0] && (
+                          <span className="invite-external-sent-name">{invite.creatorName}</span>
+                        )}
+                        <span className="invite-external-sent-status">{invite.status}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </>
           )}
 

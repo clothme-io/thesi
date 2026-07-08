@@ -648,3 +648,254 @@
   color: var(--muted);
   font-size: 12px;
 }
+
+.invite-external-sent {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.invite-external-sent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fbfd;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.invite-external-sent-empty {
+  margin: 0;
+  padding: 14px;
+}
+
+.invite-external-sent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.invite-external-sent-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.invite-external-sent-row:last-child {
+  border-bottom: none;
+}
+
+.invite-external-sent-email {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.invite-external-sent-name {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.invite-external-sent-status {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.brand-creator-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.brand-creator-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  padding: 16px;
+  position: relative;
+}
+
+.brand-creator-card--fav {
+  border-color: #f0c040;
+  box-shadow: 0 0 0 1px rgba(240, 192, 64, 0.25);
+}
+
+.brand-creator-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  min-height: 28px;
+}
+
+.brand-creator-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.brand-creator-card-link h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.brand-creator-card-bio {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.brand-creator-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 0 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand-creator-stats-row div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.brand-creator-stats-row strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.brand-creator-stats-row span {
+  color: var(--muted);
+}
+
+.brand-creator-card-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.brand-creator-fav-btn {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.brand-creator-fav-btn--active {
+  color: #e6a800;
+}
+
+.brand-creator-fav-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.brand-creator-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.brand-creator-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.brand-creator-stat strong {
+  font-size: 18px;
+}
+
+.brand-creator-stat span {
+  color: var(--muted);
+}
+
+.brand-ugc-table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.brand-ugc-table {
+  min-width: 720px;
+}
+
+.brand-ugc-table th,
+.brand-ugc-table td {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.brand-ugc-brand {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.brand-payment-method-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-payment-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.brand-payment-method-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.brand-billing-plan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f8fbfd;
+}
+
+.invite-creator-row--fav label {
+  border-color: #f0c040;
+  background: #fffdf5;
+}

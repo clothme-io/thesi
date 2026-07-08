@@ -1,16 +1,23 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthProvider";
-import { BrandSettingsPageContent } from "@/components/settings/BrandSettingsPageContent";
 import { CreatorSettingsPageContent } from "@/components/settings/CreatorSettingsPageContent";
+import { BRAND_SETTINGS_ROUTES } from "@/lib/settings/brand-routes";
 
 export default function SettingsPage() {
-  const { session } = useAuth();
+  const router = useRouter();
+  const { session, isLoading } = useAuth();
   const isBrand = session?.user.role === "brand";
 
-  if (isBrand) {
-    return <BrandSettingsPageContent />;
-  }
+  useEffect(() => {
+    if (!isLoading && isBrand) {
+      router.replace(BRAND_SETTINGS_ROUTES.general);
+    }
+  }, [isLoading, isBrand, router]);
+
+  if (isLoading || isBrand) return null;
 
   return <CreatorSettingsPageContent />;
 }

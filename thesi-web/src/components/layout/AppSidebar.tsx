@@ -25,10 +25,11 @@ const CREATOR_NAV: NavItem[] = [
 const BRAND_NAV: NavItem[] = [
   { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
   { href: "/app/campaigns", label: "Campaigns", icon: "▣" },
+  { href: "/app/creators", label: "Creators", icon: "◈", match: (path: string) => path.startsWith("/app/creators") },
   { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
   { href: "/app/inbox", label: "Inbox", icon: "✉" },
   { href: "/app/profile", label: "Brand profile", icon: "◉" },
-  { href: "/app/settings", label: "Settings", icon: "⚙" },
+  { href: "/app/settings", label: "Settings", icon: "⚙", match: (path: string) => path.startsWith("/app/settings") },
 ];
 
 function isActive(pathname: string, href: string, match?: (path: string) => boolean) {

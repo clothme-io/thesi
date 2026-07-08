@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthProvider";
 import { useMarketplace } from "@/lib/marketplace/storage";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import {
@@ -35,6 +36,8 @@ const PAYMENT_OPTIONS: Array<PaymentStructure | "all"> = [
 const STATUS_OPTIONS: Array<MarketplaceListingStatus | "all"> = ["all", "open", "closing_soon", "closed"];
 
 export function MarketplacePageContent() {
+  const { session } = useAuth();
+  const isBrand = session?.user.role === "brand";
   const { data, ready } = useMarketplace();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<MarketplaceListingType | "all">("all");
@@ -66,7 +69,9 @@ export function MarketplacePageContent() {
         <div>
           <h1>Marketplace</h1>
           <span className="workspace-subtitle">
-            {filtered.length} opportunities · {appliedCount} applied
+            {isBrand
+              ? `${filtered.length} listings · manage your posted campaigns`
+              : `${filtered.length} opportunities · ${appliedCount} applied`}
           </span>
         </div>
       </header>
@@ -134,8 +139,8 @@ export function MarketplacePageContent() {
                     <span className={`marketplace-status marketplace-status--${listing.status}`}>
                       {LISTING_STATUS_LABELS[listing.status]}
                     </span>
-                    {applied && <span className="marketplace-badge">Applied</span>}
-                    {inCrm && <span className="marketplace-badge marketplace-badge--crm">In CRM</span>}
+                    {!isBrand && applied && <span className="marketplace-badge">Applied</span>}
+                    {!isBrand && inCrm && <span className="marketplace-badge marketplace-badge--crm">In CRM</span>}
                   </div>
                   <h2>{listing.name}</h2>
                   <p className="marketplace-brand">{listing.brandName}</p>

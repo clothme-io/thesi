@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useAuth } from "@/context/AuthProvider";
+import { InviteCreatorDrawer } from "@/components/brand/campaigns/InviteCreatorDrawer";
 import {
   useMarketplace,
   getListingById,
@@ -11,8 +13,10 @@ import {
   applyToListing,
   linkListingToCrm,
 } from "@/lib/marketplace/storage";
+import { listingInviteCampaignId, listingToInviteCriteria } from "@/lib/marketplace/invite-criteria";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
+import { getInvitesForCampaign, loadInviteData, useInvites } from "@/lib/invites/storage";
 import {
   LISTING_TYPE_LABELS,
   PAYMENT_STRUCTURE_LABELS,
@@ -23,13 +27,17 @@ import {
 export function MarketplaceDetailContent() {
   const params = useParams();
   const listingId = params.id as string;
+  const { session } = useAuth();
+  const isBrand = session?.user.role === "brand";
   const { data, ready, persist } = useMarketplace();
+  const { data: inviteData, ready: invitesReady, persist: persistInvites } = useInvites();
   const [showApply, setShowApply] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [pitch, setPitch] = useState("");
   const [addToCrmOnApply, setAddToCrmOnApply] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
-  if (!ready) return null;
+  if (!ready || (isBrand && !invitesReady)) return null;
 
   const listing = getListingById(data, listingId);
   if (!listing) {
@@ -44,6 +52,13 @@ export function MarketplaceDetailContent() {
 
   const applied = hasApplied(data, listing.id);
   const inCrm = isInCrm(data, listing.id);
+  const brandName = session?.user.fullName ?? listing.brandName;
+  const inviteCampaignId = listingInviteCampaignId(listing.id);
+  const invites = isBrand ? getInvitesForCampaign(inviteData, inviteCampaignId) : [];
+
+  const refreshInvites = () => {
+    persistInvites(loadInviteData());
+  };
 
   const showToast = (message: string) => {
     setToast(message);
@@ -82,21 +97,29 @@ export function MarketplaceDetailContent() {
           </span>
         </div>
         <div className="marketplace-detail-actions">
-          {inCrm ? (
-            <Link href={CRM_ROUTES.pipeline} className="crm-btn-secondary">
-              View in pipeline
-            </Link>
-          ) : (
-            <button type="button" className="crm-btn-secondary" onClick={handleAddToCrm}>
-              Add to CRM
+          {isBrand ? (
+            <button type="button" className="crm-btn-primary" onClick={() => setInviteOpen(true)}>
+              Invite creators
             </button>
-          )}
-          {applied ? (
-            <span className="marketplace-badge marketplace-badge--applied">Applied</span>
           ) : (
-            <button type="button" className="crm-btn-primary" onClick={() => setShowApply(true)}>
-              Apply
-            </button>
+            <>
+              {inCrm ? (
+                <Link href={CRM_ROUTES.pipeline} className="crm-btn-secondary">
+                  View in pipeline
+                </Link>
+              ) : (
+                <button type="button" className="crm-btn-secondary" onClick={handleAddToCrm}>
+                  Add to CRM
+                </button>
+              )}
+              {applied ? (
+                <span className="marketplace-badge marketplace-badge--applied">Applied</span>
+              ) : (
+                <button type="button" className="crm-btn-primary" onClick={() => setShowApply(true)}>
+                  Apply
+                </button>
+              )}
+            </>
           )}
         </div>
       </header>
@@ -255,7 +278,7 @@ export function MarketplaceDetailContent() {
               </div>
             </section>
 
-            {listing.brandId && (
+            {listing.brandId && !isBrand && (
               <section className="workspace-section">
                 <h3>Brand CRM</h3>
                 <p className="crm-contact-sub" style={{ marginBottom: 12 }}>
@@ -266,11 +289,34 @@ export function MarketplaceDetailContent() {
                 </Link>
               </section>
             )}
+
+            {isBrand && (
+              <section className="workspace-section">
+                <h3>Invites sent</h3>
+                {invites.length === 0 ? (
+                  <p className="crm-contact-sub">No creator invites sent for this listing yet.</p>
+                ) : (
+                  invites.map((invite) => (
+                    <div className="crm-meta-row" key={invite.id}>
+                      <span>
+                        {invite.creatorName}
+                        {invite.external && (
+                          <span className="crm-tag" style={{ marginLeft: 8 }}>
+                            External
+                          </span>
+                        )}
+                      </span>
+                      <span>{invite.status}</span>
+                    </div>
+                  ))
+                )}
+              </section>
+            )}
           </aside>
         </div>
       </div>
 
-      {showApply && (
+      {showApply && !isBrand && (
         <div className="marketplace-modal-backdrop" onClick={() => setShowApply(false)}>
           <div className="marketplace-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Apply to {listing.name}</h2>
@@ -310,6 +356,18 @@ export function MarketplaceDetailContent() {
             </form>
           </div>
         </div>
+      )}
+
+      {isBrand && (
+        <InviteCreatorDrawer
+          open={inviteOpen}
+          onClose={() => setInviteOpen(false)}
+          campaignId={inviteCampaignId}
+          campaignName={listing.name}
+          brandName={brandName}
+          criteria={listingToInviteCriteria(listing)}
+          onInvited={refreshInvites}
+        />
       )}
     </>
   );
