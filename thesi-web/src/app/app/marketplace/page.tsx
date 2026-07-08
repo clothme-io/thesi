@@ -1,24 +1,5 @@
-function PlaceholderPage({ title, description }: { title: string; description: string }) {
-  return (
-    <>
-      <header className="app-topbar">
-        <h1>{title}</h1>
-      </header>
-      <div className="app-content">
-        <div className="app-panel">
-          <h2>Coming soon</h2>
-          <p>{description}</p>
-        </div>
-      </div>
-    </>
-  );
-}
+import { MarketplacePageContent } from "@/components/marketplace/MarketplacePageContent";
 
 export default function MarketplacePage() {
-  return (
-    <PlaceholderPage
-      title="Marketplace"
-      description="Browse or publish UGC campaign opportunities."
-    />
-  );
+  return <MarketplacePageContent />;
 }
