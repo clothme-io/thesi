@@ -168,7 +168,12 @@ export function BrandDetailContent() {
 
         {tab === "Messages" && (
           <div className="crm-detail-panel">
-            <p className="crm-contact-sub">Inbox integration coming soon. Messages with {brand.name} will appear here.</p>
+            <p className="crm-contact-sub" style={{ marginBottom: 12 }}>
+              View and reply to messages with {brand.name} in your inbox.
+            </p>
+            <Link href={`/app/inbox?brand=${brand.id}`} className="crm-btn-primary" style={{ display: "inline-block" }}>
+              Open inbox thread →
+            </Link>
           </div>
         )}
       </div>
