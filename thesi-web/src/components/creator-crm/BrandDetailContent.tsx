@@ -12,6 +12,7 @@ import {
   getContractsForBrand,
   getActivitiesForBrand,
 } from "@/lib/creator-crm/storage";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import {
   formatMoney,
   RELATIONSHIP_STAGE_LABELS,
@@ -35,7 +36,7 @@ export function BrandDetailContent() {
   if (!brand) {
     return (
       <div className="app-content">
-        <p>Brand not found. <Link href="/app/brands">Back to brands</Link></p>
+        <p>Brand not found. <Link href={CRM_ROUTES.brands}>Back to brands</Link></p>
       </div>
     );
   }
@@ -50,7 +51,7 @@ export function BrandDetailContent() {
     <>
       <header className="app-topbar">
         <div>
-          <Link href="/app/brands" className="auth-link" style={{ fontSize: 13 }}>← Brands</Link>
+          <Link href={CRM_ROUTES.brands} className="auth-link" style={{ fontSize: 13 }}>← Brands</Link>
           <h1 style={{ marginTop: 4 }}>{brand.name}</h1>
         </div>
         <span className={`crm-status crm-status--active`}>
@@ -90,7 +91,7 @@ export function BrandDetailContent() {
               <h3 style={{ marginTop: 24 }}>Past jobs</h3>
               {jobs.map((job) => (
                 <div key={job.id} className="crm-meta-row">
-                  <span>{job.title}</span>
+                  <Link href={CRM_ROUTES.job(job.id)}>{job.title}</Link>
                   <span>{JOB_STATUS_LABELS[job.status]}</span>
                 </div>
               ))}
@@ -122,7 +123,11 @@ export function BrandDetailContent() {
           <div className="crm-detail-panel">
             {jobs.map((job) => (
               <div key={job.id} className="crm-meta-row">
-                <span>{job.title} · due {job.deadline}</span>
+                <span>
+                  <Link href={CRM_ROUTES.job(job.id)}>{job.title}</Link>
+                  {" · due "}
+                  {job.deadline}
+                </span>
                 <span>{JOB_STATUS_LABELS[job.status]}</span>
               </div>
             ))}

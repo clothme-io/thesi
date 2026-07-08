@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { formatMoney, PAYMENT_STATUS_LABELS } from "@/lib/creator-crm/types";
 
 export function PaymentsPageContent() {
@@ -47,7 +48,7 @@ export function PaymentsPageContent() {
                 return (
                   <tr key={payment.id}>
                     <td>{payment.invoiceNumber || "—"}</td>
-                    <td><Link href={`/app/brands/${payment.brandId}`}>{brand?.name}</Link></td>
+                    <td><Link href={CRM_ROUTES.brand(payment.brandId)}>{brand?.name}</Link></td>
                     <td>
                       <span className={`crm-status crm-status--${payment.status === "paid" ? "client" : payment.status === "overdue" ? "lead" : "active"}`}>
                         {PAYMENT_STATUS_LABELS[payment.status]}

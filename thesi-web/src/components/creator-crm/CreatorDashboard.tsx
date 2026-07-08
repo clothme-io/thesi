@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCreatorCrm, getDashboardMetrics } from "@/lib/creator-crm/storage";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { formatMoney, DEAL_STAGE_LABELS } from "@/lib/creator-crm/types";
 
 export function CreatorDashboard() {
@@ -13,7 +14,7 @@ export function CreatorDashboard() {
   return (
     <>
       <header className="app-topbar">
-        <h1>Home</h1>
+        <h1>Dashboard</h1>
         <span style={{ color: "var(--muted)", fontSize: 14 }}>Creator dashboard</span>
       </header>
 
@@ -60,7 +61,7 @@ export function CreatorDashboard() {
                 return (
                   <div key={job.id} className="crm-list-item">
                     <span>
-                      <Link href={`/app/jobs`}>{job.title}</Link>
+                      <Link href={CRM_ROUTES.job(job.id)}>{job.title}</Link>
                       <span className="crm-contact-sub"> · {brand?.name}</span>
                     </span>
                     <span>{job.deadline}</span>
@@ -102,7 +103,7 @@ export function CreatorDashboard() {
                 </div>
               );
             })}
-            <Link href="/app/pipeline" className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
+            <Link href={CRM_ROUTES.pipeline} className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
               View pipeline →
             </Link>
           </section>
@@ -119,7 +120,7 @@ export function CreatorDashboard() {
                 </div>
               ))
             )}
-            <Link href="/app/tasks" className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
+            <Link href={CRM_ROUTES.tasks} className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
               View all tasks →
             </Link>
           </section>
@@ -132,7 +133,7 @@ export function CreatorDashboard() {
                 <span>{event.date}</span>
               </div>
             ))}
-            <Link href="/app/calendar" className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
+            <Link href={CRM_ROUTES.calendar} className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
               Open calendar →
             </Link>
           </section>

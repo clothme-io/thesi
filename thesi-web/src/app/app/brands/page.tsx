@@ -1,5 +1,6 @@
-import { BrandsPageContent } from "@/components/creator-crm/BrandsPageContent";
+import { redirect } from "next/navigation";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
-export default function BrandsPage() {
-  return <BrandsPageContent />;
+export default function LegacyBrandsRedirect() {
+  redirect(CRM_ROUTES.brands);
 }

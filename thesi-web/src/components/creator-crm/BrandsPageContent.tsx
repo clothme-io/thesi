@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { RELATIONSHIP_STAGE_LABELS } from "@/lib/creator-crm/types";
 
 export function BrandsPageContent() {
@@ -24,7 +25,7 @@ export function BrandsPageContent() {
 
         <div className="crm-brand-grid">
           {data.brands.map((brand) => (
-            <Link key={brand.id} href={`/app/brands/${brand.id}`} className="crm-brand-card">
+            <Link key={brand.id} href={CRM_ROUTES.brand(brand.id)} className="crm-brand-card">
               <span className={`crm-status crm-status--${brand.relationshipStage === "partner" ? "client" : brand.relationshipStage === "prospect" ? "lead" : "active"}`}>
                 {RELATIONSHIP_STAGE_LABELS[brand.relationshipStage]}
               </span>

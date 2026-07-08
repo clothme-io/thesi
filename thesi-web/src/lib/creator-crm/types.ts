@@ -180,11 +180,18 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   overdue: "Overdue",
 };
 
+export const CONTRACT_STATUSES: ContractStatus[] = ["draft", "sent", "signed", "expired"];
+
 export const CONTRACT_STATUS_LABELS: Record<ContractStatus, string> = {
   draft: "Draft",
   sent: "Sent",
   signed: "Signed",
   expired: "Expired",
+};
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  pending: "Pending",
+  done: "Done",
 };
 
 export function formatMoney(cents: number): string {

@@ -1,5 +1,6 @@
-import { PaymentsPageContent } from "@/components/creator-crm/PaymentsPageContent";
+import { redirect } from "next/navigation";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
-export default function PaymentsPage() {
-  return <PaymentsPageContent />;
+export default function LegacyPaymentsRedirect() {
+  redirect(CRM_ROUTES.payments);
 }

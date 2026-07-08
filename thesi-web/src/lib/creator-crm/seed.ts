@@ -201,6 +201,17 @@ export const SEED_CRM_DATA: CreatorCrmData = {
       createdAt: "2026-06-20T10:00:00.000Z",
       updatedAt: "2026-06-22T10:00:00.000Z",
     },
+    {
+      id: "contract-4",
+      brandId: "brand-nike",
+      jobId: "job-2",
+      title: "Spring Training Series Agreement",
+      status: "expired",
+      fileName: "nike-spring-training-v1.pdf",
+      expiresAt: "2026-06-01",
+      createdAt: "2026-05-01T10:00:00.000Z",
+      updatedAt: "2026-06-02T10:00:00.000Z",
+    },
   ],
   payments: [
     {

@@ -1,5 +1,6 @@
-import { PipelinePageContent } from "@/components/creator-crm/PipelinePageContent";
+import { redirect } from "next/navigation";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
-export default function PipelinePage() {
-  return <PipelinePageContent />;
+export default function LegacyPipelineRedirect() {
+  redirect(CRM_ROUTES.pipeline);
 }

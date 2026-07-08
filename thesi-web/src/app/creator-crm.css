@@ -96,6 +96,52 @@
   color: var(--muted);
 }
 
+.crm-pipeline--contracts {
+  grid-template-columns: repeat(4, minmax(200px, 1fr));
+}
+
+.crm-pipeline-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.crm-pipeline-column--drop-target {
+  border-color: var(--ink);
+  background: rgba(183, 255, 89, 0.12);
+  box-shadow: inset 0 0 0 2px rgba(15, 78, 113, 0.15);
+}
+
+.crm-pipeline-card--draggable {
+  cursor: grab;
+}
+
+.crm-pipeline-card--draggable:active {
+  cursor: grabbing;
+}
+
+.crm-pipeline-card--dragging {
+  opacity: 0.45;
+}
+
+.crm-table-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.crm-table-link:hover .crm-contact-name {
+  color: var(--blue);
+}
+
+.crm-table-row-link {
+  cursor: pointer;
+}
+
+.crm-table-row-link:hover {
+  background: var(--surface);
+}
+
 .crm-brand-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

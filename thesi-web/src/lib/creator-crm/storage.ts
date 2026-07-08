@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { CreatorCrmData } from "./types";
+import type { CreatorCrmData, DealStage } from "./types";
+import { DEAL_STAGE_LABELS } from "./types";
 import { SEED_CRM_DATA } from "./seed";
 
 const STORAGE_KEY = "thesi_creator_crm";
@@ -45,6 +46,64 @@ export function useCreatorCrm() {
 
 export function getBrandById(data: CreatorCrmData, id: string) {
   return data.brands.find((b) => b.id === id);
+}
+
+export function getJobById(data: CreatorCrmData, id: string) {
+  return data.jobs.find((j) => j.id === id);
+}
+
+export function getDealById(data: CreatorCrmData, id: string) {
+  return data.deals.find((d) => d.id === id);
+}
+
+export function getContractById(data: CreatorCrmData, id: string) {
+  return data.contracts.find((c) => c.id === id);
+}
+
+export function getPaymentsForJob(data: CreatorCrmData, jobId: string) {
+  return data.payments.filter((p) => p.jobId === jobId);
+}
+
+export function getTasksForJob(data: CreatorCrmData, jobId: string) {
+  return data.tasks.filter((t) => t.jobId === jobId);
+}
+
+export function getCalendarEventsForJob(data: CreatorCrmData, jobId: string) {
+  return data.calendarEvents.filter((e) => e.jobId === jobId);
+}
+
+export function getActivitiesForJob(data: CreatorCrmData, jobId: string) {
+  return data.activities
+    .filter((a) => a.jobId === jobId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function moveDealStage(
+  data: CreatorCrmData,
+  dealId: string,
+  stage: DealStage,
+): CreatorCrmData {
+  const deal = data.deals.find((d) => d.id === dealId);
+  if (!deal || deal.stage === stage) return data;
+
+  const now = new Date().toISOString();
+  return {
+    ...data,
+    deals: data.deals.map((d) =>
+      d.id === dealId ? { ...d, stage, updatedAt: now } : d,
+    ),
+    activities: [
+      {
+        id: `act-${Date.now()}`,
+        brandId: deal.brandId,
+        dealId: deal.id,
+        type: "deal_moved",
+        message: `Deal moved to ${DEAL_STAGE_LABELS[stage]}`,
+        createdAt: now,
+      },
+      ...data.activities,
+    ],
+  };
 }
 
 export function getDealsForBrand(data: CreatorCrmData, brandId: string) {

@@ -4,23 +4,25 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
-const CREATOR_NAV = [
-  { href: "/app/dashboard", label: "Home", icon: "⌂" },
-  { href: "/app/brands", label: "Brands", icon: "◎" },
-  { href: "/app/pipeline", label: "Pipeline", icon: "▤" },
-  { href: "/app/jobs", label: "Jobs", icon: "▣" },
-  { href: "/app/contracts", label: "Contracts", icon: "📄" },
-  { href: "/app/payments", label: "Payments", icon: "💳" },
-  { href: "/app/calendar", label: "Calendar", icon: "📅" },
-  { href: "/app/tasks", label: "Tasks", icon: "✓" },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: string;
+  match?: (path: string) => boolean;
+};
+
+const CREATOR_NAV: NavItem[] = [
+  { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
+  { href: CRM_ROUTES.brands, label: "CRM", icon: "◎", match: (path: string) => path.startsWith("/app/crm") },
   { href: "/app/inbox", label: "Inbox", icon: "✉" },
   { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
   { href: "/app/profile", label: "Profile", icon: "◉" },
   { href: "/app/settings", label: "Settings", icon: "⚙" },
 ];
 
-const BRAND_NAV = [
+const BRAND_NAV: NavItem[] = [
   { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
   { href: "/app/campaigns", label: "Campaigns", icon: "▣" },
   { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
@@ -28,6 +30,11 @@ const BRAND_NAV = [
   { href: "/app/profile", label: "Profile", icon: "◉" },
   { href: "/app/settings", label: "Settings", icon: "⚙" },
 ];
+
+function isActive(pathname: string, href: string, match?: (path: string) => boolean) {
+  if (match) return match(pathname);
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -54,7 +61,7 @@ export function AppSidebar() {
           <Link
             key={item.href}
             href={item.href}
-            className={`app-sidebar-link ${pathname === item.href || pathname.startsWith(`${item.href}/`) ? "app-sidebar-link--active" : ""}`}
+            className={`app-sidebar-link ${isActive(pathname, item.href, item.match) ? "app-sidebar-link--active" : ""}`}
             title={collapsed ? item.label : undefined}
           >
             <span className="app-sidebar-icon" aria-hidden="true">

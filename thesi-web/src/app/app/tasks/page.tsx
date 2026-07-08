@@ -1,5 +1,6 @@
-import { TasksPageContent } from "@/components/creator-crm/TasksPageContent";
+import { redirect } from "next/navigation";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
-export default function TasksPage() {
-  return <TasksPageContent />;
+export default function LegacyTasksRedirect() {
+  redirect(CRM_ROUTES.tasks);
 }

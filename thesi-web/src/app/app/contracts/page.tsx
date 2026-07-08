@@ -1,5 +1,6 @@
-import { ContractsPageContent } from "@/components/creator-crm/ContractsPageContent";
+import { redirect } from "next/navigation";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
-export default function ContractsPage() {
-  return <ContractsPageContent />;
+export default function LegacyContractsRedirect() {
+  redirect(CRM_ROUTES.contracts);
 }

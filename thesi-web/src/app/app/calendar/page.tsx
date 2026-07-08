@@ -1,5 +1,6 @@
-import { CalendarPageContent } from "@/components/creator-crm/CalendarPageContent";
+import { redirect } from "next/navigation";
+import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
-export default function CalendarPage() {
-  return <CalendarPageContent />;
+export default function LegacyCalendarRedirect() {
+  redirect(CRM_ROUTES.calendar);
 }
