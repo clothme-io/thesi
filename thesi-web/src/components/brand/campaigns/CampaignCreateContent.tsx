@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
-import { createBrandCampaign, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
+import { createBrandCampaign, useBrandCampaigns, getCampaignById } from "@/lib/brand-campaigns/storage";
 import type {
   BrandCampaignPaymentModel,
   BrandCampaignStatus,
   BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
+import { publishCampaignToMarketplace } from "@/lib/marketplace/publish-from-campaign";
 
 const TYPE_OPTIONS: { label: string; value: BrandCampaignType }[] = [
   { label: "TikTok", value: "tiktok" },
@@ -120,6 +121,8 @@ export function CampaignCreateContent() {
 
   const handleCreate = () => {
     const payload = buildCampaignPayload("active");
+    const userId = session?.user.id ?? "dev-user-1";
+
     if (inviteContext) {
       const next = {
         campaigns: data.campaigns.map((c) =>
@@ -127,11 +130,16 @@ export function CampaignCreateContent() {
         ),
       };
       persist(next);
+      const campaign = getCampaignById(next, inviteContext.id);
+      if (campaign) {
+        publishCampaignToMarketplace(campaign, userId, brandName);
+      }
       router.push(`/app/campaigns/${inviteContext.id}`);
       return;
     }
     const { data: next, campaign } = createBrandCampaign(data, payload);
     persist(next);
+    publishCampaignToMarketplace(campaign, userId, brandName);
     router.push(`/app/campaigns/${campaign.id}`);
   };
 

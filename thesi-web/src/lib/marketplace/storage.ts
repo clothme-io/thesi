@@ -5,8 +5,19 @@ import { loadCrmData, saveCrmData } from "@/lib/creator-crm/storage";
 import { addListingToCrm } from "./crm-integration";
 import type { MarketplaceApplication, MarketplaceData, MarketplaceListing } from "./types";
 import { SEED_MARKETPLACE_DATA } from "./seed";
+import { mergeMarketplaceListings } from "./listings";
 
 const STORAGE_KEY = "thesi_marketplace";
+
+function normalizeMarketplaceData(raw: Partial<MarketplaceData>): MarketplaceData {
+  const customListings = raw.customListings ?? [];
+  return {
+    customListings,
+    listings: mergeMarketplaceListings(customListings),
+    applications: raw.applications ?? SEED_MARKETPLACE_DATA.applications,
+    crmLinkedListingIds: raw.crmLinkedListingIds ?? SEED_MARKETPLACE_DATA.crmLinkedListingIds,
+  };
+}
 
 export function loadMarketplaceData(): MarketplaceData {
   if (typeof window === "undefined") return SEED_MARKETPLACE_DATA;
@@ -16,12 +27,8 @@ export function loadMarketplaceData(): MarketplaceData {
     return SEED_MARKETPLACE_DATA;
   }
   try {
-    const parsed = JSON.parse(raw) as MarketplaceData;
-    return {
-      ...SEED_MARKETPLACE_DATA,
-      ...parsed,
-      listings: SEED_MARKETPLACE_DATA.listings,
-    };
+    const parsed = JSON.parse(raw) as Partial<MarketplaceData>;
+    return normalizeMarketplaceData(parsed);
   } catch {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_MARKETPLACE_DATA));
     return SEED_MARKETPLACE_DATA;
@@ -30,7 +37,12 @@ export function loadMarketplaceData(): MarketplaceData {
 
 export function saveMarketplaceData(data: MarketplaceData) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const toSave = {
+    customListings: data.customListings,
+    applications: data.applications,
+    crmLinkedListingIds: data.crmLinkedListingIds,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
 }
 
 export function useMarketplace() {
@@ -43,8 +55,12 @@ export function useMarketplace() {
   }, []);
 
   const persist = useCallback((next: MarketplaceData) => {
-    setData(next);
-    saveMarketplaceData(next);
+    const normalized = normalizeMarketplaceData({
+      ...next,
+      customListings: next.customListings,
+    });
+    setData(normalized);
+    saveMarketplaceData(normalized);
   }, []);
 
   return { data, ready, persist };

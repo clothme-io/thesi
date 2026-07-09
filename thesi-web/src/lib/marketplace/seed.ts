@@ -183,6 +183,7 @@ export const SEED_MARKETPLACE_LISTINGS: MarketplaceData["listings"] = [
 ];
 
 export const SEED_MARKETPLACE_DATA: MarketplaceData = {
+  customListings: [],
   listings: SEED_MARKETPLACE_LISTINGS,
   applications: [],
   crmLinkedListingIds: [],

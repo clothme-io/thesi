@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthProvider";
 import { useMarketplace } from "@/lib/marketplace/storage";
+import { getListingsForBrand } from "@/lib/marketplace/listings";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import {
   LISTING_TYPE_LABELS,
@@ -38,15 +39,23 @@ const STATUS_OPTIONS: Array<MarketplaceListingStatus | "all"> = ["all", "open", 
 export function MarketplacePageContent() {
   const { session } = useAuth();
   const isBrand = session?.user.role === "brand";
+  const userId = session?.user.id ?? "dev-user-1";
   const { data, ready } = useMarketplace();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<MarketplaceListingType | "all">("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentStructure | "all">("all");
   const [statusFilter, setStatusFilter] = useState<MarketplaceListingStatus | "all">("all");
 
+  const sourceListings = useMemo(() => {
+    if (isBrand) {
+      return getListingsForBrand(data.listings, userId);
+    }
+    return data.listings;
+  }, [data.listings, isBrand, userId]);
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return data.listings.filter((listing) => {
+    return sourceListings.filter((listing) => {
       if (typeFilter !== "all" && listing.type !== typeFilter) return false;
       if (paymentFilter !== "all" && listing.payment.structure !== paymentFilter) return false;
       if (statusFilter !== "all" && listing.status !== statusFilter) return false;
@@ -57,11 +66,12 @@ export function MarketplacePageContent() {
         listing.brief.toLowerCase().includes(query)
       );
     });
-  }, [data.listings, search, typeFilter, paymentFilter, statusFilter]);
+  }, [sourceListings, search, typeFilter, paymentFilter, statusFilter]);
 
   if (!ready) return null;
 
   const appliedCount = data.applications.length;
+  const myListingCount = getListingsForBrand(data.listings, userId).length;
 
   return (
     <>
@@ -70,18 +80,29 @@ export function MarketplacePageContent() {
           <h1>Marketplace</h1>
           <span className="workspace-subtitle">
             {isBrand
-              ? `${filtered.length} listings · manage your posted campaigns`
+              ? `${myListingCount} your listing${myListingCount === 1 ? "" : "s"} · post from Campaigns`
               : `${filtered.length} opportunities · ${appliedCount} applied`}
           </span>
         </div>
+        {isBrand && (
+          <Link href="/app/campaigns/new" className="crm-btn-primary">
+            + New campaign
+          </Link>
+        )}
       </header>
 
       <div className="app-content">
+        {isBrand && (
+          <p className="workspace-hint" style={{ marginTop: 0, marginBottom: 16 }}>
+            Your posted campaigns appear here. Enable &quot;Post to marketplace&quot; when creating or activating a campaign.
+          </p>
+        )}
+
         <div className="marketplace-toolbar">
           <input
             type="search"
             className="crm-search"
-            placeholder="Search campaigns, brands…"
+            placeholder={isBrand ? "Search your listings…" : "Search campaigns, brands…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -123,7 +144,16 @@ export function MarketplacePageContent() {
         <div className="marketplace-grid">
           {filtered.length === 0 ? (
             <div className="app-panel">
-              <p>No listings match your filters.</p>
+              {isBrand ? (
+                <>
+                  <p>No marketplace listings yet.</p>
+                  <Link href="/app/campaigns/new" className="crm-btn-primary" style={{ display: "inline-block", marginTop: 12 }}>
+                    Create a campaign and post to marketplace
+                  </Link>
+                </>
+              ) : (
+                <p>No listings match your filters.</p>
+              )}
             </div>
           ) : (
             filtered.map((listing) => {
@@ -139,6 +169,9 @@ export function MarketplacePageContent() {
                     <span className={`marketplace-status marketplace-status--${listing.status}`}>
                       {LISTING_STATUS_LABELS[listing.status]}
                     </span>
+                    {isBrand && listing.campaignId && (
+                      <span className="marketplace-badge marketplace-badge--crm">Your campaign</span>
+                    )}
                     {!isBrand && applied && <span className="marketplace-badge">Applied</span>}
                     {!isBrand && inCrm && <span className="marketplace-badge marketplace-badge--crm">In CRM</span>}
                   </div>

@@ -1,26 +1,33 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { useAuth } from "@/context/AuthProvider";
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { RELATIONSHIP_STAGE_LABELS } from "@/lib/creator-crm/types";
+import { InviteBrandDrawer } from "./InviteBrandDrawer";
 
 export function BrandsPageContent() {
+  const { session } = useAuth();
   const { data, ready } = useCreatorCrm();
+  const [inviteOpen, setInviteOpen] = useState(false);
+
   if (!ready) return null;
 
   return (
     <>
       <header className="app-topbar">
         <h1>Brands</h1>
-        <button type="button" className="crm-btn-primary">
-          + Add brand
+        <button type="button" className="crm-btn-primary" onClick={() => setInviteOpen(true)}>
+          + Invite brand
         </button>
       </header>
 
       <div className="app-content">
         <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: 20 }}>
           Manage your brand relationships — Nike, local boutiques, skincare brands, restaurants, and more.
+          Invite new brands to join Thesi and optionally add them to your CRM.
         </p>
 
         <div className="crm-brand-grid">
@@ -40,6 +47,13 @@ export function BrandsPageContent() {
           ))}
         </div>
       </div>
+
+      <InviteBrandDrawer
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        invitedBy={session?.user.fullName ?? "Creator"}
+        invitedByEmail={session?.user.email ?? ""}
+      />
     </>
   );
 }

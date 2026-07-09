@@ -1,4 +1,4 @@
-import { loadInboxData, saveInboxData } from "@/lib/inbox/storage";
+import { addInboxNotification, loadInboxData, saveInboxData } from "@/lib/inbox/storage";
 import type { InboxContact, InboxMessage } from "@/lib/inbox/types";
 import { sendStubNotification } from "@/lib/notifications/stub";
 import { addInvite, loadInviteData, saveInviteData } from "./storage";
@@ -73,6 +73,15 @@ export async function sendCampaignInvite(input: SendCampaignInviteInput): Promis
     brandName: input.brandName,
     campaignName: input.campaignName,
     campaignId: input.campaignId,
+  });
+
+  addInboxNotification({
+    type: "campaign_invite",
+    title: `Campaign invite: ${input.campaignName}`,
+    body: `${input.brandName} invited you to collaborate on "${input.campaignName}". Check Messages to reply.`,
+    href: "/app/inbox",
+    campaignId: input.campaignId,
+    audience: "creator",
   });
 
   return invite;

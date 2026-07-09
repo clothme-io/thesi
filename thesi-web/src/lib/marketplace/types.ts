@@ -39,6 +39,8 @@ export interface MarketplaceListing {
   name: string;
   brandName: string;
   brandId?: string;
+  ownerUserId?: string;
+  campaignId?: string;
   type: MarketplaceListingType;
   status: MarketplaceListingStatus;
   startDate: string;
@@ -65,9 +67,11 @@ export interface MarketplaceApplication {
 }
 
 export interface MarketplaceData {
-  listings: MarketplaceListing[];
+  customListings: MarketplaceListing[];
   applications: MarketplaceApplication[];
   crmLinkedListingIds: string[];
+  /** Merged seed + custom — computed on load, not persisted separately. */
+  listings: MarketplaceListing[];
 }
 
 export const LISTING_TYPE_LABELS: Record<MarketplaceListingType, string> = {
