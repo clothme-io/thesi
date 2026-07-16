@@ -20,4 +20,4 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /usr/src/app/dist ./dist
 EXPOSE 5000
-CMD ["sh", "-c", "node dist/dbConfig/drizzle/migrate.js && node dist/main"]
+CMD ["node", "dist/main"]
