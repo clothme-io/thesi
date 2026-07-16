@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { OnboardingGuard, getOnboardingProgress } from "@/components/auth/OnboardingGuard";
 import { useAuth } from "@/context/AuthProvider";
 
@@ -8,10 +9,16 @@ export default function WelcomePage() {
   const router = useRouter();
   const { completeWelcome, session } = useAuth();
   const isBrand = session?.user.role === "brand";
+  const [error, setError] = useState("");
 
-  function handleContinue() {
-    completeWelcome();
-    router.push("/onboarding/questions");
+  async function handleContinue() {
+    setError("");
+    try {
+      await completeWelcome();
+      router.push("/onboarding/questions");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not continue");
+    }
   }
 
   return (
@@ -25,6 +32,11 @@ export default function WelcomePage() {
             />
           </div>
           <h1>Welcome to Thesi</h1>
+          {error && (
+            <p className="auth-error" role="alert">
+              {error}
+            </p>
+          )}
           {isBrand ? (
             <p>
               We built Thesi so brands can run UGC campaigns like a real operation — not a patchwork of

@@ -1,5 +1,6 @@
-import { Body, Controller, HttpStatus, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AdminApiKeyGuard } from 'src/shared/auth/admin-api-key.guard';
 import {
   CreateCreatorApplicationDto,
   CreatorApplicationResponse,
@@ -18,6 +19,34 @@ export class CreatorApplicationsController {
     const data = await this.service.create(dto);
     return {
       status: HttpStatus.CREATED,
+      error: null,
+      data,
+    };
+  }
+
+  @Get()
+  @UseGuards(AdminApiKeyGuard)
+  @ApiHeader({ name: 'X-Admin-Api-Key', required: true })
+  @ApiOperation({ summary: 'List creator applications (admin)' })
+  @ApiResponse({ status: 200, type: CreatorApplicationResponse })
+  async list(@Query('status') status?: string) {
+    const data = await this.service.list(status);
+    return {
+      status: HttpStatus.OK,
+      error: null,
+      data,
+    };
+  }
+
+  @Patch(':id/approve')
+  @UseGuards(AdminApiKeyGuard)
+  @ApiHeader({ name: 'X-Admin-Api-Key', required: true })
+  @ApiOperation({ summary: 'Approve application and create creator account (admin)' })
+  @ApiResponse({ status: 200, type: CreatorApplicationResponse })
+  async approve(@Param('id') id: string): Promise<CreatorApplicationResponse> {
+    const data = await this.service.approve(id);
+    return {
+      status: HttpStatus.OK,
       error: null,
       data,
     };

@@ -23,18 +23,29 @@ interface AuthContextValue {
   signIn: (input: SignInInput) => Promise<AuthSession>;
   signUp: (input: SignUpInput) => Promise<AuthSession>;
   signOut: () => void;
-  changePassword: (newPassword: string) => Promise<void>;
-  completeWelcome: () => void;
+  changePassword: (input: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) => Promise<void>;
+  completeWelcome: () => Promise<void>;
   submitOnboarding: (answers: OnboardingAnswers) => Promise<void>;
   updateSession: (session: AuthSession) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function callAuthApi<T>(path: string, body: unknown): Promise<T> {
+async function callAuthApi<T>(
+  path: string,
+  body: unknown,
+  accessToken?: string,
+): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify(body),
   });
 
@@ -95,53 +106,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [persist]);
 
   const changePassword = useCallback(
-    async (newPassword: string) => {
+    async (input: { currentPassword: string; newPassword: string; confirmPassword: string }) => {
       if (!session) return;
 
-      if (!isAuthDevMode()) {
-        await callAuthApi("/api/auth/change-password", {
-          currentPassword: "",
-          newPassword,
-          confirmPassword: newPassword,
+      if (isAuthDevMode()) {
+        persist({
+          ...session,
+          user: {
+            ...session.user,
+            mustChangePassword: false,
+            onboardingStep: "welcome",
+          },
         });
+        return;
       }
 
-      persist({
-        ...session,
-        user: {
-          ...session.user,
-          mustChangePassword: false,
-          onboardingStep: "welcome",
-        },
-      });
+      const data = await callAuthApi<AuthSession>(
+        "/api/auth/change-password",
+        input,
+        session.accessToken,
+      );
+      persist(data);
     },
     [persist, session],
   );
 
-  const completeWelcome = useCallback(() => {
+  const completeWelcome = useCallback(async () => {
     if (!session) return;
-    persist({
-      ...session,
-      user: { ...session.user, onboardingStep: "questions" },
-    });
+
+    if (isAuthDevMode()) {
+      persist({
+        ...session,
+        user: { ...session.user, onboardingStep: "questions" },
+      });
+      return;
+    }
+
+    const data = await callAuthApi<AuthSession>(
+      "/api/auth/onboarding/welcome",
+      {},
+      session.accessToken,
+    );
+    persist(data);
   }, [persist, session]);
 
   const submitOnboarding = useCallback(
     async (answers: OnboardingAnswers) => {
       if (!session) return;
 
-      if (!isAuthDevMode()) {
-        await callAuthApi("/api/auth/onboarding", answers);
+      if (isAuthDevMode()) {
+        persist({
+          ...session,
+          user: {
+            ...session.user,
+            onboardingCompleted: true,
+            onboardingStep: "complete",
+          },
+        });
+        return;
       }
 
-      persist({
-        ...session,
-        user: {
-          ...session.user,
-          onboardingCompleted: true,
-          onboardingStep: "complete",
-        },
-      });
+      const data = await callAuthApi<AuthSession>(
+        "/api/auth/onboarding",
+        answers,
+        session.accessToken,
+      );
+      persist(data);
     },
     [persist, session],
   );

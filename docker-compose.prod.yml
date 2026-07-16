@@ -1,0 +1,55 @@
+# Production-image smoke test (no hot reload).
+# Requires clothme-db Postgres on host :5434 with database `thesi` migrated.
+#
+#   cd ../clothme-db && docker compose up -d postgres && ./scripts/migrate.sh thesi
+#   cd ../thesi && docker compose -f docker-compose.prod.yml up --build
+
+services:
+  thesi-api:
+    container_name: thesi-api-prod
+    build:
+      context: ./thesi-api
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "5010:5000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:5434/thesi
+      POSTGRES_SSL_ENABLED: "false"
+      PORT: 5000
+      NODE_ENV: production
+      JWT_SECRET: prod-test-jwt-secret
+      JWT_REFRESH_SECRET: prod-test-jwt-refresh-secret
+      JWT_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION: 7d
+      ADMIN_API_KEY: prod-test-admin-key
+      EMAIL_FROM: Thesi <noreply@thesi.clothme.io>
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - thesi_prod_network
+    restart: unless-stopped
+
+  thesi-web:
+    container_name: thesi-web-prod
+    build:
+      context: ./thesi-web
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:5010
+        NEXT_PUBLIC_AUTH_DEV_MODE: "false"
+    ports:
+      - "3010:3000"
+    environment:
+      THESI_API_URL: http://thesi-api:5000
+      NODE_ENV: production
+    depends_on:
+      - thesi-api
+    networks:
+      - thesi_prod_network
+    restart: unless-stopped
+
+networks:
+  thesi_prod_network:
+    driver: bridge

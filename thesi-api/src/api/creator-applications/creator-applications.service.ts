@@ -1,9 +1,12 @@
-import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { v4 as uuidv4 } from 'uuid';
+import { AuthService } from 'src/api/auth/auth.service';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { EmailService } from 'src/shared/email/email.service';
+import { generateTempPassword } from 'src/shared/auth/token.util';
 import { CreateCreatorApplicationDto, CreatorApplicationData } from './dto/creator-application.dto';
 
 @Injectable()
@@ -14,6 +17,7 @@ export class CreatorApplicationsService {
     @Inject(DrizzleAsyncProvider)
     private readonly db: NodePgDatabase<typeof schema>,
     private readonly emailService: EmailService,
+    private readonly authService: AuthService,
   ) {}
 
   async create(dto: CreateCreatorApplicationDto): Promise<CreatorApplicationData> {
@@ -48,5 +52,55 @@ export class CreatorApplicationsService {
       .catch((err) => this.logger.warn(`Failed to send confirmation email: ${err?.message}`));
 
     return inserted as CreatorApplicationData;
+  }
+
+  async list(status?: string): Promise<CreatorApplicationData[]> {
+    const rows = status
+      ? await this.db
+          .select()
+          .from(schema.thesiCreatorApplication)
+          .where(eq(schema.thesiCreatorApplication.status, status))
+      : await this.db.select().from(schema.thesiCreatorApplication);
+
+    return rows as CreatorApplicationData[];
+  }
+
+  async approve(id: string): Promise<CreatorApplicationData> {
+    const [application] = await this.db
+      .select()
+      .from(schema.thesiCreatorApplication)
+      .where(eq(schema.thesiCreatorApplication.id, id))
+      .limit(1);
+
+    if (!application) {
+      throw new NotFoundException('Creator application not found');
+    }
+
+    if (application.status === 'approved') {
+      return application as CreatorApplicationData;
+    }
+
+    const tempPassword = generateTempPassword();
+    await this.authService.createUserFromApplication({
+      email: application.email,
+      fullName: application.fullName,
+      creatorApplicationId: application.id,
+      tempPassword,
+    });
+
+    const [updated] = await this.db
+      .update(schema.thesiCreatorApplication)
+      .set({
+        status: 'approved',
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.thesiCreatorApplication.id, id))
+      .returning();
+
+    this.emailService
+      .sendCreatorAccountReady(application.email, application.fullName, tempPassword)
+      .catch((err) => this.logger.warn(`Failed to send account ready email: ${err?.message}`));
+
+    return updated as CreatorApplicationData;
   }
 }

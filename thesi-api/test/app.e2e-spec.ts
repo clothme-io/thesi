@@ -1,10 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import {
+  FallbackExceptionFilter,
+  HttpExceptionFilter,
+} from './../src/shared/filters/http-exception.filter';
 
-describe('AppController (e2e)', () => {
+describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
@@ -13,14 +17,23 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.setGlobalPrefix('v1');
+    app.useGlobalFilters(new FallbackExceptionFilter(), new HttpExceptionFilter());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('POST /v1/auth/signin rejects unknown user', () => {
     return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+      .post('/v1/auth/signin')
+      .send({ email: 'missing@example.com', password: 'password123' })
+      .expect(401);
   });
 
   afterEach(async () => {

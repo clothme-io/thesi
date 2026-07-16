@@ -30,7 +30,7 @@ export default function ChangePasswordPage() {
 
     setLoading(true);
     try {
-      await changePassword(newPassword);
+      await changePassword({ currentPassword, newPassword, confirmPassword });
       router.push("/onboarding/welcome");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update password");

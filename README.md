@@ -7,19 +7,35 @@ UGC business platform for the ClothME Creator Community.
 
 ## Quick start (Docker)
 
+**Requires clothme-db Postgres running first:**
+
 ```bash
-cd thesi
+cd ../clothme-db
+docker compose up -d postgres
+./scripts/migrate.sh thesi
+
+cd ../thesi
 cp thesi-api/.env.example thesi-api/.env
 cp thesi-web/.env.example thesi-web/.env.local
 docker compose up --build
+```
+
+### Production images (local smoke test)
+
+Same DB prerequisite, then:
+
+```bash
+cd thesi
+docker compose -f docker-compose.prod.yml up --build
 ```
 
 | Service    | URL                        |
 |------------|----------------------------|
 | Web        | http://localhost:3010      |
 | API        | http://localhost:5010/v1   |
+| Health     | http://localhost:5010/v1/health |
 | Swagger    | http://localhost:5010/v1/api |
-| Postgres   | localhost:5433             |
+| Postgres   | localhost:5434 (clothme-db, DB `thesi`) |
 
 ## Local development (without Docker)
 
@@ -29,14 +45,14 @@ docker compose up --build
 cd thesi-api
 cp .env.example .env
 
-# Start Postgres only (from thesi/ root)
-cd .. && docker compose up postgres -d && cd thesi-api
+# Start clothme-db Postgres and migrate thesi database
+cd ../../clothme-db && docker compose up -d postgres && ./scripts/migrate.sh thesi
+cd ../thesi/thesi-api
 
-npm run db:migrate
 npm run start:dev
 ```
 
-**Important:** When running the API or migrations on your machine, `.env` must use `localhost:5433`. The hostname `postgres` only works inside Docker Compose.
+**Important:** `.env` must use `localhost:5434` (clothme-db). Migrations run from `clothme-db`, not from Thesi.
 
 
 ### Web
@@ -65,17 +81,26 @@ Supports **Resend** (primary) and **AWS SES** (fallback). If neither is configur
 | `AWS_SECRET_ACCESS_KEY` | AWS credentials |
 | `EMAIL_FROM`       | Sender address       |
 
-## Database
+## Database (Flyway)
 
-Uses shared PostgreSQL / TimescaleDB (Option A) with `thesi_*` tables in a dedicated schema namespace.
+**All migrations live in [`clothme-db`](../clothme-db/databases/thesi/).** Thesi does not run its own Flyway.
+
+| Command | Purpose |
+|---------|---------|
+| `cd ../clothme-db && ./scripts/migrate.sh thesi` | Apply pending migrations |
+| `./scripts/db-migrate.sh` | Shortcut (delegates to clothme-db) |
+| `./scripts/db-info.sh` | Show migration status |
+
+Add new SQL under `clothme-db/databases/thesi/sql/` as `V{n}__description.sql`. Keep `thesi-api` Drizzle schemas in sync (ORM only).
 
 ## Phase 1 (current)
 
 - [x] Project scaffolding
 - [x] Creators landing, apply, and success pages (ported from clothme-client)
 - [x] Creator applications API + BFF proxy
-- [x] Docker Compose local stack
-- [ ] Database migrations on shared TimescaleDB (deferred — schema strategy TBD)
+- [x] Docker Compose local stack (API + web; DB via clothme-db)
+- [x] Database `thesi` in clothme-db
+- [ ] Additional schema migrations (via clothme-db)
 
 ## Phase 2 (UI — in progress)
 
@@ -83,7 +108,24 @@ Uses shared PostgreSQL / TimescaleDB (Option A) with `thesi_*` tables in a dedic
 - [x] Onboarding flow UI (change password → founder welcome → questionnaire)
 - [x] App shell with collapsible sidebar + dashboard placeholder
 - [x] Auth context with **dev mode** (no database required)
-- [ ] Backend auth API (wired when migrations are ready)
+- [x] Backend auth API (`thesi_users`, JWT, refresh tokens, onboarding)
+- [x] Flyway baseline in clothme-db (`thesi` database)
+- [x] Admin creator-application approve → user invite with temp password
+
+### Auth API endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /v1/auth/signup` | Brand self-serve registration |
+| `POST /v1/auth/signin` | Sign in |
+| `POST /v1/auth/refresh` | Rotate access token |
+| `POST /v1/auth/change-password` | First-login / password change (JWT required) |
+| `POST /v1/onboarding/welcome` | Advance welcome step (JWT required) |
+| `POST /v1/onboarding/questions` | Persist onboarding answers (JWT required) |
+| `GET /v1/creator-applications` | List applications (admin key) |
+| `PATCH /v1/creator-applications/:id/approve` | Approve + create creator account (admin key) |
+
+Admin requests require header `X-Admin-Api-Key` (set `ADMIN_API_KEY` in `thesi-api/.env`).
 
 ### Preview auth UI without database
 

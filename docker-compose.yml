@@ -10,21 +10,20 @@ services:
     env_file:
       - ./thesi-api/.env
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      POSTGRES_HOST: host.docker.internal
+      POSTGRES_PORT: 5434
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: thesi
       POSTGRES_SSL_ENABLED: "false"
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/thesi
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:5434/thesi
       PORT: 5000
       NODE_ENV: development
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./thesi-api:/usr/src/app
       - /usr/src/app/node_modules
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - thesi_network
     restart: unless-stopped
@@ -51,28 +50,6 @@ services:
       - thesi_network
     restart: unless-stopped
 
-  postgres:
-    container_name: thesi-postgres-local
-    image: postgres:16
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: thesi
-    volumes:
-      - thesi_postgres_data:/var/lib/postgresql/data
-    networks:
-      - thesi_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d thesi"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
 networks:
   thesi_network:
     driver: bridge
-
-volumes:
-  thesi_postgres_data:

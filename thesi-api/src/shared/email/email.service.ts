@@ -83,4 +83,23 @@ export class EmailService {
       text: `Hi ${fullName}, thank you for applying to Thesi. We received your application and will be in touch.`,
     });
   }
+
+  async sendCreatorAccountReady(to: string, fullName: string, tempPassword: string): Promise<void> {
+    await this.send({
+      to,
+      subject: 'Your Thesi creator account is ready',
+      html: `
+        <p>Hi ${fullName},</p>
+        <p>Your creator application was approved. Your Thesi account is ready.</p>
+        <p>Sign in at <a href="https://thesi.clothme.io/sign-in">thesi.clothme.io/sign-in</a> with:</p>
+        <ul>
+          <li><strong>Email:</strong> ${to}</li>
+          <li><strong>Temporary password:</strong> ${tempPassword}</li>
+        </ul>
+        <p>You will be asked to set a new password on first sign-in.</p>
+        <p>— The Thesi Team</p>
+      `,
+      text: `Hi ${fullName}, your Thesi creator account is ready. Sign in with ${to} and temporary password: ${tempPassword}. You must set a new password on first sign-in.`,
+    });
+  }
 }
