@@ -38,7 +38,7 @@ env:
   INFRA_BRANCH: rancher-quickstart
   OVERLAY_PATHS_DEV: fleet/bundles/apps/thesi-api/overlays/dev
   OVERLAY_PATHS_PROD: fleet/bundles/apps/thesi-api/overlays/prod
-  DEV_HEALTH_URL: https://dv-thesi.api-clothme.com/v1/health
+  DEV_HEALTH_URL: https://dv.get-thesi.com/v1/health
   RELEASE_LABEL: thesi-api-release
 
 permissions:
