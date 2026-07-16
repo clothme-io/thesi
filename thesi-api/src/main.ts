@@ -3,6 +3,10 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import {
+  FallbackExceptionFilter,
+  HttpExceptionFilter,
+} from './shared/filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -10,11 +14,12 @@ async function bootstrap() {
   app.enableCors({
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Api-Key'],
     credentials: true,
   });
 
   app.setGlobalPrefix('v1');
+  app.useGlobalFilters(new FallbackExceptionFilter(), new HttpExceptionFilter());
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -31,8 +36,14 @@ async function bootstrap() {
     .addTag('thesi')
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('v1/api', app, document);
+  try {
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('v1/api', app, document);
+  } catch (err) {
+    console.warn(
+      `Swagger setup skipped: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 5000;

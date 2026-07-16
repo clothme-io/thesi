@@ -1,0 +1,747 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "deploy | rollback (git pin) | rollback-fast (rollouts undo + git pin)"
+        required: true
+        type: choice
+        options:
+          - deploy
+          - rollback
+          - rollback-fast
+        default: deploy
+      promote_to:
+        description: "Target environment (manual deploy only; push to main always runs dev then prod)"
+        required: false
+        type: choice
+        options:
+          - dev
+          - prod
+        default: prod
+      image_tag:
+        description: "sha- tag for manual deploy/rollback (optional on deploy — builds from main)"
+        required: false
+        type: string
+  issue_comment:
+    types: [created]
+
+env:
+  APP_NAME: thesi-api
+  ROLLOUT_NAME: thesi-api
+  ROLLOUT_NAMESPACE: apps
+  IMAGE_REPOSITORY: ghcr.io/clothme-io/thesi-api
+  INFRA_BRANCH: rancher-quickstart
+  OVERLAY_PATHS_DEV: fleet/bundles/apps/thesi-api/overlays/dev
+  OVERLAY_PATHS_PROD: fleet/bundles/apps/thesi-api/overlays/prod
+  DEV_HEALTH_URL: https://dv-thesi.api-clothme.com/v1/health
+  RELEASE_LABEL: thesi-api-release
+
+permissions:
+  contents: read
+  packages: write
+  issues: write
+
+jobs:
+  parse-approval-comment:
+    if: github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+    outputs:
+      matched: ${{ steps.parse.outputs.matched }}
+      decision: ${{ steps.parse.outputs.decision }}
+      stage: ${{ steps.parse.outputs.stage }}
+      image_tag: ${{ steps.parse.outputs.image_tag }}
+      rollback_mode: ${{ steps.parse.outputs.rollback_mode }}
+    steps:
+      - name: Parse approval comment
+        id: parse
+        uses: actions/github-script@v7
+        env:
+          PROD_APPROVER: ${{ vars.PROD_APPROVER }}
+          RELEASE_LABEL: ${{ env.RELEASE_LABEL }}
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const comment = context.payload.comment;
+
+            core.setOutput('matched', 'false');
+            core.setOutput('decision', '');
+            core.setOutput('stage', '');
+            core.setOutput('image_tag', '');
+            core.setOutput('rollback_mode', '');
+
+            if (issue.pull_request) return;
+            if (issue.state !== 'open') return;
+
+            const labels = issue.labels.map((label) =>
+              typeof label === 'string' ? label : label.name
+            );
+            if (!labels.includes(process.env.RELEASE_LABEL || 'thesi-api-release')) return;
+
+            const meta = issue.body.match(/<!-- release-metadata\s*([\s\S]*?)\s*-->/);
+            if (!meta) {
+              core.setFailed('Release issue is missing metadata block.');
+              return;
+            }
+
+            const metadata = {};
+            for (const line of meta[1].trim().split('\n')) {
+              const idx = line.indexOf(':');
+              if (idx === -1) continue;
+              const key = line.slice(0, idx).trim();
+              const value = line.slice(idx + 1).trim();
+              if (key) metadata[key] = value;
+            }
+
+            const stage = metadata.stage || '';
+            const imageTag = metadata.image_tag || '';
+            const rollbackMode = metadata.rollback_mode || '';
+
+            if (!stage || !/^sha-[0-9a-f]+$/.test(imageTag)) {
+              core.setFailed(`Invalid release metadata: stage=${stage} image_tag=${imageTag}`);
+              return;
+            }
+
+            const approver = process.env.PROD_APPROVER;
+            if (!approver) {
+              core.setFailed('Set repository variable PROD_APPROVER.');
+              return;
+            }
+
+            if (comment.user.login !== approver) {
+              core.notice(`Ignored comment from @${comment.user.login}; approver is @${approver}.`);
+              return;
+            }
+
+            const body = (comment.body || '').trim();
+            const approved = /^(approve|approved|lgtm|yes)[.!]*$/i.test(body);
+            const denied = /^(deny|denied|no)[.!]*$/i.test(body);
+            if (!approved && !denied) {
+              core.notice('Comment is not an approval keyword; ignoring.');
+              return;
+            }
+
+            const decision = approved ? 'approved' : 'denied';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: decision === 'approved'
+                ? `Approved by @${approver}. Continuing release pipeline...`
+                : `Denied by @${approver}. Release stopped.`,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              state: 'closed',
+            });
+
+            core.setOutput('matched', 'true');
+            core.setOutput('decision', decision);
+            core.setOutput('stage', stage);
+            core.setOutput('image_tag', imageTag);
+            core.setOutput('rollback_mode', rollbackMode);
+
+  handle-denial:
+    needs: [parse-approval-comment]
+    if: |
+      needs.parse-approval-comment.outputs.matched == 'true' &&
+      needs.parse-approval-comment.outputs.decision == 'denied'
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::Release denied for stage ${{ needs.parse-approval-comment.outputs.stage }}."
+          exit 1
+
+  test:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "::notice::Automated tests will gate deploys in a later phase."
+
+  build:
+    needs: test
+    if: |
+      (github.event_name == 'push' || inputs.action == 'deploy') &&
+      (github.event_name == 'push' || inputs.image_tag == '')
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.sha_tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: sha_tag
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./thesi-api
+          file: ./thesi-api/Dockerfile
+          target: production
+          push: true
+          tags: ${{ env.IMAGE_REPOSITORY }}:${{ steps.sha_tag.outputs.tag }}
+
+  bump-dev:
+    needs: [test, build]
+    if: |
+      always() &&
+      needs.test.result == 'success' &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped') &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && inputs.promote_to == 'dev')
+      )
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            echo "value=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ needs.build.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          repository: clothme-io/clothme_infra_kube
+          token: ${{ secrets.INFRA_REPO_PAT }}
+          ref: ${{ env.INFRA_BRANCH }}
+          path: infra
+
+      - name: Bump dev image tags
+        run: |
+          TAG="${{ steps.tag.outputs.value }}"
+          IFS=',' read -ra OVERLAYS <<< "${{ env.OVERLAY_PATHS_DEV }}"
+          for rel in "${OVERLAYS[@]}"; do
+            file="infra/${rel}/kustomization.yaml"
+            python3 - "$file" "$TAG" <<'PY'
+          import re, sys
+          path, tag = sys.argv[1], sys.argv[2]
+          text = open(path, encoding="utf-8").read()
+          text = re.sub(r"newTag:\s*\S+", f"newTag: {tag}", text, count=1)
+          open(path, "w", encoding="utf-8").write(text)
+          print(f"Updated {path} -> {tag}")
+          PY
+          done
+
+      - name: Commit and push
+        working-directory: infra
+        run: |
+          TAG="${{ steps.tag.outputs.value }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::notice::Dev tag already at $TAG"
+            exit 0
+          fi
+          git commit -m "deploy(${{ env.APP_NAME }}): $TAG -> dev"
+          git push origin "${{ env.INFRA_BRANCH }}"
+
+  dev-wait-healthy:
+    needs: [bump-dev]
+    if: |
+      needs.bump-dev.result == 'success' &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && inputs.promote_to == 'dev')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Argo sync
+        run: |
+          echo "Waiting for Argo CD to sync dev (~3 min)..."
+          sleep 180
+
+      - name: Verify dev health endpoint
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.DEV_HEALTH_URL }}" --max-time 15 || true)
+            echo "Attempt $i: HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "::notice::Dev healthy at ${{ env.DEV_HEALTH_URL }}"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Dev health check failed at ${{ env.DEV_HEALTH_URL }}"
+          exit 1
+
+  create-prod-deploy-issue:
+    needs: [dev-wait-healthy, bump-dev, build, test]
+    if: |
+      always() &&
+      (
+        (github.event_name == 'push' && needs.dev-wait-healthy.result == 'success') ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          inputs.action == 'deploy' &&
+          inputs.promote_to == 'prod' &&
+          needs.test.result == 'success' &&
+          (needs.build.result == 'success' || needs.build.result == 'skipped')
+        )
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require prod approver variable
+        run: |
+          if [ -z "${{ vars.PROD_APPROVER }}" ]; then
+            echo "::error::Set repository variable PROD_APPROVER (GitHub username of the approver)."
+            exit 1
+          fi
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            echo "value=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ needs.bump-dev.outputs.image_tag }}" ]; then
+            echo "value=${{ needs.bump-dev.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ needs.build.outputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open prod deploy approval issue
+        uses: actions/github-script@v7
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.value }}
+          PROD_APPROVER: ${{ vars.PROD_APPROVER }}
+          DEV_HEALTH_URL: ${{ env.DEV_HEALTH_URL }}
+          RELEASE_LABEL: ${{ env.RELEASE_LABEL }}
+        with:
+          script: |
+            const imageTag = process.env.IMAGE_TAG;
+            const approver = process.env.PROD_APPROVER;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[thesi-api] Approve prod deploy: ${imageTag}`,
+              labels: [process.env.RELEASE_LABEL || 'thesi-api-release', 'stage-prod-deploy'],
+              assignees: [approver],
+              body: [
+                '## Prod deploy approval',
+                '',
+                `Image: \`${imageTag}\``,
+                `Dev health: ${process.env.DEV_HEALTH_URL}`,
+                '',
+                'Test dev, then comment **approve** to deploy prod preview.',
+                'Comment **deny** to stop this release.',
+                '',
+                '<!-- release-metadata',
+                'stage: prod-deploy',
+                `image_tag: ${imageTag}`,
+                '-->',
+              ].join('\n'),
+            });
+            core.notice(`Opened approval issue: ${issue.data.html_url}`);
+
+  create-rollback-issue:
+    if: github.event_name == 'workflow_dispatch' && (inputs.action == 'rollback' || inputs.action == 'rollback-fast')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require rollback tag
+        run: |
+          if [ -z "${{ inputs.image_tag }}" ]; then
+            echo "::error::image_tag (known-good sha-) is required for rollback."
+            exit 1
+          fi
+          if [ -z "${{ vars.PROD_APPROVER }}" ]; then
+            echo "::error::Set repository variable PROD_APPROVER."
+            exit 1
+          fi
+
+      - name: Open rollback approval issue
+        uses: actions/github-script@v7
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          ROLLBACK_MODE: ${{ inputs.action == 'rollback-fast' && 'fast' || 'git' }}
+          PROD_APPROVER: ${{ vars.PROD_APPROVER }}
+          RELEASE_LABEL: ${{ env.RELEASE_LABEL }}
+        with:
+          script: |
+            const imageTag = process.env.IMAGE_TAG;
+            const approver = process.env.PROD_APPROVER;
+            const rollbackMode = process.env.ROLLBACK_MODE;
+            const stage = rollbackMode === 'fast' ? 'rollback-fast' : 'rollback';
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[thesi-api] Approve rollback: ${imageTag}`,
+              labels: [process.env.RELEASE_LABEL || 'thesi-api-release', `stage-${stage}`],
+              assignees: [approver],
+              body: [
+                '## Rollback approval',
+                '',
+                `Mode: **${rollbackMode}**`,
+                `Target tag: \`${imageTag}\``,
+                '',
+                'Comment **approve** to continue or **deny** to cancel.',
+                '',
+                '<!-- release-metadata',
+                `stage: ${stage}`,
+                `image_tag: ${imageTag}`,
+                `rollback_mode: ${rollbackMode}`,
+                '-->',
+              ].join('\n'),
+            });
+            core.notice(`Opened rollback approval issue: ${issue.data.html_url}`);
+
+  bump-prod:
+    needs: [parse-approval-comment]
+    if: |
+      needs.parse-approval-comment.outputs.matched == 'true' &&
+      needs.parse-approval-comment.outputs.decision == 'approved' &&
+      needs.parse-approval-comment.outputs.stage == 'prod-deploy'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ needs.parse-approval-comment.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: clothme-io/clothme_infra_kube
+          token: ${{ secrets.INFRA_REPO_PAT }}
+          ref: ${{ env.INFRA_BRANCH }}
+          path: infra
+
+      - name: Verify dev still runs approved tag
+        env:
+          TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
+        run: |
+          file="infra/fleet/bundles/apps/thesi-api/overlays/dev/kustomization.yaml"
+          dev_tag=$(grep -E '^\s*newTag:' "$file" | head -1 | awk '{print $2}')
+          if [ "$dev_tag" != "$TAG" ]; then
+            echo "::error::Dev overlay is $dev_tag but approval is for $TAG"
+            exit 1
+          fi
+
+      - name: Bump prod image tags
+        env:
+          TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
+        run: |
+          IFS=',' read -ra OVERLAYS <<< "${{ env.OVERLAY_PATHS_PROD }}"
+          for rel in "${OVERLAYS[@]}"; do
+            file="infra/${rel}/kustomization.yaml"
+            python3 - "$file" "$TAG" <<'PY'
+          import re, sys
+          path, tag = sys.argv[1], sys.argv[2]
+          text = open(path, encoding="utf-8").read()
+          text = re.sub(r"newTag:\s*\S+", f"newTag: {tag}", text, count=1)
+          open(path, "w", encoding="utf-8").write(text)
+          print(f"Updated {path} -> {tag}")
+          PY
+          done
+
+      - name: Commit and push
+        working-directory: infra
+        env:
+          TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::notice::Prod tag already at $TAG"
+            exit 0
+          fi
+          git commit -m "deploy(${{ env.APP_NAME }}): $TAG -> prod"
+          git push origin "${{ env.INFRA_BRANCH }}"
+
+  prod-wait-preview:
+    needs: [bump-prod]
+    if: needs.bump-prod.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup kubectl and argo rollouts plugin
+        run: |
+          curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          curl -fsSL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o kubectl-argo-rollouts
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
+      - name: Configure prod kubeconfig
+        run: |
+          if [ -z "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" ]; then
+            echo "::error::Set repository secret CLOTHME_PROD_KUBECONFIG (clothme-prod kubeconfig)."
+            exit 1
+          fi
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Wait for Argo sync and preview readiness
+        run: |
+          echo "Waiting for Argo CD to sync prod preview (~3 min)..."
+          sleep 180
+          kubectl argo rollouts status ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} --timeout 15m
+
+  create-traffic-cutover-issue:
+    needs: [prod-wait-preview, bump-prod]
+    if: needs.prod-wait-preview.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open traffic cutover approval issue
+        uses: actions/github-script@v7
+        env:
+          IMAGE_TAG: ${{ needs.bump-prod.outputs.image_tag }}
+          PROD_APPROVER: ${{ vars.PROD_APPROVER }}
+          RELEASE_LABEL: ${{ env.RELEASE_LABEL }}
+        with:
+          script: |
+            const imageTag = process.env.IMAGE_TAG;
+            const approver = process.env.PROD_APPROVER;
+            if (!approver) {
+              core.setFailed('Set repository variable PROD_APPROVER.');
+              return;
+            }
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[thesi-api] Approve traffic cutover: ${imageTag}`,
+              labels: [process.env.RELEASE_LABEL || 'thesi-api-release', 'stage-traffic-cutover'],
+              assignees: [approver],
+              body: [
+                '## Traffic cutover approval',
+                '',
+                `Image: \`${imageTag}\``,
+                'Preview passed pre-promotion analysis.',
+                '',
+                'Comment **approve** to promote live traffic.',
+                'Comment **deny** to keep the current version.',
+                '',
+                '<!-- release-metadata',
+                'stage: traffic-cutover',
+                `image_tag: ${imageTag}`,
+                '-->',
+              ].join('\n'),
+            });
+            core.notice(`Opened traffic cutover issue: ${issue.data.html_url}`);
+
+  prod-promote:
+    needs: [parse-approval-comment]
+    if: |
+      needs.parse-approval-comment.outputs.matched == 'true' &&
+      needs.parse-approval-comment.outputs.decision == 'approved' &&
+      needs.parse-approval-comment.outputs.stage == 'traffic-cutover'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup kubectl and argo rollouts plugin
+        run: |
+          curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          curl -fsSL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o kubectl-argo-rollouts
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
+      - name: Configure prod kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Promote rollout
+        run: |
+          kubectl argo rollouts promote ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }}
+          kubectl argo rollouts status ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} --timeout 15m
+
+      - name: Verify rollout healthy
+        run: |
+          PHASE=$(kubectl get rollout ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} -o jsonpath='{.status.phase}')
+          if [ "$PHASE" != "Healthy" ]; then
+            echo "::error::Rollout not healthy after promote"
+            exit 1
+          fi
+          echo "::notice::Prod deploy complete. Image tag: ${{ needs.parse-approval-comment.outputs.image_tag }}"
+
+  bump-infra-rollback:
+    needs: [parse-approval-comment]
+    if: |
+      needs.parse-approval-comment.outputs.matched == 'true' &&
+      needs.parse-approval-comment.outputs.decision == 'approved' &&
+      needs.parse-approval-comment.outputs.stage == 'rollback'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ needs.parse-approval-comment.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: clothme-io/clothme_infra_kube
+          token: ${{ secrets.INFRA_REPO_PAT }}
+          ref: ${{ env.INFRA_BRANCH }}
+          path: infra
+
+      - name: Pin prod to rolled-back tag
+        env:
+          TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
+        run: |
+          IFS=',' read -ra OVERLAYS <<< "${{ env.OVERLAY_PATHS_PROD }}"
+          for rel in "${OVERLAYS[@]}"; do
+            file="infra/${rel}/kustomization.yaml"
+            python3 - "$file" "$TAG" <<'PY'
+          import re, sys
+          path, tag = sys.argv[1], sys.argv[2]
+          text = open(path, encoding="utf-8").read()
+          text = re.sub(r"newTag:\s*\S+", f"newTag: {tag}", text, count=1)
+          open(path, "w", encoding="utf-8").write(text)
+          print(f"Updated {path} -> {tag}")
+          PY
+          done
+
+      - name: Commit and push
+        working-directory: infra
+        env:
+          TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::notice::Tag already at $TAG"
+            exit 0
+          fi
+          git commit -m "rollback(${{ env.APP_NAME }}): $TAG -> prod"
+          git push origin "${{ env.INFRA_BRANCH }}"
+
+  rollback-fast-undo:
+    needs: [parse-approval-comment]
+    if: |
+      needs.parse-approval-comment.outputs.matched == 'true' &&
+      needs.parse-approval-comment.outputs.decision == 'approved' &&
+      needs.parse-approval-comment.outputs.stage == 'rollback-fast'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup kubectl and argo rollouts plugin
+        run: |
+          curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          curl -fsSL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o kubectl-argo-rollouts
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
+      - name: Configure prod kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Undo rollout (fast rollback)
+        run: |
+          kubectl argo rollouts undo ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }}
+          kubectl argo rollouts status ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} --timeout 10m
+
+      - name: Verify active health
+        run: |
+          PHASE=$(kubectl get rollout ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} -o jsonpath='{.status.phase}')
+          if [ "$PHASE" != "Healthy" ]; then
+            echo "::error::Rollout phase is $PHASE after undo"
+            exit 1
+          fi
+
+  bump-infra-after-fast-rollback:
+    needs: [rollback-fast-undo, parse-approval-comment]
+    if: needs.rollback-fast-undo.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: clothme-io/clothme_infra_kube
+          token: ${{ secrets.INFRA_REPO_PAT }}
+          ref: ${{ env.INFRA_BRANCH }}
+          path: infra
+
+      - name: Pin git to rolled-back tag
+        env:
+          TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
+        run: |
+          IFS=',' read -ra OVERLAYS <<< "${{ env.OVERLAY_PATHS_PROD }}"
+          for rel in "${OVERLAYS[@]}"; do
+            file="infra/${rel}/kustomization.yaml"
+            python3 - "$file" "$TAG" <<'PY'
+          import re, sys
+          path, tag = sys.argv[1], sys.argv[2]
+          text = open(path, encoding="utf-8").read()
+          text = re.sub(r"newTag:\s*\S+", f"newTag: {tag}", text, count=1)
+          open(path, "w", encoding="utf-8").write(text)
+          print(f"Updated {path} -> {tag}")
+          PY
+          done
+
+      - name: Commit and push
+        working-directory: infra
+        env:
+          TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "::notice::Tag already at $TAG"
+            exit 0
+          fi
+          git commit -m "rollback(${{ env.APP_NAME }}): $TAG -> prod (after fast undo)"
+          git push origin "${{ env.INFRA_BRANCH }}"
+
+  prod-wait-healthy:
+    needs: [bump-infra-rollback]
+    if: needs.bump-infra-rollback.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup kubectl and argo rollouts plugin
+        run: |
+          curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          curl -fsSL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o kubectl-argo-rollouts
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
+      - name: Configure prod kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Wait for git rollback rollout
+        run: |
+          echo "Waiting for Argo CD to sync rolled-back image (~3 min)..."
+          sleep 180
+          kubectl argo rollouts status ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} --timeout 15m
+
+  prod-wait-healthy-after-fast-rollback:
+    needs: [bump-infra-after-fast-rollback]
+    if: needs.bump-infra-after-fast-rollback.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup kubectl and argo rollouts plugin
+        run: |
+          curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o kubectl
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+          curl -fsSL https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64 -o kubectl-argo-rollouts
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
+      - name: Configure prod kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Confirm rollout healthy after fast rollback
+        run: |
+          kubectl argo rollouts status ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} --timeout 10m
