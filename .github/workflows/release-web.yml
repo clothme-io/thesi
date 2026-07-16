@@ -506,7 +506,27 @@ jobs:
             echo "::error::Argo did not apply approved image $EXPECTED within 15 minutes (current: $CURRENT)"
             exit 1
           fi
-          kubectl argo rollouts status "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" --timeout 15m
+          echo "Waiting for blue/green preview pause (not full Healthy — promote is a separate approval)..."
+          for i in $(seq 1 90); do
+            PHASE=$(kubectl get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+            MSG=$(kubectl get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o jsonpath='{.status.message}' 2>/dev/null || true)
+            echo "Attempt $i: phase=$PHASE message=$MSG"
+            case "$PHASE" in
+              Paused)
+                echo "Preview ready ($MSG)"
+                exit 0
+                ;;
+              Degraded|Error)
+                echo "::error::Rollout $PHASE while waiting for preview: $MSG"
+                kubectl argo rollouts get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" || true
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Timed out waiting for BlueGreenPause on ${{ env.ROLLOUT_NAME }}"
+          kubectl argo rollouts get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" || true
+          exit 1
 
   create-traffic-cutover-issue:
     needs: [prod-wait-preview, bump-prod]
