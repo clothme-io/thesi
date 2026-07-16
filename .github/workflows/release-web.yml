@@ -1,12 +1,12 @@
-name: Release
+name: Release Web
 
 on:
   push:
     branches:
       - main
     paths:
-      - "thesi-api/**"
-      - ".github/workflows/release.yml"
+      - "thesi-web/**"
+      - ".github/workflows/release-web.yml"
   workflow_dispatch:
     inputs:
       action:
@@ -34,15 +34,15 @@ on:
     types: [created]
 
 env:
-  APP_NAME: thesi-api
-  ROLLOUT_NAME: thesi-api
+  APP_NAME: thesi-web
+  ROLLOUT_NAME: thesi-web
   ROLLOUT_NAMESPACE: apps
-  IMAGE_REPOSITORY: ghcr.io/clothme-io/thesi-api
+  IMAGE_REPOSITORY: ghcr.io/clothme-io/thesi-web
   INFRA_BRANCH: rancher-quickstart
-  OVERLAY_PATHS_DEV: fleet/bundles/apps/thesi-api/overlays/dev
-  OVERLAY_PATHS_PROD: fleet/bundles/apps/thesi-api/overlays/prod
-  DEV_HEALTH_URL: https://dv.get-thesi.com/v1/health
-  RELEASE_LABEL: thesi-api-release
+  OVERLAY_PATHS_DEV: fleet/bundles/apps/thesi-web/overlays/dev
+  OVERLAY_PATHS_PROD: fleet/bundles/apps/thesi-web/overlays/prod
+  DEV_HEALTH_URL: https://dv-app.get-thesi.com/
+  RELEASE_LABEL: thesi-web-release
 
 permissions:
   contents: read
@@ -83,7 +83,7 @@ jobs:
             const labels = issue.labels.map((label) =>
               typeof label === 'string' ? label : label.name
             );
-            if (!labels.includes(process.env.RELEASE_LABEL || 'thesi-api-release')) return;
+            if (!labels.includes(process.env.RELEASE_LABEL || 'thesi-web-release')) return;
 
             const meta = issue.body.match(/<!-- release-metadata\s*([\s\S]*?)\s*-->/);
             if (!meta) {
@@ -187,9 +187,12 @@ jobs:
         run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v5
         with:
-          context: ./thesi-api
-          file: ./thesi-api/Dockerfile
+          context: ./thesi-web
+          file: ./thesi-web/Dockerfile
           target: production
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://dv.get-thesi.com
+            NEXT_PUBLIC_AUTH_DEV_MODE=false
           push: true
           tags: ${{ env.IMAGE_REPOSITORY }}:${{ steps.sha_tag.outputs.tag }}
 
@@ -330,8 +333,8 @@ jobs:
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `[thesi-api] Approve prod deploy: ${imageTag}`,
-              labels: [process.env.RELEASE_LABEL || 'thesi-api-release', 'stage-prod-deploy'],
+              title: `[thesi-web] Approve prod deploy: ${imageTag}`,
+              labels: [process.env.RELEASE_LABEL || 'thesi-web-release', 'stage-prod-deploy'],
               body: [
                 `Approver: @${approver}`,
                 '## Prod deploy approval',
@@ -381,8 +384,8 @@ jobs:
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `[thesi-api] Approve rollback: ${imageTag}`,
-              labels: [process.env.RELEASE_LABEL || 'thesi-api-release', `stage-${stage}`],
+              title: `[thesi-web] Approve rollback: ${imageTag}`,
+              labels: [process.env.RELEASE_LABEL || 'thesi-web-release', `stage-${stage}`],
               body: [
                 `Approver: @${approver}`,
                 '## Rollback approval',
@@ -422,7 +425,7 @@ jobs:
         env:
           TAG: ${{ needs.parse-approval-comment.outputs.image_tag }}
         run: |
-          file="infra/fleet/bundles/apps/thesi-api/overlays/dev/kustomization.yaml"
+          file="infra/fleet/bundles/apps/thesi-web/overlays/dev/kustomization.yaml"
           dev_tag=$(grep -E '^\s*newTag:' "$file" | head -1 | awk '{print $2}')
           if [ "$dev_tag" != "$TAG" ]; then
             echo "::error::Dev overlay is $dev_tag but approval is for $TAG"
@@ -513,8 +516,8 @@ jobs:
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `[thesi-api] Approve traffic cutover: ${imageTag}`,
-              labels: [process.env.RELEASE_LABEL || 'thesi-api-release', 'stage-traffic-cutover'],
+              title: `[thesi-web] Approve traffic cutover: ${imageTag}`,
+              labels: [process.env.RELEASE_LABEL || 'thesi-web-release', 'stage-traffic-cutover'],
               body: [
                 `Approver: @${approver}`,
                 '## Traffic cutover approval',
