@@ -488,11 +488,25 @@ jobs:
           echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
-      - name: Wait for Argo sync and preview readiness
+      - name: Wait for approved image and preview readiness
+        env:
+          TAG: ${{ needs.bump-prod.outputs.image_tag }}
         run: |
-          echo "Waiting for Argo CD to sync prod preview (~3 min)..."
-          sleep 180
-          kubectl argo rollouts status ${{ env.ROLLOUT_NAME }} -n ${{ env.ROLLOUT_NAMESPACE }} --timeout 15m
+          EXPECTED="${{ env.IMAGE_REPOSITORY }}:$TAG"
+          echo "Waiting for Argo CD to apply $EXPECTED..."
+          for i in $(seq 1 90); do
+            CURRENT=$(kubectl get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+            echo "Attempt $i: current=$CURRENT expected=$EXPECTED"
+            if [ "$CURRENT" = "$EXPECTED" ]; then
+              break
+            fi
+            sleep 10
+          done
+          if [ "$CURRENT" != "$EXPECTED" ]; then
+            echo "::error::Argo did not apply approved image $EXPECTED within 15 minutes (current: $CURRENT)"
+            exit 1
+          fi
+          kubectl argo rollouts status "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" --timeout 15m
 
   create-traffic-cutover-issue:
     needs: [prod-wait-preview, bump-prod]
