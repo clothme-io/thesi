@@ -12,10 +12,7 @@ export class AdminApiKeyGuard implements CanActivate {
   constructor(private readonly configService: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const configured = this.configService.get<string>('ADMIN_API_KEY');
-    if (!configured) {
-      throw new UnauthorizedException('Admin API is not configured');
-    }
+    const configured = this.configService.getOrThrow<string>('ADMIN_API_KEY');
 
     const req = context.switchToHttp().getRequest<Request>();
     const provided = req.headers['x-admin-api-key'];

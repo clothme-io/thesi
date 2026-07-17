@@ -1,5 +1,17 @@
-import { Body, Controller, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from 'src/shared/auth/current-user.decorator';
 import { JwtAuthGuard } from 'src/shared/auth/jwt-auth.guard';
 import type { AuthJwtPayload } from 'src/shared/auth/jwt-auth.guard';
@@ -26,6 +38,7 @@ export class AuthController {
   }
 
   @Post('signin')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in' })
   @ApiResponse({ status: 200, type: AuthResponse })
   async signIn(@Body() dto: SignInDto): Promise<AuthResponse> {
@@ -34,6 +47,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, type: AuthResponse })
   async refresh(@Body() dto: RefreshTokenDto): Promise<AuthResponse> {
@@ -42,6 +56,7 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change password (required on first sign-in)' })

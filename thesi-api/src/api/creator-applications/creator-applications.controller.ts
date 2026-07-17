@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AdminApiKeyGuard } from 'src/shared/auth/admin-api-key.guard';
 import {
@@ -15,7 +25,9 @@ export class CreatorApplicationsController {
   @Post()
   @ApiOperation({ summary: 'Submit a creator application' })
   @ApiResponse({ status: 201, type: CreatorApplicationResponse })
-  async create(@Body() dto: CreateCreatorApplicationDto): Promise<CreatorApplicationResponse> {
+  async create(
+    @Body() dto: CreateCreatorApplicationDto,
+  ): Promise<CreatorApplicationResponse> {
     const data = await this.service.create(dto);
     return {
       status: HttpStatus.CREATED,
@@ -41,10 +53,30 @@ export class CreatorApplicationsController {
   @Patch(':id/approve')
   @UseGuards(AdminApiKeyGuard)
   @ApiHeader({ name: 'X-Admin-Api-Key', required: true })
-  @ApiOperation({ summary: 'Approve application and create creator account (admin)' })
+  @ApiOperation({
+    summary: 'Approve application and create creator account (admin)',
+  })
   @ApiResponse({ status: 200, type: CreatorApplicationResponse })
   async approve(@Param('id') id: string): Promise<CreatorApplicationResponse> {
     const data = await this.service.approve(id);
+    return {
+      status: HttpStatus.OK,
+      error: null,
+      data,
+    };
+  }
+
+  @Patch(':id/resend-invite')
+  @UseGuards(AdminApiKeyGuard)
+  @ApiHeader({ name: 'X-Admin-Api-Key', required: true })
+  @ApiOperation({
+    summary: 'Reset temporary password and resend creator invite (admin)',
+  })
+  @ApiResponse({ status: 200, type: CreatorApplicationResponse })
+  async resendInvite(
+    @Param('id') id: string,
+  ): Promise<CreatorApplicationResponse> {
+    const data = await this.service.resendInvite(id);
     return {
       status: HttpStatus.OK,
       error: null,

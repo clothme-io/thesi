@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -35,6 +36,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+class AuthApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function callAuthApi<T>(
   path: string,
   body: unknown,
@@ -51,7 +61,7 @@ async function callAuthApi<T>(
 
   const json = await res.json();
   if (!res.ok || json.error) {
-    throw new Error(json.error?.message || "Request failed");
+    throw new AuthApiError(json.error?.message || "Request failed", res.status);
   }
   return json.data as T;
 }
@@ -59,6 +69,7 @@ async function callAuthApi<T>(
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const refreshPromiseRef = useRef<Promise<AuthSession> | null>(null);
 
   useEffect(() => {
     setSession(getStoredSession());
@@ -69,6 +80,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(next);
     storeSession(next);
   }, []);
+
+  const refreshSession = useCallback((refreshToken: string) => {
+    if (!refreshPromiseRef.current) {
+      refreshPromiseRef.current = callAuthApi<AuthSession>(
+        "/api/auth/refresh",
+        { refreshToken },
+      ).finally(() => {
+        refreshPromiseRef.current = null;
+      });
+    }
+    return refreshPromiseRef.current;
+  }, []);
+
+  const callAuthenticatedApi = useCallback(
+    async <T,>(path: string, body: unknown): Promise<T> => {
+      if (!session) {
+        throw new Error("You must sign in to continue");
+      }
+
+      try {
+        return await callAuthApi<T>(path, body, session.accessToken);
+      } catch (error) {
+        if (!(error instanceof AuthApiError) || error.status !== 401) {
+          throw error;
+        }
+      }
+
+      let refreshed: AuthSession;
+      try {
+        refreshed = await refreshSession(session.refreshToken);
+        persist(refreshed);
+      } catch {
+        persist(null);
+        throw new Error("Your session expired. Please sign in again.");
+      }
+
+      try {
+        return await callAuthApi<T>(path, body, refreshed.accessToken);
+      } catch (error) {
+        if (error instanceof AuthApiError && error.status === 401) {
+          persist(null);
+        }
+        throw error;
+      }
+    },
+    [persist, refreshSession, session],
+  );
 
   const signIn = useCallback(
     async (input: SignInInput) => {
@@ -121,14 +179,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const data = await callAuthApi<AuthSession>(
+      const data = await callAuthenticatedApi<AuthSession>(
         "/api/auth/change-password",
         input,
-        session.accessToken,
       );
       persist(data);
     },
-    [persist, session],
+    [callAuthenticatedApi, persist, session],
   );
 
   const completeWelcome = useCallback(async () => {
@@ -142,13 +199,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const data = await callAuthApi<AuthSession>(
+    const data = await callAuthenticatedApi<AuthSession>(
       "/api/auth/onboarding/welcome",
       {},
-      session.accessToken,
     );
     persist(data);
-  }, [persist, session]);
+  }, [callAuthenticatedApi, persist, session]);
 
   const submitOnboarding = useCallback(
     async (answers: OnboardingAnswers) => {
@@ -166,14 +222,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const data = await callAuthApi<AuthSession>(
+      const data = await callAuthenticatedApi<AuthSession>(
         "/api/auth/onboarding",
         answers,
-        session.accessToken,
       );
       persist(data);
     },
-    [persist, session],
+    [callAuthenticatedApi, persist, session],
   );
 
   const updateSession = useCallback(

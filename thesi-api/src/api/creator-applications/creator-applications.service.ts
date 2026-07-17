@@ -1,4 +1,12 @@
-import { HttpStatus, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  ConflictException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,7 +15,10 @@ import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { EmailService } from 'src/shared/email/email.service';
 import { generateTempPassword } from 'src/shared/auth/token.util';
-import { CreateCreatorApplicationDto, CreatorApplicationData } from './dto/creator-application.dto';
+import {
+  CreateCreatorApplicationDto,
+  CreatorApplicationData,
+} from './dto/creator-application.dto';
 
 @Injectable()
 export class CreatorApplicationsService {
@@ -20,7 +31,9 @@ export class CreatorApplicationsService {
     private readonly authService: AuthService,
   ) {}
 
-  async create(dto: CreateCreatorApplicationDto): Promise<CreatorApplicationData> {
+  async create(
+    dto: CreateCreatorApplicationDto,
+  ): Promise<CreatorApplicationData> {
     const id = uuidv4();
 
     const [inserted] = await this.db
@@ -49,7 +62,9 @@ export class CreatorApplicationsService {
 
     this.emailService
       .sendCreatorApplicationConfirmation(dto.email, dto.fullName)
-      .catch((err) => this.logger.warn(`Failed to send confirmation email: ${err?.message}`));
+      .catch((err) =>
+        this.logger.warn(`Failed to send confirmation email: ${err?.message}`),
+      );
 
     return inserted as CreatorApplicationData;
   }
@@ -66,6 +81,55 @@ export class CreatorApplicationsService {
   }
 
   async approve(id: string): Promise<CreatorApplicationData> {
+    const tempPassword = generateTempPassword();
+    const { application, alreadyApproved } = await this.db.transaction(
+      async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(schema.thesiCreatorApplication)
+          .where(eq(schema.thesiCreatorApplication.id, id))
+          .limit(1);
+
+        if (!current) {
+          throw new NotFoundException('Creator application not found');
+        }
+
+        if (current.status === 'approved') {
+          return { application: current, alreadyApproved: true };
+        }
+
+        await this.authService.createUserFromApplication(
+          {
+            email: current.email,
+            fullName: current.fullName,
+            creatorApplicationId: current.id,
+            tempPassword,
+          },
+          tx,
+        );
+
+        const [updated] = await tx
+          .update(schema.thesiCreatorApplication)
+          .set({
+            status: 'approved',
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.thesiCreatorApplication.id, id))
+          .returning();
+
+        return { application: updated, alreadyApproved: false };
+      },
+    );
+
+    if (alreadyApproved) {
+      return application as CreatorApplicationData;
+    }
+
+    await this.sendAccountReadyOrThrow(application, tempPassword);
+    return application as CreatorApplicationData;
+  }
+
+  async resendInvite(id: string): Promise<CreatorApplicationData> {
     const [application] = await this.db
       .select()
       .from(schema.thesiCreatorApplication)
@@ -75,32 +139,37 @@ export class CreatorApplicationsService {
     if (!application) {
       throw new NotFoundException('Creator application not found');
     }
-
-    if (application.status === 'approved') {
-      return application as CreatorApplicationData;
+    if (application.status !== 'approved') {
+      throw new ConflictException(
+        'Creator application must be approved before resending its invite',
+      );
     }
 
     const tempPassword = generateTempPassword();
-    await this.authService.createUserFromApplication({
-      email: application.email,
-      fullName: application.fullName,
-      creatorApplicationId: application.id,
-      tempPassword,
-    });
+    await this.authService.resetCreatorTemporaryPassword(id, tempPassword);
+    await this.sendAccountReadyOrThrow(application, tempPassword);
 
-    const [updated] = await this.db
-      .update(schema.thesiCreatorApplication)
-      .set({
-        status: 'approved',
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.thesiCreatorApplication.id, id))
-      .returning();
+    return application as CreatorApplicationData;
+  }
 
-    this.emailService
-      .sendCreatorAccountReady(application.email, application.fullName, tempPassword)
-      .catch((err) => this.logger.warn(`Failed to send account ready email: ${err?.message}`));
-
-    return updated as CreatorApplicationData;
+  private async sendAccountReadyOrThrow(
+    application: typeof schema.thesiCreatorApplication.$inferSelect,
+    tempPassword: string,
+  ): Promise<void> {
+    try {
+      await this.emailService.sendCreatorAccountReady(
+        application.email,
+        application.fullName,
+        tempPassword,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Creator account ${application.id} was created, but invite delivery failed: ${message}`,
+      );
+      throw new BadGatewayException(
+        `Creator account was created, but invitation delivery failed. Retry PATCH /v1/creator-applications/${application.id}/resend-invite.`,
+      );
+    }
   }
 }
