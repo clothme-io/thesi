@@ -22,6 +22,7 @@ services:
       JWT_REFRESH_SECRET: prod-test-jwt-refresh-secret
       JWT_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION: 7d
+      THESI_WEB_URL: http://localhost:3010
       ADMIN_API_KEY: prod-test-admin-key
       EMAIL_FROM: Thesi <noreply@thesi.clothme.io>
     extra_hosts:

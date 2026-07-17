@@ -14,9 +14,10 @@ import { OnboardingController } from './onboarding.controller';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'change-me-in-production',
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: (configService.get<string>('JWT_EXPIRATION') || '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`,
+          expiresIn: (configService.get<string>('JWT_EXPIRATION') ||
+            '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`,
         },
       }),
     }),

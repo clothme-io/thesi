@@ -1,5 +1,17 @@
-import { Body, Controller, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from 'src/shared/auth/current-user.decorator';
 import { JwtAuthGuard } from 'src/shared/auth/jwt-auth.guard';
 import type { AuthJwtPayload } from 'src/shared/auth/jwt-auth.guard';
@@ -13,16 +25,20 @@ export class OnboardingController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('welcome')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark welcome step complete' })
   @ApiResponse({ status: 200, type: AuthResponse })
-  async completeWelcome(@CurrentUser() user: AuthJwtPayload): Promise<AuthResponse> {
+  async completeWelcome(
+    @CurrentUser() user: AuthJwtPayload,
+  ): Promise<AuthResponse> {
     const data = await this.authService.completeWelcome(user.sub);
     return { status: HttpStatus.OK, error: null, data };
   }
 
   @Post('questions')
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Submit onboarding questionnaire' })

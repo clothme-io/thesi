@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -25,8 +26,13 @@ import {
 import { OnboardingAnswersDto } from './dto/onboarding.dto';
 
 type UserRow = typeof schema.thesiUser.$inferSelect;
+type DbExecutor = Pick<
+  NodePgDatabase<typeof schema>,
+  'insert' | 'select' | 'update'
+>;
 
-export type OnboardingStep = 'change-password' | 'welcome' | 'questions' | 'complete';
+export type OnboardingStep =
+  'change-password' | 'welcome' | 'questions' | 'complete';
 
 @Injectable()
 export class AuthService {
@@ -73,7 +79,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const valid = await this.passwordService.compare(dto.password, user.passwordHash);
+    const valid = await this.passwordService.compare(
+      dto.password,
+      user.passwordHash,
+    );
     if (!valid) {
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -89,7 +98,12 @@ export class AuthService {
       .where(eq(schema.thesiRefreshToken.tokenHash, tokenHash))
       .limit(1);
 
-    if (!stored || stored.revokedAt || !stored.expiresAt || stored.expiresAt < new Date()) {
+    if (
+      !stored ||
+      stored.revokedAt ||
+      !stored.expiresAt ||
+      stored.expiresAt < new Date()
+    ) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
@@ -111,7 +125,10 @@ export class AuthService {
     return this.createSession(user);
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto): Promise<AuthSessionDto> {
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+  ): Promise<AuthSessionDto> {
     if (dto.newPassword !== dto.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
     }
@@ -126,9 +143,12 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const valid = await this.passwordService.compare(dto.currentPassword, user.passwordHash);
+    const valid = await this.passwordService.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
     if (!valid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new ForbiddenException('Current password is incorrect');
     }
 
     const passwordHash = await this.passwordService.hash(dto.newPassword);
@@ -163,7 +183,10 @@ export class AuthService {
     return this.createSession(updated);
   }
 
-  async submitOnboarding(userId: string, dto: OnboardingAnswersDto): Promise<AuthSessionDto> {
+  async submitOnboarding(
+    userId: string,
+    dto: OnboardingAnswersDto,
+  ): Promise<AuthSessionDto> {
     const [user] = await this.db
       .select()
       .from(schema.thesiUser)
@@ -217,20 +240,25 @@ export class AuthService {
     return this.createSession(updated);
   }
 
-  async createUserFromApplication(input: {
-    email: string;
-    fullName: string;
-    creatorApplicationId: string;
-    tempPassword: string;
-  }): Promise<UserRow> {
+  async createUserFromApplication(
+    input: {
+      email: string;
+      fullName: string;
+      creatorApplicationId: string;
+      tempPassword: string;
+    },
+    db: DbExecutor = this.db,
+  ): Promise<UserRow> {
     const email = input.email.trim().toLowerCase();
-    const existing = await this.findUserByEmail(email);
+    const existing = await this.findUserByEmail(email, db);
     if (existing) {
-      throw new ConflictException('A user account already exists for this email');
+      throw new ConflictException(
+        'A user account already exists for this email',
+      );
     }
 
     const passwordHash = await this.passwordService.hash(input.tempPassword);
-    const [user] = await this.db
+    const [user] = await db
       .insert(schema.thesiUser)
       .values({
         id: uuidv4(),
@@ -248,6 +276,32 @@ export class AuthService {
     return user;
   }
 
+  async resetCreatorTemporaryPassword(
+    creatorApplicationId: string,
+    tempPassword: string,
+  ): Promise<UserRow> {
+    const passwordHash = await this.passwordService.hash(tempPassword);
+    const [user] = await this.db
+      .update(schema.thesiUser)
+      .set({
+        passwordHash,
+        mustChangePassword: true,
+        onboardingCompleted: false,
+        onboardingStep: 'change-password',
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.thesiUser.creatorApplicationId, creatorApplicationId))
+      .returning();
+
+    if (!user) {
+      throw new ConflictException(
+        'No creator account exists for this application',
+      );
+    }
+
+    return user;
+  }
+
   private async createSession(user: UserRow): Promise<AuthSessionDto> {
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
@@ -256,7 +310,8 @@ export class AuthService {
     });
 
     const refreshToken = generateRefreshToken();
-    const refreshExpiration = this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
+    const refreshExpiration =
+      this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
     const expiresAt = this.addDuration(new Date(), refreshExpiration);
 
     await this.db.insert(schema.thesiRefreshToken).values({
@@ -300,8 +355,11 @@ export class AuthService {
     return 'welcome';
   }
 
-  private async findUserByEmail(email: string): Promise<UserRow | undefined> {
-    const [user] = await this.db
+  private async findUserByEmail(
+    email: string,
+    db: DbExecutor = this.db,
+  ): Promise<UserRow | undefined> {
+    const [user] = await db
       .select()
       .from(schema.thesiUser)
       .where(eq(schema.thesiUser.email, email))
