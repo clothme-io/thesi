@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useAuth } from "@/context/AuthProvider";
 import { useCreatorCrm, getDashboardMetrics } from "@/lib/creator-crm/storage";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { formatMoney, DEAL_STAGE_LABELS } from "@/lib/creator-crm/types";
 
 export function CreatorDashboard() {
-  const { data, ready } = useCreatorCrm();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready } = useCreatorCrm(authenticatedRequest);
   if (!ready) return null;
 
   const metrics = getDashboardMetrics(data);

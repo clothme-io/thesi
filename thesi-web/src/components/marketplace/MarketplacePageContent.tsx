@@ -37,10 +37,10 @@ const PAYMENT_OPTIONS: Array<PaymentStructure | "all"> = [
 const STATUS_OPTIONS: Array<MarketplaceListingStatus | "all"> = ["all", "open", "closing_soon", "closed"];
 
 export function MarketplacePageContent() {
-  const { session } = useAuth();
+  const { session, authenticatedRequest } = useAuth();
   const isBrand = session?.user.role === "brand";
   const userId = session?.user.id ?? "dev-user-1";
-  const { data, ready } = useMarketplace();
+  const { data, ready, error } = useMarketplace(authenticatedRequest);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<MarketplaceListingType | "all">("all");
   const [paymentFilter, setPaymentFilter] = useState<PaymentStructure | "all">("all");
@@ -92,6 +92,7 @@ export function MarketplacePageContent() {
       </header>
 
       <div className="app-content">
+        {error && <p className="workspace-hint">{error}</p>}
         {isBrand && (
           <p className="workspace-hint" style={{ marginTop: 0, marginBottom: 16 }}>
             Your posted campaigns appear here. Enable &quot;Post to marketplace&quot; when creating or activating a campaign.

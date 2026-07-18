@@ -1,59 +1,48 @@
-import { loadBrandCampaignData } from "@/lib/brand-campaigns/storage";
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
 import { addInboxNotification } from "@/lib/inbox/storage";
-import { loadBrandProfile } from "@/lib/profile/brand-storage";
-import { campaignToListing, mergeMarketplaceListings } from "./listings";
-import { loadMarketplaceData, saveMarketplaceData } from "./storage";
 
-export function publishCampaignToMarketplace(
+type AuthenticatedRequest = <T>(
+  path: string,
+  options?: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+  },
+) => Promise<T>;
+
+/**
+ * Marketplace listings are synced by thesi-api when campaigns are created/updated.
+ * This helper keeps the brand inbox notification when a campaign goes live.
+ */
+export async function publishCampaignToMarketplace(
   campaign: BrandCampaign,
-  ownerUserId: string,
-  brandName?: string,
-): void {
+  _ownerUserId: string,
+  _brandName?: string,
+  authenticatedRequest?: AuthenticatedRequest,
+): Promise<void> {
   if (!campaign.postToMarketplace || campaign.status !== "active") {
-    unpublishCampaignFromMarketplace(campaign.id);
     return;
   }
 
-  const name = brandName ?? (loadBrandProfile().companyName || "Your Brand");
-  const listing = campaignToListing(campaign, name, ownerUserId);
-  const data = loadMarketplaceData();
-  const customListings = [
-    ...data.customListings.filter((l) => l.campaignId !== campaign.id),
-    listing,
-  ];
-
-  saveMarketplaceData({
-    ...data,
-    customListings,
-    listings: mergeMarketplaceListings(customListings),
-  });
-
-  addInboxNotification({
-    type: "campaign_update",
-    title: "Campaign published to marketplace",
-    body: `"${campaign.name}" is now live on the marketplace for creators to browse and apply.`,
-    href: `/app/marketplace/${listing.id}`,
-    campaignId: campaign.id,
-    audience: "brand",
-  });
-}
-
-export function unpublishCampaignFromMarketplace(campaignId: string): void {
-  const data = loadMarketplaceData();
-  const customListings = data.customListings.filter((l) => l.campaignId !== campaignId);
-  saveMarketplaceData({
-    ...data,
-    customListings,
-    listings: mergeMarketplaceListings(customListings),
-  });
-}
-
-export function syncAllPostedCampaigns(ownerUserId: string, brandName?: string): void {
-  const campaigns = loadBrandCampaignData().campaigns.filter(
-    (c) => c.postToMarketplace && c.status === "active",
-  );
-  for (const campaign of campaigns) {
-    publishCampaignToMarketplace(campaign, ownerUserId, brandName);
+  if (authenticatedRequest) {
+    await addInboxNotification(authenticatedRequest, {
+      type: "campaign_update",
+      title: "Campaign published to marketplace",
+      body: `"${campaign.name}" is now live on the marketplace for creators to browse and apply.`,
+      href: "/app/marketplace",
+      campaignId: campaign.id,
+      audience: "brand",
+    });
   }
+}
+
+export function unpublishCampaignFromMarketplace(_campaignId: string): void {
+  // Server removes the listing when the campaign is updated.
+}
+
+export function syncAllPostedCampaigns(
+  _campaigns: BrandCampaign[],
+  _ownerUserId: string,
+  _brandName?: string,
+): void {
+  // No-op — listings are API-backed.
 }

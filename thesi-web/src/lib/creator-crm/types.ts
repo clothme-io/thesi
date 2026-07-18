@@ -94,6 +94,8 @@ export interface Payment {
   dueDate: string;
   paidAt?: string;
   invoiceNumber?: string;
+  description?: string;
+  sentAt?: string;
   createdAt: string;
   updatedAt: string;
 }

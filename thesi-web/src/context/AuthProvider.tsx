@@ -32,6 +32,19 @@ interface AuthContextValue {
   completeWelcome: () => Promise<void>;
   submitOnboarding: (answers: OnboardingAnswers) => Promise<void>;
   updateSession: (session: AuthSession) => void;
+  authenticatedRequest: <T>(
+    path: string,
+    options?: {
+      method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+      body?: unknown;
+    },
+  ) => Promise<T>;
+  authenticatedBinaryRequest: (
+    path: string,
+    options?: {
+      method?: "GET" | "DELETE";
+    },
+  ) => Promise<{ blob: Blob; fileName: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -49,14 +62,18 @@ async function callAuthApi<T>(
   path: string,
   body: unknown,
   accessToken?: string,
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "POST",
 ): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const res = await fetch(path, {
-    method: "POST",
+    method,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify(body),
+    ...(body === undefined
+      ? {}
+      : { body: isFormData ? body : JSON.stringify(body) }),
   });
 
   const json = await res.json();
@@ -64,6 +81,37 @@ async function callAuthApi<T>(
     throw new AuthApiError(json.error?.message || "Request failed", res.status);
   }
   return json.data as T;
+}
+
+async function callAuthBinary(
+  path: string,
+  accessToken: string,
+  method: "GET" | "DELETE" = "GET",
+): Promise<{ blob: Blob; fileName: string | null }> {
+  const res = await fetch(path, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    let message = "Request failed";
+    try {
+      const json = await res.json();
+      message = json.error?.message || message;
+    } catch {
+      // binary error bodies are fine
+    }
+    throw new AuthApiError(message, res.status);
+  }
+
+  const disposition = res.headers.get("content-disposition");
+  const match = disposition?.match(/filename="([^"]+)"/);
+  return {
+    blob: await res.blob(),
+    fileName: match?.[1] ?? null,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -93,14 +141,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return refreshPromiseRef.current;
   }, []);
 
-  const callAuthenticatedApi = useCallback(
-    async <T,>(path: string, body: unknown): Promise<T> => {
+  const authenticatedRequest = useCallback(
+    async <T,>(
+      path: string,
+      options: {
+        method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+        body?: unknown;
+      } = {},
+    ): Promise<T> => {
       if (!session) {
         throw new Error("You must sign in to continue");
       }
 
       try {
-        return await callAuthApi<T>(path, body, session.accessToken);
+        return await callAuthApi<T>(
+          path,
+          options.body,
+          session.accessToken,
+          options.method ?? "GET",
+        );
       } catch (error) {
         if (!(error instanceof AuthApiError) || error.status !== 401) {
           throw error;
@@ -117,7 +176,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        return await callAuthApi<T>(path, body, refreshed.accessToken);
+        return await callAuthApi<T>(
+          path,
+          options.body,
+          refreshed.accessToken,
+          options.method ?? "GET",
+        );
+      } catch (error) {
+        if (error instanceof AuthApiError && error.status === 401) {
+          persist(null);
+        }
+        throw error;
+      }
+    },
+    [persist, refreshSession, session],
+  );
+
+  const authenticatedBinaryRequest = useCallback(
+    async (
+      path: string,
+      options: {
+        method?: "GET" | "DELETE";
+      } = {},
+    ) => {
+      if (!session) {
+        throw new Error("You must sign in to continue");
+      }
+
+      try {
+        return await callAuthBinary(
+          path,
+          session.accessToken,
+          options.method ?? "GET",
+        );
+      } catch (error) {
+        if (!(error instanceof AuthApiError) || error.status !== 401) {
+          throw error;
+        }
+      }
+
+      let refreshed: AuthSession;
+      try {
+        refreshed = await refreshSession(session.refreshToken);
+        persist(refreshed);
+      } catch {
+        persist(null);
+        throw new Error("Your session expired. Please sign in again.");
+      }
+
+      try {
+        return await callAuthBinary(
+          path,
+          refreshed.accessToken,
+          options.method ?? "GET",
+        );
       } catch (error) {
         if (error instanceof AuthApiError && error.status === 401) {
           persist(null);
@@ -173,19 +285,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           user: {
             ...session.user,
             mustChangePassword: false,
-            onboardingStep: "welcome",
+            onboardingStep: session.user.onboardingCompleted ? "complete" : "welcome",
           },
         });
         return;
       }
 
-      const data = await callAuthenticatedApi<AuthSession>(
+      const data = await authenticatedRequest<AuthSession>(
         "/api/auth/change-password",
-        input,
+        { method: "POST", body: input },
       );
       persist(data);
     },
-    [callAuthenticatedApi, persist, session],
+    [authenticatedRequest, persist, session],
   );
 
   const completeWelcome = useCallback(async () => {
@@ -199,12 +311,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const data = await callAuthenticatedApi<AuthSession>(
+    const data = await authenticatedRequest<AuthSession>(
       "/api/auth/onboarding/welcome",
-      {},
+      { method: "POST", body: {} },
     );
     persist(data);
-  }, [callAuthenticatedApi, persist, session]);
+  }, [authenticatedRequest, persist, session]);
 
   const submitOnboarding = useCallback(
     async (answers: OnboardingAnswers) => {
@@ -222,13 +334,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const data = await callAuthenticatedApi<AuthSession>(
+      const data = await authenticatedRequest<AuthSession>(
         "/api/auth/onboarding",
-        answers,
+        { method: "POST", body: answers },
       );
       persist(data);
     },
-    [callAuthenticatedApi, persist, session],
+    [authenticatedRequest, persist, session],
   );
 
   const updateSession = useCallback(
@@ -249,6 +361,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeWelcome,
       submitOnboarding,
       updateSession,
+      authenticatedRequest,
+      authenticatedBinaryRequest,
     }),
     [
       session,
@@ -260,6 +374,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeWelcome,
       submitOnboarding,
       updateSession,
+      authenticatedRequest,
+      authenticatedBinaryRequest,
     ],
   );
 

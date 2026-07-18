@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/context/AuthProvider";
+
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -12,7 +14,8 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export function CalendarPageContent() {
-  const { data, ready } = useCreatorCrm();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready } = useCreatorCrm(authenticatedRequest);
   if (!ready) return null;
 
   const sorted = [...data.calendarEvents].sort((a, b) => a.date.localeCompare(b.date));

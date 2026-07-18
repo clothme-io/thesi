@@ -1,23 +1,42 @@
 "use client";
 
+import { useAuth } from "@/context/AuthProvider";
 import { useBrandSettings } from "@/lib/settings/brand-storage";
 import { DATE_FORMAT_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/settings/shared-types";
 import { SettingsToggle } from "../SettingsToggle";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 
 export function BrandSettingsPreferencesContent() {
-  const { settings, ready, saved, updateSettings, persistSettings } = useBrandSettings();
+  const { authenticatedRequest } = useAuth();
+  const {
+    settings,
+    ready,
+    saved,
+    saving,
+    error,
+    updateSettings,
+    persistSettings,
+  } = useBrandSettings(authenticatedRequest);
 
   if (!ready) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistSettings(settings);
+    try {
+      await persistSettings(settings);
+    } catch {
+      // The hook exposes the user-facing error state.
+    }
   };
 
   return (
     <BrandSettingsSection title="Preferences" subtitle="Timezone and workspace display" saved={saved}>
       <form className="workspace-form" onSubmit={handleSave}>
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
         <section className="workspace-section">
           <div className="workspace-grid">
             <label className="workspace-field">
@@ -59,8 +78,8 @@ export function BrandSettingsPreferencesContent() {
           </div>
         </section>
         <div className="workspace-form-footer">
-          <button type="submit" className="crm-btn-primary">
-            Save preferences
+          <button type="submit" className="crm-btn-primary" disabled={saving}>
+            {saving ? "Saving…" : "Save preferences"}
           </button>
         </div>
       </form>

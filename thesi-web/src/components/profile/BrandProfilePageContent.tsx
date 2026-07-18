@@ -13,9 +13,17 @@ import {
 import { getInitials } from "@/lib/profile/shared";
 
 export function BrandProfilePageContent() {
-  const { session } = useAuth();
+  const { session, authenticatedRequest } = useAuth();
   const fallbackCompanyName = session?.user.companyName || session?.user.fullName || "";
-  const { profile, ready, saved, updateProfile, persistProfile } = useBrandProfile(fallbackCompanyName);
+  const {
+    profile,
+    ready,
+    saved,
+    saving,
+    error,
+    updateProfile,
+    persistProfile,
+  } = useBrandProfile(authenticatedRequest, fallbackCompanyName);
 
   if (!ready) return null;
 
@@ -25,9 +33,13 @@ export function BrandProfilePageContent() {
     updateProfile({ [field]: next });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistProfile(profile);
+    try {
+      await persistProfile(profile);
+    } catch {
+      // The hook exposes the user-facing error state.
+    }
   };
 
   const displayName = profile.companyName || fallbackCompanyName;
@@ -43,6 +55,11 @@ export function BrandProfilePageContent() {
       </header>
 
       <div className="app-content">
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
         <div className="profile-hero">
           <div className="profile-avatar">{getInitials(displayName)}</div>
           <div>
@@ -241,8 +258,8 @@ export function BrandProfilePageContent() {
           </section>
 
           <div className="workspace-form-footer">
-            <button type="submit" className="crm-btn-primary">
-              Save brand profile
+            <button type="submit" className="crm-btn-primary" disabled={saving}>
+              {saving ? "Saving…" : "Save brand profile"}
             </button>
           </div>
         </form>

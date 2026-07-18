@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/context/AuthProvider";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -27,7 +28,8 @@ const TABS = ["Overview", "Deals", "Jobs", "Payments", "Notes", "Files", "Messag
 export function BrandDetailContent() {
   const params = useParams();
   const brandId = params.id as string;
-  const { data, ready } = useCreatorCrm();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready } = useCreatorCrm(authenticatedRequest);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
 
   if (!ready) return null;

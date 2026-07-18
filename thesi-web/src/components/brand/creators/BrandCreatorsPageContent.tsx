@@ -2,23 +2,30 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthProvider";
 import {
   isFavorite,
   sortProfilesWithFavoritesFirst,
-  toggleFavorite,
   useBrandCreatorFavorites,
+  useCreatorsDirectory,
 } from "@/lib/brand-creators/storage";
 import { BRAND_CREATORS_ROUTES } from "@/lib/brand-creators/routes";
-import { getAllCreators } from "@/lib/creators/directory";
 import { formatCount, formatPercent } from "@/lib/creators/types";
 
 export function BrandCreatorsPageContent() {
-  const { data: favData, ready, persist } = useBrandCreatorFavorites();
+  const { authenticatedRequest } = useAuth();
+  const { creators: allCreators, ready: creatorsReady, error: creatorsError } =
+    useCreatorsDirectory(authenticatedRequest);
+  const {
+    data: favData,
+    ready: favoritesReady,
+    error: favoritesError,
+    toggleFavorite,
+  } = useBrandCreatorFavorites(authenticatedRequest);
   const [query, setQuery] = useState("");
   const [nicheFilter, setNicheFilter] = useState("all");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-
-  const allCreators = getAllCreators();
+  const [actionError, setActionError] = useState("");
 
   const niches = useMemo(() => {
     const set = new Set<string>();
@@ -43,12 +50,21 @@ export function BrandCreatorsPageContent() {
     return list;
   }, [allCreators, query, nicheFilter, favoritesOnly, favData]);
 
-  if (!ready) return null;
+  if (!creatorsReady || !favoritesReady) return null;
 
   const favoriteCount = favData.favoriteCreatorIds.length;
 
-  const handleToggleFavorite = (creatorId: string) => {
-    persist(toggleFavorite(favData, creatorId));
+  const handleToggleFavorite = async (creatorId: string) => {
+    setActionError("");
+    try {
+      await toggleFavorite(creatorId);
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not update favorite",
+      );
+    }
   };
 
   return (
@@ -66,6 +82,11 @@ export function BrandCreatorsPageContent() {
         <p className="workspace-hint" style={{ marginTop: 0, marginBottom: 16 }}>
           Browse creator stats and UGC performance before inviting. Favorited creators appear first in invite lists.
         </p>
+        {(creatorsError || favoritesError || actionError) && (
+          <p className="workspace-hint">
+            {actionError || creatorsError || favoritesError}
+          </p>
+        )}
 
         <div className="marketplace-toolbar">
           <input
@@ -139,7 +160,8 @@ export function BrandCreatorsPageContent() {
                       </div>
                     </div>
                     <p className="brand-creator-card-meta">
-                      {creator.platforms.join(" · ")} · {creator.location} · {creator.ugcPosts.length} UGC posts
+                      {creator.platforms.join(" · ") || "No platforms"} · {creator.location || "—"} ·{" "}
+                      {creator.ugcPosts.length} UGC posts
                     </p>
                   </Link>
                 </article>

@@ -2,27 +2,36 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { useAuth } from "@/context/AuthProvider";
 import {
   isFavorite,
-  toggleFavorite,
   useBrandCreatorFavorites,
+  useCreatorDirectoryProfile,
 } from "@/lib/brand-creators/storage";
 import { BRAND_CREATORS_ROUTES } from "@/lib/brand-creators/routes";
-import { getCreatorById } from "@/lib/creators/directory";
 import { formatCount, formatPercent } from "@/lib/creators/types";
 
 export function BrandCreatorDetailContent() {
   const { id } = useParams<{ id: string }>();
-  const { data: favData, ready, persist } = useBrandCreatorFavorites();
+  const { authenticatedRequest } = useAuth();
+  const { creator, ready: creatorReady, error: creatorError } =
+    useCreatorDirectoryProfile(authenticatedRequest, id);
+  const {
+    data: favData,
+    ready: favoritesReady,
+    toggleFavorite,
+  } = useBrandCreatorFavorites(authenticatedRequest);
+  const [actionError, setActionError] = useState("");
 
-  if (!ready) return null;
+  if (!creatorReady || !favoritesReady) return null;
 
-  const creator = getCreatorById(id);
   if (!creator) {
     return (
       <div className="app-content">
         <p>
-          Creator not found. <Link href={BRAND_CREATORS_ROUTES.list}>Back to creators</Link>
+          {creatorError || "Creator not found."}{" "}
+          <Link href={BRAND_CREATORS_ROUTES.list}>Back to creators</Link>
         </p>
       </div>
     );
@@ -39,19 +48,31 @@ export function BrandCreatorDetailContent() {
           </Link>
           <h1 style={{ marginTop: 4 }}>{creator.name}</h1>
           <span className="workspace-subtitle">
-            {creator.platforms.join(" · ")} · {creator.location}
+            {creator.platforms.join(" · ") || "No platforms"} · {creator.location || "—"}
           </span>
         </div>
         <button
           type="button"
           className={`crm-btn-secondary ${fav ? "brand-creator-fav-btn--active" : ""}`}
-          onClick={() => persist(toggleFavorite(favData, creator.id))}
+          onClick={async () => {
+            setActionError("");
+            try {
+              await toggleFavorite(creator.id);
+            } catch (requestError) {
+              setActionError(
+                requestError instanceof Error
+                  ? requestError.message
+                  : "Could not update favorite",
+              );
+            }
+          }}
         >
           {fav ? "★ Favorited" : "☆ Add to favorites"}
         </button>
       </header>
 
       <div className="app-content">
+        {actionError && <p className="workspace-hint">{actionError}</p>}
         <div className="crm-detail-grid">
           <div>
             <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
@@ -70,7 +91,7 @@ export function BrandCreatorDetailContent() {
               </div>
               <div className="crm-meta-row">
                 <span>Follower range</span>
-                <span>{creator.followerRange}</span>
+                <span>{creator.followerRange || "—"}</span>
               </div>
             </div>
 
@@ -154,23 +175,27 @@ export function BrandCreatorDetailContent() {
 
             <div className="crm-detail-panel">
               <h3>By platform</h3>
-              {creator.stats.platforms.map((platform) => (
-                <div key={platform.platform} style={{ marginBottom: 16 }}>
-                  <strong>{platform.platform}</strong>
-                  <div className="crm-meta-row">
-                    <span>Followers</span>
-                    <span>{formatCount(platform.followers)}</span>
+              {creator.stats.platforms.length === 0 ? (
+                <p className="workspace-hint">No platform stats yet.</p>
+              ) : (
+                creator.stats.platforms.map((platform) => (
+                  <div key={platform.platform} style={{ marginBottom: 16 }}>
+                    <strong>{platform.platform}</strong>
+                    <div className="crm-meta-row">
+                      <span>Followers</span>
+                      <span>{formatCount(platform.followers)}</span>
+                    </div>
+                    <div className="crm-meta-row">
+                      <span>Avg views</span>
+                      <span>{formatCount(platform.avgViews)}</span>
+                    </div>
+                    <div className="crm-meta-row">
+                      <span>Engagement</span>
+                      <span>{formatPercent(platform.engagementRate)}</span>
+                    </div>
                   </div>
-                  <div className="crm-meta-row">
-                    <span>Avg views</span>
-                    <span>{formatCount(platform.avgViews)}</span>
-                  </div>
-                  <div className="crm-meta-row">
-                    <span>Engagement</span>
-                    <span>{formatPercent(platform.engagementRate)}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </aside>
         </div>

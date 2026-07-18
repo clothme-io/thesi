@@ -1,22 +1,41 @@
 "use client";
 
+import { useAuth } from "@/context/AuthProvider";
 import { useBrandSettings } from "@/lib/settings/brand-storage";
 import { SettingsToggle } from "../SettingsToggle";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 
 export function BrandSettingsNotificationsContent() {
-  const { settings, ready, saved, updateSettings, persistSettings } = useBrandSettings();
+  const { authenticatedRequest } = useAuth();
+  const {
+    settings,
+    ready,
+    saved,
+    saving,
+    error,
+    updateSettings,
+    persistSettings,
+  } = useBrandSettings(authenticatedRequest);
 
   if (!ready) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistSettings(settings);
+    try {
+      await persistSettings(settings);
+    } catch {
+      // The hook exposes the user-facing error state.
+    }
   };
 
   return (
     <BrandSettingsSection title="Notifications" subtitle="Email and in-app alerts" saved={saved}>
       <form className="workspace-form" onSubmit={handleSave}>
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
         <section className="workspace-section">
           <div className="settings-toggle-list">
             <SettingsToggle
@@ -58,8 +77,8 @@ export function BrandSettingsNotificationsContent() {
           </div>
         </section>
         <div className="workspace-form-footer">
-          <button type="submit" className="crm-btn-primary">
-            Save notifications
+          <button type="submit" className="crm-btn-primary" disabled={saving}>
+            {saving ? "Saving…" : "Save notifications"}
           </button>
         </div>
       </form>

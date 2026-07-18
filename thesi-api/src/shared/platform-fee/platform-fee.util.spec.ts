@@ -1,7 +1,9 @@
 import {
   calculatePlatformFeeCents,
+  campaignPayoutCents,
   PLATFORM_FEE_CAP_CENTS,
   PLATFORM_FEE_RATE,
+  previewPlatformFee,
 } from './platform-fee.util';
 
 describe('calculatePlatformFeeCents', () => {
@@ -23,5 +25,33 @@ describe('calculatePlatformFeeCents', () => {
   it('returns 0 for zero or negative payout', () => {
     expect(calculatePlatformFeeCents(0)).toBe(0);
     expect(calculatePlatformFeeCents(-100)).toBe(0);
+  });
+});
+
+describe('campaignPayoutCents', () => {
+  it('uses flat rate for flat/hybrid/royalty', () => {
+    expect(
+      campaignPayoutCents({ model: 'flat_rate', flatRateCents: 50_000 }),
+    ).toBe(50_000);
+  });
+
+  it('sums milestones', () => {
+    expect(
+      campaignPayoutCents({
+        model: 'milestone',
+        milestones: [{ amountCents: 10_000 }, { amountCents: 15_000 }],
+      }),
+    ).toBe(25_000);
+  });
+});
+
+describe('previewPlatformFee', () => {
+  it('marks capped fees', () => {
+    const preview = previewPlatformFee({
+      model: 'flat_rate',
+      flatRateCents: 20_000_000,
+    });
+    expect(preview.feeCents).toBe(PLATFORM_FEE_CAP_CENTS);
+    expect(preview.capped).toBe(true);
   });
 });

@@ -157,7 +157,7 @@ export class AuthService {
       .set({
         passwordHash,
         mustChangePassword: false,
-        onboardingStep: 'welcome',
+        onboardingStep: user.onboardingCompleted ? 'complete' : 'welcome',
         updatedAt: new Date(),
       })
       .where(eq(schema.thesiUser.id, userId))

@@ -1,53 +1,65 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { InviteData, CampaignInvite } from "./types";
+import type { CampaignInvite, InviteData } from "./types";
 
-const STORAGE_KEY = "thesi_campaign_invites";
+type AuthenticatedRequest = <T>(
+  path: string,
+  options?: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+  },
+) => Promise<T>;
 
 const EMPTY: InviteData = { invites: [] };
 
-export function loadInviteData(): InviteData {
-  if (typeof window === "undefined") return EMPTY;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(EMPTY));
-    return EMPTY;
-  }
-  try {
-    return JSON.parse(raw) as InviteData;
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(EMPTY));
-    return EMPTY;
-  }
-}
-
-export function saveInviteData(data: InviteData) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-export function useInvites() {
+export function useInvites(authenticatedRequest: AuthenticatedRequest) {
   const [data, setData] = useState<InviteData>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(
+    async (campaignId?: string) => {
+      setError("");
+      const path = campaignId
+        ? `/api/invites/campaign?campaignId=${encodeURIComponent(campaignId)}`
+        : "/api/invites/campaign";
+      const next = await authenticatedRequest<InviteData>(path);
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
 
   useEffect(() => {
-    setData(loadInviteData());
-    setReady(true);
-  }, []);
+    let active = true;
+    setReady(false);
+    setError("");
+    authenticatedRequest<InviteData>("/api/invites/campaign")
+      .then((next) => {
+        if (active) setData(next);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load invites",
+          );
+          setData(EMPTY);
+        }
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest]);
 
-  const persist = useCallback((next: InviteData) => {
-    setData(next);
-    saveInviteData(next);
-  }, []);
-
-  return { data, ready, persist };
+  return { data, ready, error, reload, setData };
 }
 
 export function getInvitesForCampaign(data: InviteData, campaignId: string): CampaignInvite[] {
   return data.invites.filter((i) => i.campaignId === campaignId);
-}
-
-export function addInvite(data: InviteData, invite: CampaignInvite): InviteData {
-  return { ...data, invites: [...data.invites, invite] };
 }

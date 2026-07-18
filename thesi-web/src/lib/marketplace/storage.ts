@@ -1,69 +1,136 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { loadCrmData, saveCrmData } from "@/lib/creator-crm/storage";
-import { addListingToCrm } from "./crm-integration";
-import type { MarketplaceApplication, MarketplaceData, MarketplaceListing } from "./types";
-import { SEED_MARKETPLACE_DATA } from "./seed";
-import { mergeMarketplaceListings } from "./listings";
+import type {
+  MarketplaceApplication,
+  MarketplaceData,
+  MarketplaceListing,
+} from "./types";
 
-const STORAGE_KEY = "thesi_marketplace";
+type AuthenticatedRequest = <T>(
+  path: string,
+  options?: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+  },
+) => Promise<T>;
 
-function normalizeMarketplaceData(raw: Partial<MarketplaceData>): MarketplaceData {
-  const customListings = raw.customListings ?? [];
-  return {
-    customListings,
-    listings: mergeMarketplaceListings(customListings),
-    applications: raw.applications ?? SEED_MARKETPLACE_DATA.applications,
-    crmLinkedListingIds: raw.crmLinkedListingIds ?? SEED_MARKETPLACE_DATA.crmLinkedListingIds,
-  };
-}
+type MarketplaceApiData = {
+  listings: MarketplaceListing[];
+  applications: MarketplaceApplication[];
+  crmLinkedListingIds: string[];
+};
 
-export function loadMarketplaceData(): MarketplaceData {
-  if (typeof window === "undefined") return SEED_MARKETPLACE_DATA;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_MARKETPLACE_DATA));
-    return SEED_MARKETPLACE_DATA;
-  }
-  try {
-    const parsed = JSON.parse(raw) as Partial<MarketplaceData>;
-    return normalizeMarketplaceData(parsed);
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_MARKETPLACE_DATA));
-    return SEED_MARKETPLACE_DATA;
-  }
-}
+const EMPTY: MarketplaceData = {
+  customListings: [],
+  listings: [],
+  applications: [],
+  crmLinkedListingIds: [],
+};
 
-export function saveMarketplaceData(data: MarketplaceData) {
-  if (typeof window === "undefined") return;
-  const toSave = {
-    customListings: data.customListings,
-    applications: data.applications,
-    crmLinkedListingIds: data.crmLinkedListingIds,
-  };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-}
-
-export function useMarketplace() {
-  const [data, setData] = useState<MarketplaceData>(SEED_MARKETPLACE_DATA);
+export function useMarketplace(authenticatedRequest: AuthenticatedRequest) {
+  const [data, setData] = useState<MarketplaceData>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(async () => {
+    setError("");
+    const next = await authenticatedRequest<MarketplaceApiData>("/api/marketplace");
+    const normalized: MarketplaceData = {
+      customListings: next.listings,
+      listings: next.listings,
+      applications: next.applications,
+      crmLinkedListingIds: next.crmLinkedListingIds,
+    };
+    setData(normalized);
+    return normalized;
+  }, [authenticatedRequest]);
 
   useEffect(() => {
-    setData(loadMarketplaceData());
-    setReady(true);
-  }, []);
+    let active = true;
+    setReady(false);
+    setError("");
+    authenticatedRequest<MarketplaceApiData>("/api/marketplace")
+      .then((next) => {
+        if (!active) return;
+        setData({
+          customListings: next.listings,
+          listings: next.listings,
+          applications: next.applications,
+          crmLinkedListingIds: next.crmLinkedListingIds,
+        });
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load marketplace",
+          );
+          setData(EMPTY);
+        }
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest]);
 
-  const persist = useCallback((next: MarketplaceData) => {
-    const normalized = normalizeMarketplaceData({
-      ...next,
-      customListings: next.customListings,
-    });
-    setData(normalized);
-    saveMarketplaceData(normalized);
-  }, []);
+  const applyToListing = useCallback(
+    async (listing: MarketplaceListing, pitch: string, linkToCrm: boolean) => {
+      setError("");
+      const result = await authenticatedRequest<{
+        application: MarketplaceApplication;
+        crmLinkedListingIds: string[];
+      }>(`/api/marketplace/listings/${listing.id}/apply`, {
+        method: "POST",
+        body: { pitch, addToCrm: linkToCrm },
+      });
 
-  return { data, ready, persist };
+      setData((prev) => ({
+        ...prev,
+        applications: [
+          result.application,
+          ...prev.applications.filter((app) => app.id !== result.application.id),
+        ],
+        crmLinkedListingIds: result.crmLinkedListingIds,
+        listings: prev.listings.map((item) =>
+          item.id === listing.id
+            ? { ...item, applicantsCount: item.applicantsCount + 1 }
+            : item,
+        ),
+      }));
+      return result;
+    },
+    [authenticatedRequest],
+  );
+
+  const linkListingToCrm = useCallback(
+    async (listing: MarketplaceListing) => {
+      setError("");
+      const result = await authenticatedRequest<{ crmLinkedListingIds: string[] }>(
+        `/api/marketplace/listings/${listing.id}/crm-link`,
+        { method: "POST", body: {} },
+      );
+      setData((prev) => ({
+        ...prev,
+        crmLinkedListingIds: result.crmLinkedListingIds,
+      }));
+      return result;
+    },
+    [authenticatedRequest],
+  );
+
+  return {
+    data,
+    ready,
+    error,
+    reload,
+    applyToListing,
+    linkListingToCrm,
+  };
 }
 
 export function getListingById(data: MarketplaceData, id: string) {
@@ -76,58 +143,4 @@ export function hasApplied(data: MarketplaceData, listingId: string) {
 
 export function isInCrm(data: MarketplaceData, listingId: string) {
   return data.crmLinkedListingIds.includes(listingId);
-}
-
-export function applyToListing(
-  marketplace: MarketplaceData,
-  listing: MarketplaceListing,
-  pitch: string,
-  linkToCrm: boolean,
-): { marketplace: MarketplaceData; crmUpdated: boolean } {
-  const now = new Date().toISOString();
-  let nextMarketplace = marketplace;
-
-  if (!hasApplied(marketplace, listing.id)) {
-    const application: MarketplaceApplication = {
-      id: `app-${Date.now()}`,
-      listingId: listing.id,
-      pitch,
-      appliedAt: now,
-      addedToCrm: linkToCrm,
-    };
-    nextMarketplace = {
-      ...marketplace,
-      applications: [...marketplace.applications, application],
-      crmLinkedListingIds: linkToCrm
-        ? [...new Set([...marketplace.crmLinkedListingIds, listing.id])]
-        : marketplace.crmLinkedListingIds,
-    };
-  }
-
-  if (linkToCrm && !marketplace.crmLinkedListingIds.includes(listing.id)) {
-    const crm = loadCrmData();
-    saveCrmData(addListingToCrm(crm, listing));
-    nextMarketplace = {
-      ...nextMarketplace,
-      crmLinkedListingIds: [...new Set([...nextMarketplace.crmLinkedListingIds, listing.id])],
-    };
-    return { marketplace: nextMarketplace, crmUpdated: true };
-  }
-
-  return { marketplace: nextMarketplace, crmUpdated: false };
-}
-
-export function linkListingToCrm(
-  marketplace: MarketplaceData,
-  listing: MarketplaceListing,
-): MarketplaceData {
-  if (marketplace.crmLinkedListingIds.includes(listing.id)) {
-    return marketplace;
-  }
-  const crm = loadCrmData();
-  saveCrmData(addListingToCrm(crm, listing));
-  return {
-    ...marketplace,
-    crmLinkedListingIds: [...marketplace.crmLinkedListingIds, listing.id],
-  };
 }

@@ -1,6 +1,6 @@
 /**
- * Stub notification sender for development.
- * TODO: Replace with Novu workflow triggers for production email + in-app delivery.
+ * Client-side notification helpers were replaced by Nest NovuService.
+ * Invite email/out-of-app delivery is triggered server-side on invite create.
  */
 
 export type NotificationEvent =
@@ -25,9 +25,9 @@ export type NotificationEvent =
       invitedBy: string;
     };
 
+/** @deprecated Prefer server-side Novu triggers via /api/invites. */
 export async function sendStubNotification(event: NotificationEvent): Promise<void> {
-  // TODO(Novu): dispatch workflow based on event.type with template variables.
   if (typeof window !== "undefined") {
-    console.info("[thesi-notifications stub]", event);
+    console.info("[thesi-notifications] server-owned; client stub no-op", event.type);
   }
 }

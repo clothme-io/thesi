@@ -1,4 +1,4 @@
-import type { CreatorDirectoryEntry } from "@/lib/creators/directory";
+import type { CreatorDirectoryEntry } from "@/lib/creators/types";
 import type { CampaignInviteCriteria } from "./types";
 
 function parseFollowerMin(range: string): number {

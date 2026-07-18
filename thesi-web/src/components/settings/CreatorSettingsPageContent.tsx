@@ -1,20 +1,34 @@
 "use client";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { useCreatorSettings } from "@/lib/settings/creator-storage";
 import { DATE_FORMAT_OPTIONS, TIMEZONE_OPTIONS } from "@/lib/settings/shared-types";
+import { CreatorPayoutsSection } from "./CreatorPayoutsSection";
 import { SettingsToggle } from "./SettingsToggle";
 
 export function CreatorSettingsPageContent() {
-  const { session } = useAuth();
-  const { settings, ready, saved, updateSettings, persistSettings } = useCreatorSettings();
+  const { session, authenticatedRequest } = useAuth();
+  const {
+    settings,
+    ready,
+    saved,
+    saving,
+    error,
+    updateSettings,
+    persistSettings,
+  } = useCreatorSettings(authenticatedRequest);
 
   if (!ready) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistSettings(settings);
+    try {
+      await persistSettings(settings);
+    } catch {
+      // The hook exposes the user-facing error state.
+    }
   };
 
   return (
@@ -28,6 +42,11 @@ export function CreatorSettingsPageContent() {
       </header>
 
       <div className="app-content">
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
         <form className="workspace-form" onSubmit={handleSave}>
           <section className="workspace-section">
             <h3>Account</h3>
@@ -97,6 +116,10 @@ export function CreatorSettingsPageContent() {
             </div>
           </section>
 
+          <Suspense fallback={null}>
+            <CreatorPayoutsSection />
+          </Suspense>
+
           <section className="workspace-section">
             <h3>Preferences</h3>
             <div className="workspace-grid">
@@ -140,8 +163,8 @@ export function CreatorSettingsPageContent() {
           </section>
 
           <div className="workspace-form-footer">
-            <button type="submit" className="crm-btn-primary">
-              Save settings
+            <button type="submit" className="crm-btn-primary" disabled={saving}>
+              {saving ? "Saving…" : "Save settings"}
             </button>
           </div>
         </form>
