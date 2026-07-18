@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useAuth } from "@/context/AuthProvider";
 import { useParams } from "next/navigation";
 import {
   useCreatorCrm,
@@ -25,7 +26,8 @@ import {
 export function JobDetailContent() {
   const params = useParams();
   const jobId = params.id as string;
-  const { data, ready } = useCreatorCrm();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready } = useCreatorCrm(authenticatedRequest);
 
   if (!ready) return null;
 

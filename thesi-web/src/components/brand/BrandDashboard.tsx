@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useBrandCampaigns, getBrandDashboardMetrics } from "@/lib/brand-campaigns/storage";
 import { getCampaignBudgetLabel } from "@/lib/brand-campaigns/types";
+import { useAuth } from "@/context/AuthProvider";
 
 export function BrandDashboard() {
-  const { data, ready } = useBrandCampaigns();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready, error } = useBrandCampaigns(authenticatedRequest);
   if (!ready) return null;
 
   const metrics = getBrandDashboardMetrics(data);
@@ -18,6 +20,7 @@ export function BrandDashboard() {
         <span className="workspace-subtitle">Brand workspace</span>
       </header>
       <div className="app-content">
+        {error && <p className="workspace-hint">{error}</p>}
         <div className="app-dashboard-grid">
           <div className="app-stat-card">
             <span>Total campaigns</span>
@@ -81,4 +84,3 @@ export function BrandDashboard() {
     </>
   );
 }
-

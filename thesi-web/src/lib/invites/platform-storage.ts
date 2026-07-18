@@ -1,52 +1,57 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { PlatformBrandInvite, PlatformInviteData } from "./platform-types";
+import type { PlatformInviteData } from "./platform-types";
 
-const STORAGE_KEY = "thesi_platform_invites";
+type AuthenticatedRequest = <T>(
+  path: string,
+  options?: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+  },
+) => Promise<T>;
 
 const EMPTY: PlatformInviteData = { brandInvites: [] };
 
-export function loadPlatformInviteData(): PlatformInviteData {
-  if (typeof window === "undefined") return EMPTY;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(EMPTY));
-    return EMPTY;
-  }
-  try {
-    return JSON.parse(raw) as PlatformInviteData;
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(EMPTY));
-    return EMPTY;
-  }
-}
-
-export function savePlatformInviteData(data: PlatformInviteData) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-export function usePlatformInvites() {
+export function usePlatformInvites(authenticatedRequest: AuthenticatedRequest) {
   const [data, setData] = useState<PlatformInviteData>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(async () => {
+    setError("");
+    const next = await authenticatedRequest<PlatformInviteData>(
+      "/api/invites/platform-brand",
+    );
+    setData(next);
+    return next;
+  }, [authenticatedRequest]);
 
   useEffect(() => {
-    setData(loadPlatformInviteData());
-    setReady(true);
-  }, []);
+    let active = true;
+    setReady(false);
+    setError("");
+    authenticatedRequest<PlatformInviteData>("/api/invites/platform-brand")
+      .then((next) => {
+        if (active) setData(next);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load platform invites",
+          );
+          setData(EMPTY);
+        }
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest]);
 
-  const persist = useCallback((next: PlatformInviteData) => {
-    setData(next);
-    savePlatformInviteData(next);
-  }, []);
-
-  return { data, ready, persist };
-}
-
-export function addPlatformBrandInvite(
-  data: PlatformInviteData,
-  invite: PlatformBrandInvite,
-): PlatformInviteData {
-  return { brandInvites: [...data.brandInvites, invite] };
+  return { data, ready, error, reload };
 }

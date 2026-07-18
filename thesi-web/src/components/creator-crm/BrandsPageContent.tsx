@@ -9,8 +9,8 @@ import { RELATIONSHIP_STAGE_LABELS } from "@/lib/creator-crm/types";
 import { InviteBrandDrawer } from "./InviteBrandDrawer";
 
 export function BrandsPageContent() {
-  const { session } = useAuth();
-  const { data, ready } = useCreatorCrm();
+  const { session, authenticatedRequest } = useAuth();
+  const { data, ready } = useCreatorCrm(authenticatedRequest);
   const [inviteOpen, setInviteOpen] = useState(false);
 
   if (!ready) return null;

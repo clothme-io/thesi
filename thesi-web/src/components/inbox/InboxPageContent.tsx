@@ -9,11 +9,6 @@ import {
   getUnreadCount,
   getNotificationsForRole,
   getUnreadNotificationCount,
-  markContactMessagesRead,
-  markNotificationRead,
-  markAllNotificationsRead,
-  addReply,
-  deleteMessage,
   formatMessageDateTime,
 } from "@/lib/inbox/storage";
 import type { InboxMessage } from "@/lib/inbox/types";
@@ -37,14 +32,25 @@ const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
 export function InboxPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { session } = useAuth();
+  const { session, authenticatedRequest } = useAuth();
   const role = session?.user.role === "brand" ? "brand" : "creator";
-  const { data, ready, persist } = useInbox();
+  const {
+    data,
+    ready,
+    error,
+    markContactRead,
+    sendReply,
+    removeMessage,
+    markNotificationRead,
+    markAllNotificationsRead,
+  } = useInbox(authenticatedRequest);
   const [tab, setTab] = useState<InboxTab>("messages");
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [replySubjectValue, setReplySubjectValue] = useState("");
   const [replyContent, setReplyContent] = useState("");
   const [search, setSearch] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const brandId = searchParams.get("brand");
@@ -78,11 +84,20 @@ export function InboxPageContent() {
   const selectedContact = data.contacts.find((c) => c.id === selectedContactId);
   const messages = selectedContactId ? getMessagesForContact(data, selectedContactId) : [];
 
-  const selectContact = (contactId: string) => {
+  const selectContact = async (contactId: string) => {
     setSelectedContactId(contactId);
     setReplySubjectValue("");
     setReplyContent("");
-    persist(markContactMessagesRead(data, contactId));
+    setActionError("");
+    try {
+      await markContactRead(contactId);
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not mark conversation read",
+      );
+    }
   };
 
   const handleReplyTo = (message: InboxMessage) => {
@@ -90,22 +105,52 @@ export function InboxPageContent() {
     setReplyContent("");
   };
 
-  const handleSendReply = (e: React.FormEvent) => {
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedContactId || !replyContent.trim()) return;
+    setSending(true);
+    setActionError("");
     const subject = replySubjectValue.trim() || "Re: Message";
-    persist(addReply(data, selectedContactId, subject, replyContent.trim()));
-    setReplySubjectValue("");
-    setReplyContent("");
+    try {
+      await sendReply(selectedContactId, subject, replyContent.trim());
+      setReplySubjectValue("");
+      setReplyContent("");
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not send reply",
+      );
+    } finally {
+      setSending(false);
+    }
   };
 
-  const handleDelete = (messageId: string) => {
-    persist(deleteMessage(data, messageId));
+  const handleDelete = async (messageId: string) => {
+    setActionError("");
+    try {
+      await removeMessage(messageId);
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not delete message",
+      );
+    }
   };
 
-  const handleNotificationClick = (notificationId: string, href?: string) => {
-    persist(markNotificationRead(data, notificationId));
-    if (href) router.push(href);
+  const handleNotificationClick = async (notificationId: string, href?: string) => {
+    setActionError("");
+    try {
+      await markNotificationRead(notificationId);
+      if (href) router.push(href);
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not update notification",
+      );
+    }
   };
 
   if (!ready) return null;
@@ -132,7 +177,18 @@ export function InboxPageContent() {
           <button
             type="button"
             className="crm-btn-secondary"
-            onClick={() => persist(markAllNotificationsRead(data, role))}
+            onClick={async () => {
+              setActionError("");
+              try {
+                await markAllNotificationsRead();
+              } catch (requestError) {
+                setActionError(
+                  requestError instanceof Error
+                    ? requestError.message
+                    : "Could not mark notifications read",
+                );
+              }
+            }}
           >
             Mark all read
           </button>
@@ -140,6 +196,11 @@ export function InboxPageContent() {
       </header>
 
       <div className="app-content app-content--flush">
+        {(error || actionError) && (
+          <p className="workspace-hint" style={{ padding: "12px 16px 0" }}>
+            {actionError || error}
+          </p>
+        )}
         <div className="inbox-tabs">
           <button
             type="button"
@@ -290,8 +351,8 @@ export function InboxPageContent() {
                       />
                     </label>
                     <div className="inbox-reply-footer">
-                      <button type="submit" className="crm-btn-primary">
-                        Send reply
+                      <button type="submit" className="crm-btn-primary" disabled={sending}>
+                        {sending ? "Sending…" : "Send reply"}
                       </button>
                     </div>
                   </form>

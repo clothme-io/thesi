@@ -111,6 +111,8 @@ Add new SQL under `clothme-db/databases/thesi/sql/` as `V{n}__description.sql`. 
 - [x] Backend auth API (`thesi_users`, JWT, refresh tokens, onboarding)
 - [x] Flyway baseline in clothme-db (`thesi` database)
 - [x] Admin creator-application approve → user invite with temp password
+- [x] Creator and brand profiles integrated through the API (`V2`)
+- [x] Creator and brand workspace settings integrated through the API (`V3`)
 
 ### Auth API endpoints
 
@@ -124,6 +126,12 @@ Add new SQL under `clothme-db/databases/thesi/sql/` as `V{n}__description.sql`. 
 | `POST /v1/onboarding/questions` | Persist onboarding answers (JWT required) |
 | `GET /v1/creator-applications` | List applications (admin key) |
 | `PATCH /v1/creator-applications/:id/approve` | Approve + create creator account (admin key) |
+| `GET /v1/profile` | Read the authenticated creator or brand profile |
+| `PUT /v1/profile/creator` | Save the authenticated creator profile |
+| `PUT /v1/profile/brand` | Save the authenticated brand profile |
+| `GET /v1/settings` | Read settings for the authenticated account role |
+| `PUT /v1/settings/creator` | Save creator notification and workspace settings |
+| `PUT /v1/settings/brand` | Save brand notification and workspace settings |
 
 Admin requests require header `X-Admin-Api-Key` (set `ADMIN_API_KEY` in `thesi-api/.env`).
 

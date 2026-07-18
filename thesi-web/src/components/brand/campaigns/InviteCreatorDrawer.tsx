@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CREATOR_DIRECTORY } from "@/lib/creators/directory";
-import { loadBrandCreatorFavorites, sortCreatorsWithFavoritesFirst } from "@/lib/brand-creators/storage";
+import { useAuth } from "@/context/AuthProvider";
+import {
+  sortCreatorsWithFavoritesFirst,
+  toDirectoryEntries,
+  useBrandCreatorFavorites,
+  useCreatorsDirectory,
+} from "@/lib/brand-creators/storage";
 import { matchCreatorsToCampaign } from "@/lib/invites/matching";
 import { sendCampaignInvite } from "@/lib/invites/send-campaign-invite";
-import { getInvitesForCampaign, loadInviteData } from "@/lib/invites/storage";
+import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
 import type { CampaignInviteCriteria } from "@/lib/invites/types";
 
 type DrawerTab = "matched" | "external";
@@ -47,37 +52,44 @@ export function InviteCreatorDrawer({
   criteria,
   onInvited,
 }: InviteCreatorDrawerProps) {
+  const { authenticatedRequest } = useAuth();
+  const { creators, ready: creatorsReady } = useCreatorsDirectory(authenticatedRequest);
+  const { data: favData, ready: favoritesReady } =
+    useBrandCreatorFavorites(authenticatedRequest);
+  const { data: inviteData, ready: invitesReady, reload: reloadInvites } =
+    useInvites(authenticatedRequest);
   const [tab, setTab] = useState<DrawerTab>("matched");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [externalRaw, setExternalRaw] = useState("");
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [inviteTick, setInviteTick] = useState(0);
 
   const matched = useMemo(() => {
-    const results = matchCreatorsToCampaign(CREATOR_DIRECTORY, criteria);
-    const favorites = loadBrandCreatorFavorites().favoriteCreatorIds;
-    return sortCreatorsWithFavoritesFirst(results, favorites);
-  }, [criteria, inviteTick]);
+    const results = matchCreatorsToCampaign(toDirectoryEntries(creators), criteria);
+    return sortCreatorsWithFavoritesFirst(results, favData.favoriteCreatorIds);
+  }, [criteria, creators, favData.favoriteCreatorIds]);
+
+  const campaignInvites = useMemo(
+    () => getInvitesForCampaign(inviteData, campaignId),
+    [inviteData, campaignId],
+  );
 
   const alreadyInvitedEmails = useMemo(() => {
     if (!open) return new Set<string>();
-    const data = loadInviteData();
-    return new Set(getInvitesForCampaign(data, campaignId).map((i) => i.creatorEmail.toLowerCase()));
-  }, [open, campaignId, inviteTick]);
+    return new Set(campaignInvites.map((i) => i.creatorEmail.toLowerCase()));
+  }, [open, campaignInvites]);
 
   const favoriteIds = useMemo(() => {
     if (!open) return new Set<string>();
-    return new Set(loadBrandCreatorFavorites().favoriteCreatorIds);
-  }, [open, inviteTick]);
+    return new Set(favData.favoriteCreatorIds);
+  }, [open, favData.favoriteCreatorIds]);
 
   const externalInvites = useMemo(() => {
     if (!open) return [];
-    const data = loadInviteData();
-    return getInvitesForCampaign(data, campaignId)
+    return campaignInvites
       .filter((invite) => invite.external)
       .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
-  }, [open, campaignId, inviteTick]);
+  }, [open, campaignInvites]);
 
   useEffect(() => {
     if (!open) {
@@ -85,8 +97,10 @@ export function InviteCreatorDrawer({
       setSelectedIds(new Set());
       setExternalRaw("");
       setFeedback(null);
+      return;
     }
-  }, [open]);
+    void reloadInvites(campaignId);
+  }, [open, campaignId, reloadInvites]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,6 +112,7 @@ export function InviteCreatorDrawer({
   }, [open, onClose]);
 
   if (!open) return null;
+  if (!creatorsReady || !favoritesReady || !invitesReady) return null;
 
   const toggleCreator = (id: string) => {
     setSelectedIds((prev) => {
@@ -115,40 +130,52 @@ export function InviteCreatorDrawer({
 
     try {
       if (tab === "matched") {
-        const creators = matched.filter((c) => selectedIds.has(c.id));
-        for (const creator of creators) {
+        const selected = matched.filter((c) => selectedIds.has(c.id));
+        for (const creator of selected) {
           if (alreadyInvitedEmails.has(creator.email.toLowerCase())) continue;
-          await sendCampaignInvite({
-            campaignId,
-            campaignName,
-            brandName,
-            creatorId: creator.id,
-            creatorEmail: creator.email,
-            creatorName: creator.name,
-            external: false,
-          });
+          await sendCampaignInvite(
+            {
+              campaignId,
+              campaignName,
+              brandName,
+              creatorId: creator.id,
+              creatorEmail: creator.email,
+              creatorName: creator.name,
+              external: false,
+            },
+            authenticatedRequest,
+          );
           sent += 1;
         }
       } else {
         const externals = parseExternalLines(externalRaw);
         for (const entry of externals) {
           if (alreadyInvitedEmails.has(entry.email.toLowerCase())) continue;
-          await sendCampaignInvite({
-            campaignId,
-            campaignName,
-            brandName,
-            creatorEmail: entry.email,
-            creatorName: entry.name,
-            external: true,
-          });
+          await sendCampaignInvite(
+            {
+              campaignId,
+              campaignName,
+              brandName,
+              creatorEmail: entry.email,
+              creatorName: entry.name,
+              external: true,
+            },
+            authenticatedRequest,
+          );
           sent += 1;
         }
       }
+      await reloadInvites(campaignId);
       setFeedback(sent > 0 ? `Sent ${sent} invite${sent === 1 ? "" : "s"}.` : "No new invites sent.");
-      setInviteTick((t) => t + 1);
       onInvited?.();
       if (tab === "matched") setSelectedIds(new Set());
       else setExternalRaw("");
+    } catch (requestError) {
+      setFeedback(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not send invites",
+      );
     } finally {
       setSending(false);
     }
@@ -238,7 +265,7 @@ export function InviteCreatorDrawer({
           ) : (
             <>
               <p className="workspace-hint" style={{ marginTop: 0 }}>
-                Paste names and emails (one per line). External invites trigger email only — TODO: wire Novu.
+                Paste names and emails (one per line). External invites are emailed via Novu; on-platform creators also get an inbox thread.
               </p>
               <label className="crm-form-field">
                 <span>Emails</span>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useAuth } from "@/context/AuthProvider";
 import { useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import {
   BRAND_CAMPAIGN_STATUS_LABELS,
@@ -19,7 +20,8 @@ const STATUS_FILTERS: Array<BrandCampaignStatus | "all"> = [
 ];
 
 export function CampaignsPageContent() {
-  const { data, ready } = useBrandCampaigns();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready, error } = useBrandCampaigns(authenticatedRequest);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<BrandCampaignStatus | "all">("all");
 
@@ -47,6 +49,7 @@ export function CampaignsPageContent() {
         </Link>
       </header>
       <div className="app-content">
+        {error && <p className="workspace-hint">{error}</p>}
         <div className="marketplace-toolbar">
           <input
             className="crm-search"
@@ -98,4 +101,3 @@ export function CampaignsPageContent() {
     </>
   );
 }
-

@@ -4,50 +4,86 @@ import { useCallback, useEffect, useState } from "react";
 import type { CreatorSettings } from "./creator-types";
 import { DEFAULT_CREATOR_SETTINGS } from "./creator-types";
 
-const STORAGE_KEY = "thesi_creator_settings";
+type AuthenticatedRequest = <T>(
+  path: string,
+  options?: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+  },
+) => Promise<T>;
 
-export function loadCreatorSettings(): CreatorSettings {
-  if (typeof window === "undefined") return DEFAULT_CREATOR_SETTINGS;
-  const legacy = localStorage.getItem("thesi_app_settings");
-  const raw = localStorage.getItem(STORAGE_KEY) ?? legacy;
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CREATOR_SETTINGS));
-    return DEFAULT_CREATOR_SETTINGS;
-  }
-  try {
-    return { ...DEFAULT_CREATOR_SETTINGS, ...JSON.parse(raw) } as CreatorSettings;
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CREATOR_SETTINGS));
-    return DEFAULT_CREATOR_SETTINGS;
-  }
-}
-
-export function saveCreatorSettings(settings: CreatorSettings) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
-export function useCreatorSettings() {
+export function useCreatorSettings(
+  authenticatedRequest: AuthenticatedRequest,
+) {
   const [settings, setSettings] = useState<CreatorSettings>(DEFAULT_CREATOR_SETTINGS);
   const [ready, setReady] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    setSettings(loadCreatorSettings());
-    setReady(true);
-  }, []);
+    let active = true;
+    setReady(false);
+    setError("");
+    authenticatedRequest<CreatorSettings>("/api/settings")
+      .then((data) => {
+        if (active) setSettings(data);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load settings",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest]);
 
   const updateSettings = useCallback((patch: Partial<CreatorSettings>) => {
     setSettings((prev) => ({ ...prev, ...patch }));
     setSaved(false);
   }, []);
 
-  const persistSettings = useCallback((next: CreatorSettings) => {
-    setSettings(next);
-    saveCreatorSettings(next);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  }, []);
+  const persistSettings = useCallback(
+    async (next: CreatorSettings) => {
+      setSaving(true);
+      setError("");
+      try {
+        const savedSettings = await authenticatedRequest<CreatorSettings>(
+          "/api/settings/creator",
+          { method: "PUT", body: next },
+        );
+        setSettings(savedSettings);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Could not save settings",
+        );
+        throw requestError;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [authenticatedRequest],
+  );
 
-  return { settings, ready, saved, updateSettings, persistSettings };
+  return {
+    settings,
+    ready,
+    saved,
+    saving,
+    error,
+    updateSettings,
+    persistSettings,
+  };
 }

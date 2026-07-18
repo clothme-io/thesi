@@ -10,6 +10,7 @@ const CRM_NAV = [
   { href: CRM_ROUTES.jobs, label: "Jobs", match: (path: string) => path.startsWith(CRM_ROUTES.jobs) },
   { href: CRM_ROUTES.contracts, label: "Contracts", match: (path: string) => path.startsWith(CRM_ROUTES.contracts) },
   { href: CRM_ROUTES.payments, label: "Payments", match: (path: string) => path.startsWith(CRM_ROUTES.payments) },
+  { href: CRM_ROUTES.invoices, label: "Invoices", match: (path: string) => path.startsWith(CRM_ROUTES.invoices) },
   { href: CRM_ROUTES.calendar, label: "Calendar", match: (path: string) => path.startsWith(CRM_ROUTES.calendar) },
   { href: CRM_ROUTES.tasks, label: "Tasks", match: (path: string) => path.startsWith(CRM_ROUTES.tasks) },
 ];

@@ -1,47 +1,146 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { CreatorCrmData, DealStage } from "./types";
-import { DEAL_STAGE_LABELS } from "./types";
-import { SEED_CRM_DATA } from "./seed";
+import type {
+  CreatorCrmData,
+  DealStage,
+  PaymentStatus,
+  TaskStatus,
+} from "./types";
 
-const STORAGE_KEY = "thesi_creator_crm";
+type AuthenticatedRequest = <T>(
+  path: string,
+  options?: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+  },
+) => Promise<T>;
 
-export function loadCrmData(): CreatorCrmData {
-  if (typeof window === "undefined") return SEED_CRM_DATA;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_CRM_DATA));
-    return SEED_CRM_DATA;
-  }
-  try {
-    return JSON.parse(raw) as CreatorCrmData;
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_CRM_DATA));
-    return SEED_CRM_DATA;
-  }
-}
+const EMPTY: CreatorCrmData = {
+  brands: [],
+  deals: [],
+  jobs: [],
+  contracts: [],
+  payments: [],
+  calendarEvents: [],
+  tasks: [],
+  activities: [],
+};
 
-export function saveCrmData(data: CreatorCrmData) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-export function useCreatorCrm() {
-  const [data, setData] = useState<CreatorCrmData>(SEED_CRM_DATA);
+export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
+  const [data, setData] = useState<CreatorCrmData>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(async () => {
+    setError("");
+    const next = await authenticatedRequest<CreatorCrmData>("/api/creator-crm");
+    setData(next);
+    return next;
+  }, [authenticatedRequest]);
 
   useEffect(() => {
-    setData(loadCrmData());
-    setReady(true);
-  }, []);
+    let active = true;
+    setReady(false);
+    setError("");
+    authenticatedRequest<CreatorCrmData>("/api/creator-crm")
+      .then((next) => {
+        if (active) setData(next);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load CRM",
+          );
+          setData(EMPTY);
+        }
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest]);
 
-  const persist = useCallback((next: CreatorCrmData) => {
-    setData(next);
-    saveCrmData(next);
-  }, []);
+  const moveDeal = useCallback(
+    async (dealId: string, stage: DealStage) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/deals/${dealId}/stage`,
+        { method: "PATCH", body: { stage } },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
 
-  return { data, ready, persist };
+  const setTaskStatus = useCallback(
+    async (taskId: string, status: TaskStatus) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/tasks/${taskId}`,
+        { method: "PATCH", body: { status } },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createInvoice = useCallback(
+    async (input: {
+      brandId: string;
+      jobId?: string;
+      amountCents: number;
+      dueDate: string;
+      description?: string;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/payments",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateInvoice = useCallback(
+    async (
+      paymentId: string,
+      patch: {
+        status?: PaymentStatus;
+        amountCents?: number;
+        dueDate?: string;
+        description?: string;
+      },
+    ) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/payments/${paymentId}`,
+        { method: "PATCH", body: patch },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  return {
+    data,
+    ready,
+    error,
+    reload,
+    moveDeal,
+    setTaskStatus,
+    createInvoice,
+    updateInvoice,
+  };
 }
 
 export function getBrandById(data: CreatorCrmData, id: string) {
@@ -76,34 +175,6 @@ export function getActivitiesForJob(data: CreatorCrmData, jobId: string) {
   return data.activities
     .filter((a) => a.jobId === jobId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-export function moveDealStage(
-  data: CreatorCrmData,
-  dealId: string,
-  stage: DealStage,
-): CreatorCrmData {
-  const deal = data.deals.find((d) => d.id === dealId);
-  if (!deal || deal.stage === stage) return data;
-
-  const now = new Date().toISOString();
-  return {
-    ...data,
-    deals: data.deals.map((d) =>
-      d.id === dealId ? { ...d, stage, updatedAt: now } : d,
-    ),
-    activities: [
-      {
-        id: `act-${Date.now()}`,
-        brandId: deal.brandId,
-        dealId: deal.id,
-        type: "deal_moved",
-        message: `Deal moved to ${DEAL_STAGE_LABELS[stage]}`,
-        createdAt: now,
-      },
-      ...data.activities,
-    ],
-  };
 }
 
 export function getDealsForBrand(data: CreatorCrmData, brandId: string) {

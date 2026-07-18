@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
-import { getCampaignById, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
+import { downloadCampaignFile, getCampaignById, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import {
   BRAND_CAMPAIGN_PAYMENT_LABELS,
   BRAND_CAMPAIGN_STATUS_LABELS,
@@ -12,15 +12,61 @@ import {
   formatMoney,
   getCampaignBudgetLabel,
 } from "@/lib/brand-campaigns/types";
-import { getInvitesForCampaign, loadInviteData, useInvites } from "@/lib/invites/storage";
+import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
+
+type CreatorPayout = {
+  id: string;
+  creatorUserId: string;
+  amountCents: number;
+  status: "pending" | "charged" | "transferred" | "failed";
+  stripeTransferId?: string;
+  failureReason?: string;
+};
+
+const PAYOUT_STATUS_LABELS: Record<CreatorPayout["status"], string> = {
+  pending: "Pending",
+  charged: "Charged",
+  transferred: "Paid",
+  failed: "Failed",
+};
 
 export function CampaignDetailContent() {
   const { id } = useParams<{ id: string }>();
-  const { session } = useAuth();
-  const { data, ready } = useBrandCampaigns();
-  const { data: inviteData, ready: invitesReady, persist: persistInvites } = useInvites();
+  const { session, authenticatedRequest, authenticatedBinaryRequest } = useAuth();
+  const { data, ready, error } = useBrandCampaigns(authenticatedRequest);
+  const { data: inviteData, ready: invitesReady, reload: reloadInvites } =
+    useInvites(authenticatedRequest);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+  const [payouts, setPayouts] = useState<CreatorPayout[]>([]);
+  const [payoutError, setPayoutError] = useState("");
+  const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
+
+  const loadPayouts = useCallback(async () => {
+    if (!id) return;
+    const result = await authenticatedRequest<{ payouts: CreatorPayout[] }>(
+      `/api/campaigns/${id}/payouts`,
+    );
+    setPayouts(result.payouts ?? []);
+  }, [authenticatedRequest, id]);
+
+  useEffect(() => {
+    if (!ready || !id) return;
+    let active = true;
+    loadPayouts().catch((requestError) => {
+      if (active) {
+        setPayoutError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Could not load creator payouts",
+        );
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [ready, id, loadPayouts]);
 
   if (!ready || !invitesReady) return null;
 
@@ -29,7 +75,8 @@ export function CampaignDetailContent() {
     return (
       <div className="app-content">
         <p>
-          Campaign not found. <Link href="/app/campaigns">Back to campaigns</Link>
+          {error || "Campaign not found."}{" "}
+          <Link href="/app/campaigns">Back to campaigns</Link>
         </p>
       </div>
     );
@@ -37,9 +84,32 @@ export function CampaignDetailContent() {
 
   const brandName = session?.user.fullName ?? "Your Brand";
   const invites = getInvitesForCampaign(inviteData, campaign.id);
+  const payoutByCreator = new Map(
+    payouts.map((payout) => [payout.creatorUserId, payout]),
+  );
 
   const refreshInvites = () => {
-    persistInvites(loadInviteData());
+    void reloadInvites(campaign.id);
+  };
+
+  const payCreator = async (creatorUserId: string) => {
+    setPayingCreatorId(creatorUserId);
+    setPayoutError("");
+    try {
+      await authenticatedRequest(`/api/campaigns/${campaign.id}/pay-creator`, {
+        method: "POST",
+        body: { creatorUserId },
+      });
+      await loadPayouts();
+    } catch (requestError) {
+      setPayoutError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not pay creator",
+      );
+    } finally {
+      setPayingCreatorId(null);
+    }
   };
 
   return (
@@ -111,22 +181,58 @@ export function CampaignDetailContent() {
 
             <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
               <h3>Invites sent</h3>
+              {payoutError && (
+                <p className="workspace-hint" style={{ marginBottom: 10 }}>
+                  {payoutError}
+                </p>
+              )}
               {invites.length === 0 ? (
                 <p className="workspace-hint">No invites sent yet. Use Invite creators to match and reach out.</p>
               ) : (
-                invites.map((invite) => (
-                  <div className="crm-meta-row" key={invite.id}>
-                    <span>
-                      {invite.creatorName}
-                      {invite.external && (
-                        <span className="crm-tag" style={{ marginLeft: 8 }}>
-                          External
-                        </span>
-                      )}
-                    </span>
-                    <span>{invite.status}</span>
-                  </div>
-                ))
+                invites.map((invite) => {
+                  const payout = invite.creatorId
+                    ? payoutByCreator.get(invite.creatorId)
+                    : undefined;
+                  const canPay =
+                    Boolean(invite.creatorId) &&
+                    !invite.external &&
+                    payout?.status !== "transferred";
+                  return (
+                    <div className="crm-meta-row" key={invite.id}>
+                      <span>
+                        {invite.creatorName}
+                        {invite.external && (
+                          <span className="crm-tag" style={{ marginLeft: 8 }}>
+                            External
+                          </span>
+                        )}
+                        {payout && (
+                          <span className="crm-tag" style={{ marginLeft: 8 }}>
+                            {PAYOUT_STATUS_LABELS[payout.status]}
+                            {payout.status === "transferred"
+                              ? ` · ${formatMoney(payout.amountCents)}`
+                              : ""}
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span>{invite.status}</span>
+                        {canPay && invite.creatorId && (
+                          <button
+                            type="button"
+                            className="inbox-btn-text"
+                            disabled={payingCreatorId === invite.creatorId}
+                            onClick={() => void payCreator(invite.creatorId!)}
+                          >
+                            {payingCreatorId === invite.creatorId
+                              ? "Paying…"
+                              : "Pay creator"}
+                          </button>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -155,13 +261,40 @@ export function CampaignDetailContent() {
 
             <div className="crm-detail-panel">
               <h3>Files</h3>
+              {downloadError && <p className="workspace-hint">{downloadError}</p>}
               {campaign.files.length === 0 ? (
                 <p className="workspace-hint">No files uploaded.</p>
               ) : (
                 campaign.files.map((file) => (
                   <div className="crm-meta-row" key={file.id}>
-                    <span>{file.name}</span>
-                    <span>{file.sizeLabel}</span>
+                    <span>
+                      {file.name}
+                      <span className="workspace-hint" style={{ marginLeft: 8 }}>
+                        {file.sizeLabel}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="inbox-btn-text"
+                      onClick={async () => {
+                        setDownloadError("");
+                        try {
+                          await downloadCampaignFile(
+                            authenticatedBinaryRequest,
+                            campaign.id,
+                            file,
+                          );
+                        } catch (requestError) {
+                          setDownloadError(
+                            requestError instanceof Error
+                              ? requestError.message
+                              : "Could not download file",
+                          );
+                        }
+                      }}
+                    >
+                      Download
+                    </button>
                   </div>
                 ))
               )}

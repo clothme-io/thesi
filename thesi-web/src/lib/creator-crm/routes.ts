@@ -6,6 +6,7 @@ export const CRM_ROUTES = {
   job: (id: string) => `/app/crm/jobs/${id}`,
   contracts: "/app/crm/contracts",
   payments: "/app/crm/payments",
+  invoices: "/app/tools/invoices",
   calendar: "/app/crm/calendar",
   tasks: "/app/crm/tasks",
 } as const;

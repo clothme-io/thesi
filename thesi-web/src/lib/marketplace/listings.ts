@@ -1,6 +1,5 @@
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
 import type { MarketplaceListing, MarketplacePayment } from "./types";
-import { SEED_MARKETPLACE_LISTINGS } from "./seed";
 
 function buildRequirements(campaign: BrandCampaign): string[] {
   const reqs: string[] = [];
@@ -44,6 +43,7 @@ function campaignPaymentToListingPayment(campaign: BrandCampaign): MarketplacePa
   }
 }
 
+/** Client-side preview helper — server sync owns persisted listings. */
 export function campaignToListing(
   campaign: BrandCampaign,
   brandName: string,
@@ -56,7 +56,7 @@ export function campaignToListing(
     campaign.requirements.location.toLowerCase() === "us";
 
   return {
-    id: `mp-${campaign.id}`,
+    id: campaign.id,
     campaignId: campaign.id,
     ownerUserId,
     name: campaign.name,
@@ -77,12 +77,6 @@ export function campaignToListing(
     applicantsCount: 0,
     postedAt: new Date().toISOString(),
   };
-}
-
-export function mergeMarketplaceListings(customListings: MarketplaceListing[]): MarketplaceListing[] {
-  const customIds = new Set(customListings.map((l) => l.id));
-  const seed = SEED_MARKETPLACE_LISTINGS.filter((l) => !customIds.has(l.id));
-  return [...seed, ...customListings];
 }
 
 export function getListingsForBrand(

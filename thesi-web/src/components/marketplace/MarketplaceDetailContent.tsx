@@ -10,13 +10,11 @@ import {
   getListingById,
   hasApplied,
   isInCrm,
-  applyToListing,
-  linkListingToCrm,
 } from "@/lib/marketplace/storage";
 import { listingInviteCampaignId, listingToInviteCriteria } from "@/lib/marketplace/invite-criteria";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
-import { getInvitesForCampaign, loadInviteData, useInvites } from "@/lib/invites/storage";
+import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
 import {
   LISTING_TYPE_LABELS,
   PAYMENT_STRUCTURE_LABELS,
@@ -27,15 +25,19 @@ import {
 export function MarketplaceDetailContent() {
   const params = useParams();
   const listingId = params.id as string;
-  const { session } = useAuth();
+  const { session, authenticatedRequest } = useAuth();
   const isBrand = session?.user.role === "brand";
-  const { data, ready, persist } = useMarketplace();
-  const { data: inviteData, ready: invitesReady, persist: persistInvites } = useInvites();
+  const { data, ready, error, applyToListing, linkListingToCrm } =
+    useMarketplace(authenticatedRequest);
+  const { data: inviteData, ready: invitesReady, reload: reloadInvites } =
+    useInvites(authenticatedRequest);
   const [showApply, setShowApply] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [pitch, setPitch] = useState("");
   const [addToCrmOnApply, setAddToCrmOnApply] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   if (!ready || (isBrand && !invitesReady)) return null;
 
@@ -44,7 +46,8 @@ export function MarketplaceDetailContent() {
     return (
       <div className="app-content">
         <p>
-          Listing not found. <Link href={MARKETPLACE_ROUTES.list}>Back to marketplace</Link>
+          {error || "Listing not found."}{" "}
+          <Link href={MARKETPLACE_ROUTES.list}>Back to marketplace</Link>
         </p>
       </div>
     );
@@ -53,11 +56,11 @@ export function MarketplaceDetailContent() {
   const applied = hasApplied(data, listing.id);
   const inCrm = isInCrm(data, listing.id);
   const brandName = session?.user.fullName ?? listing.brandName;
-  const inviteCampaignId = listingInviteCampaignId(listing.id);
+  const inviteCampaignId = listingInviteCampaignId(listing);
   const invites = isBrand ? getInvitesForCampaign(inviteData, inviteCampaignId) : [];
 
   const refreshInvites = () => {
-    persistInvites(loadInviteData());
+    void reloadInvites(inviteCampaignId);
   };
 
   const showToast = (message: string) => {
@@ -65,23 +68,43 @@ export function MarketplaceDetailContent() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleApply = (e: React.FormEvent) => {
+  const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pitch.trim()) return;
-    const result = applyToListing(data, listing, pitch.trim(), addToCrmOnApply);
-    persist(result.marketplace);
-    setShowApply(false);
-    setPitch("");
-    showToast(
-      addToCrmOnApply
-        ? "Application submitted and added to CRM pipeline."
-        : "Application submitted.",
-    );
+    setSubmitting(true);
+    setActionError("");
+    try {
+      await applyToListing(listing, pitch.trim(), addToCrmOnApply);
+      setShowApply(false);
+      setPitch("");
+      showToast(
+        addToCrmOnApply
+          ? "Application submitted and added to CRM pipeline."
+          : "Application submitted.",
+      );
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not submit application",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleAddToCrm = () => {
-    persist(linkListingToCrm(data, listing));
-    showToast("Added to CRM — new lead in pipeline.");
+  const handleAddToCrm = async () => {
+    setActionError("");
+    try {
+      await linkListingToCrm(listing);
+      showToast("Added to CRM — new lead in pipeline.");
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not add to CRM",
+      );
+    }
   };
 
   return (
@@ -127,6 +150,9 @@ export function MarketplaceDetailContent() {
       {toast && <div className="marketplace-toast">{toast}</div>}
 
       <div className="app-content">
+        {(error || actionError) && (
+          <p className="workspace-hint">{actionError || error}</p>
+        )}
         <div className="marketplace-detail-grid">
           <div className="marketplace-detail-main">
             <section className="workspace-section">
@@ -349,8 +375,8 @@ export function MarketplaceDetailContent() {
                 <button type="button" className="crm-btn-secondary" onClick={() => setShowApply(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="crm-btn-primary">
-                  Submit application
+                <button type="submit" className="crm-btn-primary" disabled={submitting}>
+                  {submitting ? "Submitting…" : "Submit application"}
                 </button>
               </div>
             </form>

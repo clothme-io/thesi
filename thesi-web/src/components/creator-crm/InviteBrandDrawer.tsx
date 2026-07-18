@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { loadPlatformInviteData } from "@/lib/invites/platform-storage";
+import { useAuth } from "@/context/AuthProvider";
+import { usePlatformInvites } from "@/lib/invites/platform-storage";
 import { sendPlatformBrandInvite } from "@/lib/invites/send-platform-brand-invite";
 
 export interface InviteBrandDrawerProps {
@@ -37,19 +38,20 @@ export function InviteBrandDrawer({
   invitedByEmail,
   onInvited,
 }: InviteBrandDrawerProps) {
+  const { authenticatedRequest } = useAuth();
+  const { data, ready, reload } = usePlatformInvites(authenticatedRequest);
   const [externalRaw, setExternalRaw] = useState("");
   const [message, setMessage] = useState("");
   const [addToCrm, setAddToCrm] = useState(true);
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [inviteTick, setInviteTick] = useState(0);
 
   const sentInvites = useMemo(() => {
     if (!open) return [];
-    return loadPlatformInviteData()
-      .brandInvites.filter((i) => i.invitedByEmail === invitedByEmail)
-      .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
-  }, [open, invitedByEmail, inviteTick]);
+    return [...data.brandInvites].sort(
+      (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime(),
+    );
+  }, [open, data.brandInvites]);
 
   const alreadyInvitedEmails = useMemo(
     () => new Set(sentInvites.map((i) => i.brandEmail.toLowerCase())),
@@ -61,8 +63,10 @@ export function InviteBrandDrawer({
       setExternalRaw("");
       setMessage("");
       setFeedback(null);
+      return;
     }
-  }, [open]);
+    void reload();
+  }, [open, reload]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,7 +77,7 @@ export function InviteBrandDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !ready) return null;
 
   const handleSend = async () => {
     setSending(true);
@@ -84,20 +88,29 @@ export function InviteBrandDrawer({
       const entries = parseBrandLines(externalRaw);
       for (const entry of entries) {
         if (alreadyInvitedEmails.has(entry.email.toLowerCase())) continue;
-        await sendPlatformBrandInvite({
-          brandName: entry.name,
-          brandEmail: entry.email,
-          invitedBy,
-          invitedByEmail,
-          message: message.trim() || undefined,
-          addToCrm,
-        });
+        await sendPlatformBrandInvite(
+          {
+            brandName: entry.name,
+            brandEmail: entry.email,
+            invitedBy,
+            invitedByEmail,
+            message: message.trim() || undefined,
+            addToCrm,
+          },
+          authenticatedRequest,
+        );
         sent += 1;
       }
+      await reload();
       setFeedback(sent > 0 ? `Sent ${sent} invite${sent === 1 ? "" : "s"}.` : "No new invites sent.");
-      setInviteTick((t) => t + 1);
       onInvited?.();
       setExternalRaw("");
+    } catch (requestError) {
+      setFeedback(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not send invites",
+      );
     } finally {
       setSending(false);
     }
@@ -123,7 +136,7 @@ export function InviteBrandDrawer({
 
         <div className="crm-drawer-body">
           <p className="workspace-hint" style={{ marginTop: 0 }}>
-            Paste brand names and emails (one per line). Invites trigger email — TODO: wire Novu.
+            Paste brand names and emails (one per line). Invites are emailed via Novu.
           </p>
           <label className="crm-form-field">
             <span>Brand emails</span>

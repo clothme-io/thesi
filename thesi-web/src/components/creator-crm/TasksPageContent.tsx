@@ -1,24 +1,30 @@
 "use client";
 
+import { useState } from "react";
+import { useAuth } from "@/context/AuthProvider";
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
 
 export function TasksPageContent() {
-  const { data, ready, persist } = useCreatorCrm();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready, setTaskStatus, error } = useCreatorCrm(authenticatedRequest);
+  const [actionError, setActionError] = useState("");
+
   if (!ready) return null;
 
   const pending = data.tasks.filter((t) => t.status === "pending");
   const done = data.tasks.filter((t) => t.status === "done");
 
-  function toggleTask(taskId: string) {
-    const next = {
-      ...data,
-      tasks: data.tasks.map((task) =>
-        task.id === taskId
-          ? { ...task, status: task.status === "done" ? "pending" as const : "done" as const }
-          : task,
-      ),
-    };
-    persist(next);
+  async function toggleTask(taskId: string, current: "pending" | "done") {
+    setActionError("");
+    try {
+      await setTaskStatus(taskId, current === "done" ? "pending" : "done");
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not update task",
+      );
+    }
   }
 
   return (
@@ -29,6 +35,11 @@ export function TasksPageContent() {
       </header>
 
       <div className="app-content">
+        {(error || actionError) && (
+          <p className="workspace-hint" style={{ marginBottom: 12 }}>
+            {actionError || error}
+          </p>
+        )}
         <h2 className="crm-section-title">Due & pending</h2>
         {pending.map((task) => {
           const brand = task.brandId
@@ -39,7 +50,7 @@ export function TasksPageContent() {
               <input
                 type="checkbox"
                 checked={false}
-                onChange={() => toggleTask(task.id)}
+                onChange={() => toggleTask(task.id, task.status)}
               />
               <span>
                 <strong>{task.title}</strong>
@@ -56,8 +67,14 @@ export function TasksPageContent() {
             <h2 className="crm-section-title" style={{ marginTop: 32 }}>Completed</h2>
             {done.map((task) => (
               <label key={task.id} className="crm-task-item">
-                <input type="checkbox" checked onChange={() => toggleTask(task.id)} />
-                <span style={{ textDecoration: "line-through", color: "var(--muted)" }}>{task.title}</span>
+                <input
+                  type="checkbox"
+                  checked
+                  onChange={() => toggleTask(task.id, task.status)}
+                />
+                <span style={{ textDecoration: "line-through", color: "var(--muted)" }}>
+                  {task.title}
+                </span>
               </label>
             ))}
           </>

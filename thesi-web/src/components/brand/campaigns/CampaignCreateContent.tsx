@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
-import { createBrandCampaign, useBrandCampaigns, getCampaignById } from "@/lib/brand-campaigns/storage";
+import { useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import type {
   BrandCampaignPaymentModel,
   BrandCampaignStatus,
@@ -12,6 +12,11 @@ import type {
 } from "@/lib/brand-campaigns/types";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { publishCampaignToMarketplace } from "@/lib/marketplace/publish-from-campaign";
+import {
+  calculatePlatformFeeCents,
+  formatCents,
+  PLATFORM_FEE_CAP_CENTS,
+} from "@/lib/platform-fee";
 
 const TYPE_OPTIONS: { label: string; value: BrandCampaignType }[] = [
   { label: "TikTok", value: "tiktok" },
@@ -54,8 +59,9 @@ const defaultDates = () => {
 
 export function CampaignCreateContent() {
   const router = useRouter();
-  const { session } = useAuth();
-  const { data, ready, persist } = useBrandCampaigns();
+  const { session, authenticatedRequest } = useAuth();
+  const { ready, createCampaign, updateCampaign, uploadCampaignFile, error: loadError } =
+    useBrandCampaigns(authenticatedRequest);
   const dates = defaultDates();
 
   const [name, setName] = useState("");
@@ -74,11 +80,20 @@ export function CampaignCreateContent() {
   const [postToMarketplace, setPostToMarketplace] = useState(true);
   const [inviteContext, setInviteContext] = useState<{ id: string; name: string } | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [attachedFiles, setAttachedFiles] = useState<
+    Array<{ id: string; name: string; sizeLabel: string }>
+  >([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const draftRef = useRef<{ id: string; name: string } | null>(null);
 
   if (!ready) return null;
 
   const brandName = session?.user.fullName ?? "Your Brand";
+  const payoutCents = parseMoneyToCents(flatAmount);
+  const feeCents = calculatePlatformFeeCents(payoutCents);
+  const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
 
   const buildCampaignPayload = (status: BrandCampaignStatus) => ({
     name: name.trim() || "Untitled campaign",
@@ -103,51 +118,109 @@ export function CampaignCreateContent() {
     postToMarketplace,
   });
 
-  const saveDraft = (): { id: string; name: string } => {
+  const flushPendingUploads = async (campaignId: string) => {
+    if (pendingFiles.length === 0) return [] as Array<{ id: string; name: string; sizeLabel: string }>;
+    const uploaded: Array<{ id: string; name: string; sizeLabel: string }> = [];
+    for (const file of pendingFiles) {
+      uploaded.push(await uploadCampaignFile(campaignId, file));
+    }
+    setAttachedFiles((prev) => [...uploaded, ...prev]);
+    setPendingFiles([]);
+    return uploaded;
+  };
+
+  const saveDraft = async (): Promise<{ id: string; name: string }> => {
     if (draftRef.current) {
+      await flushPendingUploads(draftRef.current.id);
       return draftRef.current;
     }
-    const { data: next, campaign } = createBrandCampaign(data, buildCampaignPayload("draft"));
-    persist(next);
+    const campaign = await createCampaign(buildCampaignPayload("draft"));
     const context = { id: campaign.id, name: campaign.name };
     draftRef.current = context;
     setInviteContext(context);
+    await flushPendingUploads(campaign.id);
     return context;
   };
 
-  const handleSaveDraft = () => {
-    saveDraft();
+  const handleSaveDraft = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await saveDraft();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not save draft",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    setSaving(true);
+    setError("");
     const payload = buildCampaignPayload("active");
     const userId = session?.user.id ?? "dev-user-1";
 
-    if (inviteContext) {
-      const next = {
-        campaigns: data.campaigns.map((c) =>
-          c.id === inviteContext.id ? { ...c, ...payload, status: "active" as const } : c,
-        ),
-      };
-      persist(next);
-      const campaign = getCampaignById(next, inviteContext.id);
-      if (campaign) {
-        publishCampaignToMarketplace(campaign, userId, brandName);
+    try {
+      if (inviteContext) {
+        const campaign = await updateCampaign(inviteContext.id, payload);
+        const uploaded = await flushPendingUploads(campaign.id);
+        await publishCampaignToMarketplace(
+          {
+            ...campaign,
+            files: [...uploaded, ...campaign.files],
+          },
+          userId,
+          brandName,
+          authenticatedRequest,
+        );
+        router.push(`/app/campaigns/${campaign.id}`);
+        return;
       }
-      router.push(`/app/campaigns/${inviteContext.id}`);
-      return;
+      const campaign = await createCampaign(payload);
+      const uploaded = await flushPendingUploads(campaign.id);
+      await publishCampaignToMarketplace(
+        {
+          ...campaign,
+          files: [...uploaded, ...campaign.files],
+        },
+        userId,
+        brandName,
+        authenticatedRequest,
+      );
+      router.push(`/app/campaigns/${campaign.id}`);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not create campaign",
+      );
+    } finally {
+      setSaving(false);
     }
-    const { data: next, campaign } = createBrandCampaign(data, payload);
-    persist(next);
-    publishCampaignToMarketplace(campaign, userId, brandName);
-    router.push(`/app/campaigns/${campaign.id}`);
   };
 
-  const handleInvite = () => {
-    const context = saveDraft();
-    setInviteContext(context);
-    setInviteOpen(true);
+  const handleInvite = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const context = await saveDraft();
+      setInviteContext(context);
+      setInviteOpen(true);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not prepare invite draft",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
+
   return (
     <>
       <header className="app-topbar">
@@ -157,11 +230,19 @@ export function CampaignCreateContent() {
           </Link>
           <h1 style={{ marginTop: 4 }}>New campaign</h1>
         </div>
-        <button className="crm-btn-primary" type="button" onClick={handleSaveDraft}>
+        <button
+          className="crm-btn-primary"
+          type="button"
+          onClick={handleSaveDraft}
+          disabled={saving}
+        >
           Save draft
         </button>
       </header>
       <div className="app-content">
+        {(error || loadError) && (
+          <p className="workspace-hint">{error || loadError}</p>
+        )}
         <div className="workspace-form">
           <section className="workspace-section">
             <h3>Campaign basics</h3>
@@ -275,6 +356,29 @@ export function CampaignCreateContent() {
           </section>
 
           <section className="workspace-section">
+            <h3>Platform fee</h3>
+            <div className="brand-billing-plan">
+              <div>
+                <strong>
+                  {feeCents > 0 ? formatCents(feeCents) : "No fee"}
+                </strong>
+                <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
+                  {feeCents > 0
+                    ? feeCapped
+                      ? `Capped at ${formatCents(PLATFORM_FEE_CAP_CENTS)} (2% of creator payout).`
+                      : `2% of estimated creator payout (${formatCents(payoutCents)}).`
+                    : "Set a creator payout amount to calculate the activation fee."}
+                </p>
+                <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
+                  Charged from your default card when you create/activate or post
+                  to the marketplace. Drafts are free.
+                </p>
+              </div>
+              <span className="crm-tag">Due on activate</span>
+            </div>
+          </section>
+
+          <section className="workspace-section">
             <h3>Distribution & files</h3>
             <div className="workspace-grid">
               <label className="workspace-field">
@@ -289,17 +393,57 @@ export function CampaignCreateContent() {
               </label>
               <label className="workspace-field">
                 <span>Upload files</span>
-                <input type="file" multiple />
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.files ?? []);
+                    if (selected.length === 0) return;
+                    setPendingFiles((prev) => [...prev, ...selected]);
+                    e.target.value = "";
+                  }}
+                />
               </label>
+              {(pendingFiles.length > 0 || attachedFiles.length > 0) && (
+                <div className="workspace-field workspace-field--full">
+                  <span>Selected files</span>
+                  <ul className="workspace-hint" style={{ margin: 0, paddingLeft: 18 }}>
+                    {attachedFiles.map((file) => (
+                      <li key={file.id}>
+                        {file.name} ({file.sizeLabel})
+                      </li>
+                    ))}
+                    {pendingFiles.map((file) => (
+                      <li key={`${file.name}-${file.size}-${file.lastModified}`}>
+                        {file.name} (pending upload)
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </section>
 
           <div className="workspace-form-footer">
-            <button className="crm-btn-secondary" type="button" onClick={handleInvite}>
+            <button
+              className="crm-btn-secondary"
+              type="button"
+              onClick={handleInvite}
+              disabled={saving}
+            >
               Invite creators
             </button>
-            <button className="crm-btn-primary" type="button" onClick={handleCreate}>
-              Create campaign
+            <button
+              className="crm-btn-primary"
+              type="button"
+              onClick={handleCreate}
+              disabled={saving}
+            >
+              {saving
+                ? "Working…"
+                : feeCents > 0
+                  ? `Pay ${formatCents(feeCents)} & create`
+                  : "Create campaign"}
             </button>
           </div>
         </div>

@@ -36,6 +36,6 @@ export function listingToInviteCriteria(listing: MarketplaceListing): CampaignIn
   };
 }
 
-export function listingInviteCampaignId(listingId: string): string {
-  return `listing-${listingId}`;
+export function listingInviteCampaignId(listing: MarketplaceListing): string {
+  return listing.campaignId ?? `listing-${listing.id}`;
 }

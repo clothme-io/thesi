@@ -23,10 +23,15 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (session.user.onboardingCompleted) {
+    const isAccountPasswordChange =
+      session.user.onboardingCompleted &&
+      pathname === "/onboarding/change-password";
+
+    if (session.user.onboardingCompleted && !isAccountPasswordChange) {
       router.replace("/app/dashboard");
       return;
     }
+    if (isAccountPasswordChange) return;
 
     const expected = getOnboardingPathForStep(session.user.onboardingStep);
     if (pathname !== expected) {
@@ -34,7 +39,14 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, session, router, pathname]);
 
-  if (isLoading || !session || session.user.onboardingCompleted) return null;
+  if (isLoading || !session) return null;
+  if (
+    session.user.onboardingCompleted &&
+    pathname === "/onboarding/change-password"
+  ) {
+    return <>{children}</>;
+  }
+  if (session.user.onboardingCompleted) return null;
   if (pathname !== getOnboardingPathForStep(session.user.onboardingStep)) return null;
 
   return <>{children}</>;

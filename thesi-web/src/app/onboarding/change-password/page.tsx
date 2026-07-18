@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthProvider";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const { changePassword } = useAuth();
+  const { session, changePassword } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -30,8 +30,17 @@ export default function ChangePasswordPage() {
 
     setLoading(true);
     try {
+      const wasOnboarded = session?.user.onboardingCompleted === true;
       await changePassword({ currentPassword, newPassword, confirmPassword });
-      router.push("/onboarding/welcome");
+      if (wasOnboarded) {
+        router.push(
+          session?.user.role === "brand"
+            ? "/app/settings/security"
+            : "/app/settings",
+        );
+      } else {
+        router.push("/onboarding/welcome");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update password");
     } finally {
@@ -43,16 +52,23 @@ export default function ChangePasswordPage() {
     <OnboardingGuard>
       <div className="onboarding-page">
         <div className="onboarding-card">
-          <div className="onboarding-progress">
-            <div
-              className="onboarding-progress-bar"
-              style={{ width: `${getOnboardingProgress("/onboarding/change-password")}%` }}
-            />
-          </div>
-          <h1>Create your new password</h1>
+          {!session?.user.onboardingCompleted && (
+            <div className="onboarding-progress">
+              <div
+                className="onboarding-progress-bar"
+                style={{ width: `${getOnboardingProgress("/onboarding/change-password")}%` }}
+              />
+            </div>
+          )}
+          <h1>
+            {session?.user.onboardingCompleted
+              ? "Change your password"
+              : "Create your new password"}
+          </h1>
           <p>
-            For security, you must set a new password before continuing. This is required
-            on your first sign-in.
+            {session?.user.onboardingCompleted
+              ? "Enter your current password and choose a new secure password."
+              : "For security, you must set a new password before continuing. This is required on your first sign-in."}
           </p>
 
           <form onSubmit={handleSubmit}>
@@ -101,7 +117,11 @@ export default function ChangePasswordPage() {
             </div>
 
             <button type="submit" className="auth-submit" disabled={loading}>
-              {loading ? "Saving…" : "Continue"}
+              {loading
+                ? "Saving…"
+                : session?.user.onboardingCompleted
+                  ? "Save password"
+                  : "Continue"}
             </button>
           </form>
         </div>

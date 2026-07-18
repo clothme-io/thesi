@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
@@ -16,6 +16,7 @@ type NavItem = {
 const CREATOR_NAV: NavItem[] = [
   { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
   { href: CRM_ROUTES.brands, label: "CRM", icon: "◎", match: (path: string) => path.startsWith("/app/crm") },
+  { href: CRM_ROUTES.invoices, label: "Invoices", icon: "▤", match: (path: string) => path.startsWith("/app/tools/invoices") },
   { href: "/app/inbox", label: "Inbox", icon: "✉" },
   { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
   { href: "/app/profile", label: "Profile", icon: "◉" },
@@ -40,8 +41,22 @@ function isActive(pathname: string, href: string, match?: (path: string) => bool
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { session, signOut } = useAuth();
+  const { session, signOut, authenticatedRequest } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    authenticatedRequest<{ compactSidebar: boolean }>("/api/settings")
+      .then((settings) => {
+        if (active) setCollapsed(settings.compactSidebar);
+      })
+      .catch(() => {
+        // Keep the expanded default if settings are temporarily unavailable.
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest]);
 
   const nav = session?.user.role === "brand" ? BRAND_NAV : CREATOR_NAV;
 

@@ -2,21 +2,34 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useCreatorCrm, moveDealStage } from "@/lib/creator-crm/storage";
+import { useAuth } from "@/context/AuthProvider";
+import { useCreatorCrm } from "@/lib/creator-crm/storage";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { DEAL_STAGES, DEAL_STAGE_LABELS, formatMoney, type DealStage } from "@/lib/creator-crm/types";
 
 export function PipelinePageContent() {
-  const { data, ready, persist } = useCreatorCrm();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready, moveDeal, error } = useCreatorCrm(authenticatedRequest);
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
   const [dropTargetStage, setDropTargetStage] = useState<DealStage | null>(null);
+  const [actionError, setActionError] = useState("");
 
   if (!ready) return null;
 
-  const handleDrop = (stage: DealStage, dealId: string) => {
-    persist(moveDealStage(data, dealId, stage));
-    setDraggingDealId(null);
-    setDropTargetStage(null);
+  const handleDrop = async (stage: DealStage, dealId: string) => {
+    setActionError("");
+    try {
+      await moveDeal(dealId, stage);
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not update deal stage",
+      );
+    } finally {
+      setDraggingDealId(null);
+      setDropTargetStage(null);
+    }
   };
 
   return (
@@ -29,6 +42,11 @@ export function PipelinePageContent() {
       </header>
 
       <div className="app-content">
+        {(error || actionError) && (
+          <p className="workspace-hint" style={{ marginBottom: 12 }}>
+            {actionError || error}
+          </p>
+        )}
         <p className="crm-contact-sub" style={{ marginBottom: 16 }}>
           Drag deals between columns to update stage.
         </p>
@@ -53,7 +71,7 @@ export function PipelinePageContent() {
                 onDrop={(e) => {
                   e.preventDefault();
                   const dealId = e.dataTransfer.getData("text/deal-id");
-                  if (dealId) handleDrop(stage, dealId);
+                  if (dealId) void handleDrop(stage, dealId);
                 }}
               >
                 <h3>

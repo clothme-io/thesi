@@ -6,9 +6,17 @@ import { CREATOR_NICHE_OPTIONS } from "@/lib/profile/creator-types";
 import { getInitials } from "@/lib/profile/shared";
 
 export function CreatorProfilePageContent() {
-  const { session } = useAuth();
+  const { session, authenticatedRequest } = useAuth();
   const fallbackName = session?.user.fullName ?? "";
-  const { profile, ready, saved, updateProfile, persistProfile } = useCreatorProfile(fallbackName);
+  const {
+    profile,
+    ready,
+    saved,
+    saving,
+    error,
+    updateProfile,
+    persistProfile,
+  } = useCreatorProfile(authenticatedRequest, fallbackName);
 
   if (!ready) return null;
 
@@ -19,9 +27,13 @@ export function CreatorProfilePageContent() {
     updateProfile({ niches });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistProfile(profile);
+    try {
+      await persistProfile(profile);
+    } catch {
+      // The hook exposes the user-facing error state.
+    }
   };
 
   return (
@@ -35,6 +47,11 @@ export function CreatorProfilePageContent() {
       </header>
 
       <div className="app-content">
+        {error && (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        )}
         <div className="profile-hero">
           <div className="profile-avatar">{getInitials(profile.displayName || fallbackName)}</div>
           <div>
@@ -177,8 +194,8 @@ export function CreatorProfilePageContent() {
           </section>
 
           <div className="workspace-form-footer">
-            <button type="submit" className="crm-btn-primary">
-              Save profile
+            <button type="submit" className="crm-btn-primary" disabled={saving}>
+              {saving ? "Saving…" : "Save profile"}
             </button>
           </div>
         </form>

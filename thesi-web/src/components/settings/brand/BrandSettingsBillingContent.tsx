@@ -1,24 +1,47 @@
 "use client";
 
+import { useState } from "react";
+import { useAuth } from "@/context/AuthProvider";
 import { useBrandBilling } from "@/lib/settings/brand-billing-storage";
 import { formatBillingMoney } from "@/lib/settings/brand-billing-types";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 
 export function BrandSettingsBillingContent() {
-  const { data, ready, saved, updateBilling, persistBilling } = useBrandBilling();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready, saved, error, updateBilling, persistBilling } =
+    useBrandBilling(authenticatedRequest);
+  const [actionError, setActionError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   if (!ready) return null;
 
   const { billing } = data;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistBilling(billing);
+    setSaving(true);
+    setActionError("");
+    try {
+      await persistBilling(billing);
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not save billing",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <BrandSettingsSection title="Billing" subtitle="Plan and billing details" saved={saved}>
       <form className="workspace-form" onSubmit={handleSave}>
+        {(error || actionError) && (
+          <p className="workspace-hint" style={{ marginBottom: 12 }}>
+            {actionError || error}
+          </p>
+        )}
         <section className="workspace-section">
           <h3>Current plan</h3>
           <div className="brand-billing-plan">
@@ -32,7 +55,7 @@ export function BrandSettingsBillingContent() {
           </div>
           <div className="crm-meta-row" style={{ marginTop: 16 }}>
             <span>Next invoice</span>
-            <span>{billing.nextInvoiceDate}</span>
+            <span>{billing.nextInvoiceDate || "—"}</span>
           </div>
         </section>
 
@@ -113,8 +136,8 @@ export function BrandSettingsBillingContent() {
         </section>
 
         <div className="workspace-form-footer">
-          <button type="submit" className="crm-btn-primary">
-            Save billing
+          <button type="submit" className="crm-btn-primary" disabled={saving}>
+            {saving ? "Saving…" : "Save billing"}
           </button>
         </div>
       </form>

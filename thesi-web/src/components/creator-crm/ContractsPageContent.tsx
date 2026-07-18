@@ -1,12 +1,15 @@
 "use client";
 
+import { useAuth } from "@/context/AuthProvider";
+
 import Link from "next/link";
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { CONTRACT_STATUSES, CONTRACT_STATUS_LABELS } from "@/lib/creator-crm/types";
 
 export function ContractsPageContent() {
-  const { data, ready } = useCreatorCrm();
+  const { authenticatedRequest } = useAuth();
+  const { data, ready } = useCreatorCrm(authenticatedRequest);
   if (!ready) return null;
 
   return (

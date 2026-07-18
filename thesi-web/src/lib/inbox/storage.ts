@@ -1,54 +1,171 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { InboxData, InboxMessage, InboxNotification, InboxNotificationAudience } from "./types";
-import { SEED_INBOX_DATA } from "./seed";
+import type {
+  InboxData,
+  InboxMessage,
+  InboxNotification,
+  InboxNotificationAudience,
+} from "./types";
 
-const STORAGE_KEY = "thesi_inbox";
+type AuthenticatedRequest = <T>(
+  path: string,
+  options?: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+  },
+) => Promise<T>;
 
-function normalizeInboxData(raw: Partial<InboxData>): InboxData {
+const EMPTY: InboxData = {
+  contacts: [],
+  messages: [],
+  notifications: [],
+};
+
+export function useInbox(authenticatedRequest: AuthenticatedRequest) {
+  const [data, setData] = useState<InboxData>(EMPTY);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+
+  const reload = useCallback(async () => {
+    setError("");
+    const next = await authenticatedRequest<InboxData>("/api/inbox");
+    setData(next);
+    return next;
+  }, [authenticatedRequest]);
+
+  useEffect(() => {
+    let active = true;
+    setReady(false);
+    setError("");
+    authenticatedRequest<InboxData>("/api/inbox")
+      .then((next) => {
+        if (active) setData(next);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load inbox",
+          );
+          setData(EMPTY);
+        }
+      })
+      .finally(() => {
+        if (active) setReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest]);
+
+  const markContactRead = useCallback(
+    async (contactId: string) => {
+      await authenticatedRequest(`/api/inbox/contacts/${contactId}/read`, {
+        method: "POST",
+        body: {},
+      });
+      setData((prev) => ({
+        ...prev,
+        messages: prev.messages.map((message) =>
+          message.contactId === contactId && !message.isFromMe
+            ? { ...message, read: true }
+            : message,
+        ),
+      }));
+    },
+    [authenticatedRequest],
+  );
+
+  const sendReply = useCallback(
+    async (contactId: string, subject: string, content: string) => {
+      const message = await authenticatedRequest<InboxMessage>("/api/inbox/messages", {
+        method: "POST",
+        body: { contactId, subject, content },
+      });
+      setData((prev) => ({
+        ...prev,
+        messages: [...prev.messages, message],
+      }));
+      return message;
+    },
+    [authenticatedRequest],
+  );
+
+  const removeMessage = useCallback(
+    async (messageId: string) => {
+      await authenticatedRequest(`/api/inbox/messages/${messageId}`, {
+        method: "DELETE",
+      });
+      setData((prev) => ({
+        ...prev,
+        messages: prev.messages.filter((message) => message.id !== messageId),
+      }));
+    },
+    [authenticatedRequest],
+  );
+
+  const markNotificationRead = useCallback(
+    async (notificationId: string) => {
+      await authenticatedRequest(`/api/inbox/notifications/${notificationId}/read`, {
+        method: "POST",
+        body: {},
+      });
+      setData((prev) => ({
+        ...prev,
+        notifications: prev.notifications.map((notification) =>
+          notification.id === notificationId
+            ? { ...notification, read: true }
+            : notification,
+        ),
+      }));
+    },
+    [authenticatedRequest],
+  );
+
+  const markAllNotificationsRead = useCallback(async () => {
+    await authenticatedRequest("/api/inbox/notifications/read-all", {
+      method: "POST",
+      body: {},
+    });
+    setData((prev) => ({
+      ...prev,
+      notifications: prev.notifications.map((notification) => ({
+        ...notification,
+        read: true,
+      })),
+    }));
+  }, [authenticatedRequest]);
+
   return {
-    contacts: raw.contacts ?? SEED_INBOX_DATA.contacts,
-    messages: raw.messages ?? SEED_INBOX_DATA.messages,
-    notifications: raw.notifications ?? SEED_INBOX_DATA.notifications,
+    data,
+    ready,
+    error,
+    reload,
+    markContactRead,
+    sendReply,
+    removeMessage,
+    markNotificationRead,
+    markAllNotificationsRead,
   };
 }
 
-export function loadInboxData(): InboxData {
-  if (typeof window === "undefined") return SEED_INBOX_DATA;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_INBOX_DATA));
-    return SEED_INBOX_DATA;
-  }
-  try {
-    return normalizeInboxData(JSON.parse(raw) as Partial<InboxData>);
-  } catch {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_INBOX_DATA));
-    return SEED_INBOX_DATA;
-  }
-}
-
-export function saveInboxData(data: InboxData) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
-
-export function useInbox() {
-  const [data, setData] = useState<InboxData>(SEED_INBOX_DATA);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    setData(loadInboxData());
-    setReady(true);
-  }, []);
-
-  const persist = useCallback((next: InboxData) => {
-    setData(next);
-    saveInboxData(next);
-  }, []);
-
-  return { data, ready, persist };
+export async function addInboxNotification(
+  authenticatedRequest: AuthenticatedRequest,
+  input: Omit<InboxNotification, "id" | "createdAt" | "read"> & { read?: boolean },
+): Promise<InboxNotification> {
+  return authenticatedRequest<InboxNotification>("/api/inbox/notifications", {
+    method: "POST",
+    body: {
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      audience: input.audience,
+      href: input.href,
+      campaignId: input.campaignId,
+    },
+  });
 }
 
 export function getMessagesForContact(data: InboxData, contactId: string) {
@@ -72,73 +189,6 @@ export function getNotificationsForRole(
 
 export function getUnreadNotificationCount(data: InboxData, role: "creator" | "brand"): number {
   return getNotificationsForRole(data, role).filter((n) => !n.read).length;
-}
-
-export function markContactMessagesRead(data: InboxData, contactId: string): InboxData {
-  return {
-    ...data,
-    messages: data.messages.map((m) =>
-      m.contactId === contactId && !m.isFromMe ? { ...m, read: true } : m,
-    ),
-  };
-}
-
-export function markNotificationRead(data: InboxData, notificationId: string): InboxData {
-  return {
-    ...data,
-    notifications: data.notifications.map((n) =>
-      n.id === notificationId ? { ...n, read: true } : n,
-    ),
-  };
-}
-
-export function markAllNotificationsRead(data: InboxData, role: "creator" | "brand"): InboxData {
-  const visible = new Set(getNotificationsForRole(data, role).map((n) => n.id));
-  return {
-    ...data,
-    notifications: data.notifications.map((n) =>
-      visible.has(n.id) ? { ...n, read: true } : n,
-    ),
-  };
-}
-
-export function addInboxNotification(
-  input: Omit<InboxNotification, "id" | "createdAt" | "read"> & { read?: boolean },
-): InboxNotification {
-  const notification: InboxNotification = {
-    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    createdAt: new Date().toISOString(),
-    read: input.read ?? false,
-    ...input,
-  };
-  const data = loadInboxData();
-  saveInboxData({ ...data, notifications: [notification, ...data.notifications] });
-  return notification;
-}
-
-export function addReply(
-  data: InboxData,
-  contactId: string,
-  subject: string,
-  content: string,
-): InboxData {
-  const message: InboxMessage = {
-    id: `msg-${Date.now()}`,
-    contactId,
-    subject,
-    content,
-    createdAt: new Date().toISOString(),
-    read: true,
-    isFromMe: true,
-  };
-  return { ...data, messages: [...data.messages, message] };
-}
-
-export function deleteMessage(data: InboxData, messageId: string): InboxData {
-  return {
-    ...data,
-    messages: data.messages.filter((m) => m.id !== messageId),
-  };
 }
 
 export function formatMessageDateTime(iso: string) {
