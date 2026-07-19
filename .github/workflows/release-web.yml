@@ -38,7 +38,7 @@ env:
   ROLLOUT_NAME: thesi-web
   ROLLOUT_NAMESPACE: apps
   IMAGE_REPOSITORY: ghcr.io/clothme-io/thesi-web
-  INFRA_BRANCH: rancher-quickstart
+  INFRA_BRANCH: main
   OVERLAY_PATHS_DEV: fleet/bundles/apps/thesi-web/overlays/dev
   OVERLAY_PATHS_PROD: fleet/bundles/apps/thesi-web/overlays/prod
   DEV_HEALTH_URL: https://dv-app.get-thesi.com/
