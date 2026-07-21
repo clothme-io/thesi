@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import {
+  BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_STATUS_LABELS,
   BRAND_CAMPAIGN_TYPE_LABELS,
   getCampaignBudgetLabel,
@@ -33,6 +34,9 @@ export function CampaignsPageContent() {
       return (
         campaign.name.toLowerCase().includes(q) ||
         campaign.brief.toLowerCase().includes(q) ||
+        BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType]
+          ?.toLowerCase()
+          .includes(q) ||
         BRAND_CAMPAIGN_TYPE_LABELS[campaign.type].toLowerCase().includes(q)
       );
     });
@@ -71,7 +75,8 @@ export function CampaignsPageContent() {
             <thead>
               <tr>
                 <th>Campaign</th>
-                <th>Type</th>
+                <th>Campaign type</th>
+                <th>Content</th>
                 <th>Status</th>
                 <th>Start</th>
                 <th>End</th>
@@ -84,6 +89,10 @@ export function CampaignsPageContent() {
                 <tr key={campaign.id}>
                   <td>
                     <Link href={`/app/campaigns/${campaign.id}`}>{campaign.name}</Link>
+                  </td>
+                  <td>
+                    {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType] ??
+                      campaign.campaignType}
                   </td>
                   <td>{BRAND_CAMPAIGN_TYPE_LABELS[campaign.type]}</td>
                   <td>{BRAND_CAMPAIGN_STATUS_LABELS[campaign.status]}</td>

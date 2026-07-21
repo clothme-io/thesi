@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthProvider";
 import { useMarketplace } from "@/lib/marketplace/storage";
 import { getListingsForBrand } from "@/lib/marketplace/listings";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
+import { BRAND_CAMPAIGN_GOAL_TYPE_LABELS } from "@/lib/brand-campaigns/types";
 import {
   LISTING_TYPE_LABELS,
   PAYMENT_STRUCTURE_LABELS,
@@ -114,7 +115,7 @@ export function MarketplacePageContent() {
           >
             {TYPE_OPTIONS.map((opt) => (
               <option key={opt} value={opt}>
-                {opt === "all" ? "All types" : LISTING_TYPE_LABELS[opt]}
+                {opt === "all" ? "All content types" : LISTING_TYPE_LABELS[opt]}
               </option>
             ))}
           </select>
@@ -179,6 +180,10 @@ export function MarketplacePageContent() {
                   <h2>{listing.name}</h2>
                   <p className="marketplace-brand">{listing.brandName}</p>
                   <div className="marketplace-card-meta">
+                    <span>
+                      {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??
+                        listing.campaignType}
+                    </span>
                     <span>{LISTING_TYPE_LABELS[listing.type]}</span>
                     <span>{formatListingPayment(listing.payment)}</span>
                   </div>

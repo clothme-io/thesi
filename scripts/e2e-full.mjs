@@ -209,12 +209,14 @@ async function main() {
       token: brandToken,
       body: {
         name: 'E2E Summer Drop',
+        campaignType: 'experience',
         type: 'tiktok',
         status: 'active',
         startDate: '2026-07-20',
         endDate: '2026-08-20',
         brief: 'Create authentic TikTok UGC for our summer collection.',
         deliverables: '3 TikTok videos',
+        exampleVideoLinks: ['https://www.tiktok.com/@example/video/e2e'],
         requirements: {
           niches: ['Fashion'],
           minFollowersRange: '1K-5K',

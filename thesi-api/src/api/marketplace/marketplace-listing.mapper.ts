@@ -14,6 +14,7 @@ export function buildListingPayload(
   return {
     brandName,
     name: campaign.name,
+    campaignType: campaign.campaignType,
     type: campaign.type,
     status: resolveListingStatus(campaign),
     startDate: campaign.startDate,
@@ -21,6 +22,7 @@ export function buildListingPayload(
     applicationDeadline: campaign.startDate,
     brief: campaign.brief,
     deliverables: campaign.deliverables,
+    exampleVideoLinks: campaign.exampleVideoLinks ?? [],
     requirements: buildRequirements(campaign),
     files: campaign.files.map((file) => ({
       id: file.id,

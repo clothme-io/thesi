@@ -15,6 +15,7 @@ import { listingInviteCampaignId, listingToInviteCriteria } from "@/lib/marketpl
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
+import { BRAND_CAMPAIGN_GOAL_TYPE_LABELS } from "@/lib/brand-campaigns/types";
 import {
   LISTING_TYPE_LABELS,
   PAYMENT_STRUCTURE_LABELS,
@@ -116,7 +117,10 @@ export function MarketplaceDetailContent() {
           </Link>
           <h1 style={{ marginTop: 4 }}>{listing.name}</h1>
           <span className="workspace-subtitle">
-            {listing.brandName} · {LISTING_TYPE_LABELS[listing.type]}
+            {listing.brandName} ·{" "}
+            {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??
+              listing.campaignType}{" "}
+            · {LISTING_TYPE_LABELS[listing.type]}
           </span>
         </div>
         <div className="marketplace-detail-actions">
@@ -160,6 +164,10 @@ export function MarketplaceDetailContent() {
                 <span className={`marketplace-status marketplace-status--${listing.status}`}>
                   {LISTING_STATUS_LABELS[listing.status]}
                 </span>
+                <span className="marketplace-tag">
+                  {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??
+                    listing.campaignType}
+                </span>
                 <span className="marketplace-tag">{LISTING_TYPE_LABELS[listing.type]}</span>
                 <span className="marketplace-tag">{PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}</span>
               </div>
@@ -169,6 +177,21 @@ export function MarketplaceDetailContent() {
 
               <h3 style={{ marginTop: 24 }}>Deliverables</h3>
               <p>{listing.deliverables}</p>
+
+              {(listing.exampleVideoLinks?.length ?? 0) > 0 && (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Example videos</h3>
+                  <ul className="marketplace-requirements">
+                    {listing.exampleVideoLinks.map((link) => (
+                      <li key={link}>
+                        <a href={link} target="_blank" rel="noreferrer">
+                          {link}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
 
               <h3 style={{ marginTop: 24 }}>Requirements</h3>
               <ul className="marketplace-requirements">

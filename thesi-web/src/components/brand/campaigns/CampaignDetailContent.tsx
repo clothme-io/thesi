@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { downloadCampaignFile, getCampaignById, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import {
+  BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_PAYMENT_LABELS,
   BRAND_CAMPAIGN_STATUS_LABELS,
   BRAND_CAMPAIGN_TYPE_LABELS,
@@ -135,7 +136,14 @@ export function CampaignDetailContent() {
           <div className="crm-detail-panel">
             <h3>Campaign summary</h3>
             <div className="crm-meta-row">
-              <span>Type</span>
+              <span>Campaign type</span>
+              <span>
+                {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType] ??
+                  campaign.campaignType}
+              </span>
+            </div>
+            <div className="crm-meta-row">
+              <span>Content type</span>
               <span>{BRAND_CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
             </div>
             <div className="crm-meta-row">
@@ -156,6 +164,20 @@ export function CampaignDetailContent() {
             <p>{campaign.brief}</p>
             <h3 style={{ marginTop: 24 }}>Deliverables</h3>
             <p>{campaign.deliverables}</p>
+            {(campaign.exampleVideoLinks?.length ?? 0) > 0 && (
+              <>
+                <h3 style={{ marginTop: 24 }}>Example videos</h3>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {campaign.exampleVideoLinks.map((link) => (
+                    <li key={link}>
+                      <a href={link} target="_blank" rel="noreferrer">
+                        {link}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
 
           <div>

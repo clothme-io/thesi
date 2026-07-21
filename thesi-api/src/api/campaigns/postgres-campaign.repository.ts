@@ -70,12 +70,14 @@ export class PostgresCampaignRepository implements CampaignRepository {
       .values({
         ownerUserId,
         name: input.name,
+        campaignType: input.campaignType,
         type: input.type,
         status: input.status,
         startDate: input.startDate,
         endDate: input.endDate,
         brief: input.brief,
         deliverables: input.deliverables,
+        exampleVideoLinks: normalizeExampleVideoLinks(input.exampleVideoLinks),
         requirements: input.requirements,
         files: [],
         payment: input.payment,
@@ -94,12 +96,14 @@ export class PostgresCampaignRepository implements CampaignRepository {
       .update(schema.campaign)
       .set({
         name: input.name,
+        campaignType: input.campaignType,
         type: input.type,
         status: input.status,
         startDate: input.startDate,
         endDate: input.endDate,
         brief: input.brief,
         deliverables: input.deliverables,
+        exampleVideoLinks: normalizeExampleVideoLinks(input.exampleVideoLinks),
         requirements: input.requirements,
         // files are managed via /campaigns/:id/files — do not clobber
         payment: input.payment,
@@ -370,12 +374,14 @@ export class PostgresCampaignRepository implements CampaignRepository {
     return {
       id: row.id,
       name: row.name,
+      campaignType: row.campaignType as CampaignRecord['campaignType'],
       type: row.type as CampaignRecord['type'],
       status: row.status as CampaignRecord['status'],
       startDate: row.startDate,
       endDate: row.endDate,
       brief: row.brief,
       deliverables: row.deliverables,
+      exampleVideoLinks: normalizeExampleVideoLinks(row.exampleVideoLinks),
       requirements: normalizeRequirements(row.requirements),
       files: fileRows.map(toFileMeta),
       payment: normalizePayment(row.payment),
@@ -427,4 +433,12 @@ function normalizePayment(
       : {}),
     ...(value?.notes ? { notes: value.notes } : {}),
   };
+}
+
+function normalizeExampleVideoLinks(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

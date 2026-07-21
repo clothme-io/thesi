@@ -5,6 +5,7 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
     {
       id: "campaign-1",
       name: "Summer Running Campaign",
+      campaignType: "experience",
       type: "mixed_bundle",
       status: "active",
       startDate: "2026-07-15",
@@ -12,6 +13,7 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
       brief:
         "Promote the latest summer running collection with authentic creator-led storytelling and workout lifestyle footage.",
       deliverables: "3 TikToks, 2 Reels, raw b-roll",
+      exampleVideoLinks: ["https://www.tiktok.com/@example/video/1"],
       requirements: {
         niches: ["Fitness", "Lifestyle"],
         minFollowersRange: "10k+",
@@ -38,12 +40,14 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
     {
       id: "campaign-2",
       name: "Fall Lookbook UGC",
+      campaignType: "experience",
       type: "instagram_reels",
       status: "draft",
       startDate: "2026-08-05",
       endDate: "2026-09-10",
       brief: "Create warm, editorial-style content for our fall collection launch.",
       deliverables: "4 Reels, 8 photos",
+      exampleVideoLinks: [],
       requirements: {
         niches: ["Fashion"],
         minFollowersRange: "5k+",
@@ -62,12 +66,14 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
     {
       id: "campaign-3",
       name: "Creator Store Promo Q3",
+      campaignType: "experience",
       type: "mixed_bundle",
       status: "paused",
       startDate: "2026-07-01",
       endDate: "2026-07-31",
       brief: "Drive awareness for the ClothME creator store with conversion-focused content.",
       deliverables: "2 TikToks, 1 Reel, 3 photos",
+      exampleVideoLinks: [],
       requirements: {
         niches: ["Fashion", "Lifestyle"],
         minFollowersRange: "2k+",
