@@ -109,7 +109,7 @@ a {
   font-weight: 600;
 }
 
-.thesi-landing-hero {
+.thesi-landing-hero:not(.thesi-landing-hero--rich) {
   text-align: center;
   padding: clamp(80px, 12vw, 140px) clamp(18px, 5vw, 64px);
   max-width: 860px;
@@ -158,8 +158,10 @@ a {
 }
 
 /* ---------- Home landing (creator-focused) ---------- */
-/* Match ClothME.io home .hero / .how / .blog:
-   width: min(1160px, calc(100% - 36px)) */
+/* Match live ClothME.io .hero exactly:
+   width: min(1160px, calc(100% - 36px))
+   grid: minmax(0,1fr) minmax(300px,420px)
+   gap: clamp(30px, 6vw, 86px) */
 .thesi-landing {
   --thesi-home-width: min(1160px, calc(100% - 36px));
   overflow-x: hidden;
@@ -169,7 +171,7 @@ a {
     #ffffff;
 }
 
-.thesi-landing-hero--rich {
+.thesi-landing-hero.thesi-landing-hero--rich {
   position: relative;
   width: var(--thesi-home-width);
   max-width: none;
@@ -293,10 +295,10 @@ a {
 }
 
 .thesi-landing-inner {
-  width: min(var(--thesi-home-width), 100%);
+  width: var(--thesi-home-width);
   margin: 0 auto;
   box-sizing: border-box;
-  padding: clamp(64px, 8vw, 96px) var(--thesi-home-gutter);
+  padding: clamp(64px, 8vw, 96px) 0;
 }
 
 .thesi-landing-section .eyebrow {
@@ -472,22 +474,23 @@ a {
 }
 
 @media (max-width: 900px) {
-  .thesi-landing-hero--rich {
-    flex-direction: column;
+  .thesi-landing-hero.thesi-landing-hero--rich {
+    grid-template-columns: 1fr;
     min-height: auto;
     text-align: center;
-    width: min(var(--thesi-home-width), 100%);
-    padding: clamp(48px, 8vw, 72px) var(--thesi-home-gutter) 64px;
-    gap: 0;
+    gap: 28px;
+    padding: clamp(44px, 8vw, 72px) 0 64px;
   }
 
   .thesi-landing-hero-copy {
-    max-width: 560px;
+    max-width: 760px;
     margin: 0 auto;
   }
 
   .thesi-landing-hero-visual {
-    display: none;
+    width: min(100%, 420px);
+    height: 300px;
+    margin: 0 auto;
   }
 
   .thesi-landing .creator-hero-ctas {
