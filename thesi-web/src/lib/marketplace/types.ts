@@ -1,3 +1,5 @@
+import type { BrandCampaignGoalType } from "@/lib/brand-campaigns/types";
+
 export type MarketplaceListingType =
   | "tiktok"
   | "instagram_reels"
@@ -41,6 +43,7 @@ export interface MarketplaceListing {
   brandId?: string;
   ownerUserId?: string;
   campaignId?: string;
+  campaignType: BrandCampaignGoalType;
   type: MarketplaceListingType;
   status: MarketplaceListingStatus;
   startDate: string;
@@ -48,6 +51,7 @@ export interface MarketplaceListing {
   applicationDeadline: string;
   brief: string;
   deliverables: string;
+  exampleVideoLinks: string[];
   requirements: string[];
   files: MarketplaceFile[];
   payment: MarketplacePayment;

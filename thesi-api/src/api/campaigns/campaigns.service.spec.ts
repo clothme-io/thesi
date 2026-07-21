@@ -431,12 +431,14 @@ function sampleCampaign(
 ): UpsertCampaignDto {
   return {
     name: 'Untitled campaign',
+    campaignType: 'experience',
     type: 'tiktok',
     status: 'draft',
     startDate: '2026-07-01',
     endDate: '2026-08-01',
     brief: 'Brief',
     deliverables: '1 video',
+    exampleVideoLinks: [],
     requirements: {
       niches: ['Fitness'],
       minFollowersRange: '5k+',

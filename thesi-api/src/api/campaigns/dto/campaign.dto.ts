@@ -22,6 +22,15 @@ export const CAMPAIGN_TYPES = [
   'long_form',
 ] as const;
 
+/** Business goal of the campaign (separate from content format). */
+export const CAMPAIGN_GOAL_TYPES = [
+  'experience',
+  'growth',
+  'product',
+  'brand_partnership',
+  'community',
+] as const;
+
 export const CAMPAIGN_STATUSES = [
   'draft',
   'active',
@@ -160,7 +169,17 @@ export class UpsertCampaignDto {
   @MaxLength(160)
   name: string;
 
-  @ApiProperty({ enum: CAMPAIGN_TYPES })
+  @ApiProperty({
+    enum: CAMPAIGN_GOAL_TYPES,
+    description: 'Business goal of the campaign',
+  })
+  @IsIn(CAMPAIGN_GOAL_TYPES)
+  campaignType: (typeof CAMPAIGN_GOAL_TYPES)[number];
+
+  @ApiProperty({
+    enum: CAMPAIGN_TYPES,
+    description: 'Content format (applies to all campaign types)',
+  })
   @IsIn(CAMPAIGN_TYPES)
   type: (typeof CAMPAIGN_TYPES)[number];
 
@@ -187,6 +206,15 @@ export class UpsertCampaignDto {
   @IsString()
   @MaxLength(4000)
   deliverables: string;
+
+  @ApiProperty({
+    type: [String],
+    description: 'Optional example / reference video URLs',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(2000, { each: true })
+  exampleVideoLinks: string[];
 
   @ApiProperty({ type: CampaignRequirementsDto })
   @ValidateNested()

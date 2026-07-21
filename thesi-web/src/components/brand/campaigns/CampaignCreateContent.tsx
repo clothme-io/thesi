@@ -6,9 +6,14 @@ import { useRef, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import type {
+  BrandCampaignGoalType,
   BrandCampaignPaymentModel,
   BrandCampaignStatus,
   BrandCampaignType,
+} from "@/lib/brand-campaigns/types";
+import {
+  BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
+  BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
 } from "@/lib/brand-campaigns/types";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { publishCampaignToMarketplace } from "@/lib/marketplace/publish-from-campaign";
@@ -18,7 +23,17 @@ import {
   PLATFORM_FEE_CAP_CENTS,
 } from "@/lib/platform-fee";
 
-const TYPE_OPTIONS: { label: string; value: BrandCampaignType }[] = [
+const CAMPAIGN_TYPE_OPTIONS: {
+  label: string;
+  value: BrandCampaignGoalType;
+}[] = (
+  Object.keys(BRAND_CAMPAIGN_GOAL_TYPE_LABELS) as BrandCampaignGoalType[]
+).map((value) => ({
+  value,
+  label: BRAND_CAMPAIGN_GOAL_TYPE_LABELS[value],
+}));
+
+const CONTENT_TYPE_OPTIONS: { label: string; value: BrandCampaignType }[] = [
   { label: "TikTok", value: "tiktok" },
   { label: "Instagram Reels", value: "instagram_reels" },
   { label: "YouTube Shorts", value: "youtube_shorts" },
@@ -65,11 +80,14 @@ export function CampaignCreateContent() {
   const dates = defaultDates();
 
   const [name, setName] = useState("");
+  const [campaignType, setCampaignType] =
+    useState<BrandCampaignGoalType>("experience");
   const [type, setType] = useState<BrandCampaignType>("tiktok");
   const [startDate, setStartDate] = useState(dates.start);
   const [endDate, setEndDate] = useState(dates.end);
   const [brief, setBrief] = useState("");
   const [deliverables, setDeliverables] = useState("");
+  const [exampleVideoLinks, setExampleVideoLinks] = useState<string[]>([""]);
   const [niches, setNiches] = useState("Fitness, Lifestyle");
   const [minFollowersRange, setMinFollowersRange] = useState("5k+");
   const [location, setLocation] = useState("US");
@@ -97,12 +115,14 @@ export function CampaignCreateContent() {
 
   const buildCampaignPayload = (status: BrandCampaignStatus) => ({
     name: name.trim() || "Untitled campaign",
+    campaignType,
     type,
     status,
     startDate,
     endDate,
     brief,
     deliverables,
+    exampleVideoLinks: exampleVideoLinks.map((link) => link.trim()).filter(Boolean),
     requirements: {
       niches: parseList(niches),
       minFollowersRange,
@@ -252,14 +272,35 @@ export function CampaignCreateContent() {
                 <input type="text" placeholder="Campaign name" value={name} onChange={(e) => setName(e.target.value)} />
               </label>
               <label className="workspace-field">
-                <span>Type</span>
-                <select value={type} onChange={(e) => setType(e.target.value as BrandCampaignType)}>
-                  {TYPE_OPTIONS.map((opt) => (
+                <span>Campaign type</span>
+                <select
+                  value={campaignType}
+                  onChange={(e) =>
+                    setCampaignType(e.target.value as BrandCampaignGoalType)
+                  }
+                >
+                  {CAMPAIGN_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}
                 </select>
+                <span className="workspace-hint" style={{ marginTop: 6 }}>
+                  {BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES[campaignType]}
+                </span>
+              </label>
+              <label className="workspace-field">
+                <span>Content type</span>
+                <select value={type} onChange={(e) => setType(e.target.value as BrandCampaignType)}>
+                  {CONTENT_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="workspace-hint" style={{ marginTop: 6 }}>
+                  Applies to all campaign types.
+                </span>
               </label>
               <label className="workspace-field">
                 <span>Start date</span>
@@ -287,6 +328,53 @@ export function CampaignCreateContent() {
                   onChange={(e) => setDeliverables(e.target.value)}
                 />
               </label>
+              <div className="workspace-field workspace-field--full">
+                <span>Example video links</span>
+                <p className="workspace-hint" style={{ marginTop: 4 }}>
+                  Optional reference examples for creators.
+                </p>
+                {exampleVideoLinks.map((link, index) => (
+                  <div
+                    key={`example-link-${index}`}
+                    style={{ display: "flex", gap: 8, marginTop: 8 }}
+                  >
+                    <input
+                      type="url"
+                      placeholder="https://"
+                      value={link}
+                      onChange={(e) => {
+                        const next = [...exampleVideoLinks];
+                        next[index] = e.target.value;
+                        setExampleVideoLinks(next);
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    {exampleVideoLinks.length > 1 ? (
+                      <button
+                        type="button"
+                        className="inbox-btn-text"
+                        onClick={() =>
+                          setExampleVideoLinks((prev) =>
+                            prev.filter((_, i) => i !== index),
+                          )
+                        }
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="inbox-btn-text"
+                  style={{ marginTop: 8 }}
+                  onClick={() =>
+                    setExampleVideoLinks((prev) => [...prev, ""])
+                  }
+                >
+                  + Add another link
+                </button>
+              </div>
             </div>
           </section>
 

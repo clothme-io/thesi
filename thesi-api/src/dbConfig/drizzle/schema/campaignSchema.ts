@@ -45,12 +45,17 @@ export const campaign = thesiSchema.table('campaign', {
     .notNull()
     .references(() => thesiUser.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  campaignType: text('campaign_type').notNull().default('experience'),
   type: text('type').notNull(),
   status: text('status').notNull(),
   startDate: date('start_date').notNull(),
   endDate: date('end_date').notNull(),
   brief: text('brief').notNull().default(''),
   deliverables: text('deliverables').notNull().default(''),
+  exampleVideoLinks: jsonb('example_video_links')
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   requirements: jsonb('requirements')
     .$type<CampaignRequirementsJson>()
     .notNull()

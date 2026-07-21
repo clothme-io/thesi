@@ -203,6 +203,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       brandName: row.brandName,
       ownerUserId: row.ownerUserId,
       campaignId: row.campaignId,
+      campaignType: row.campaignType as MarketplaceListingRecord['campaignType'],
       type: row.type as MarketplaceListingRecord['type'],
       status: row.status as MarketplaceListingRecord['status'],
       startDate: row.startDate,
@@ -210,6 +211,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       applicationDeadline: row.applicationDeadline,
       brief: row.brief,
       deliverables: row.deliverables,
+      exampleVideoLinks: Array.isArray(row.exampleVideoLinks)
+        ? row.exampleVideoLinks.filter(
+            (item): item is string => typeof item === 'string',
+          )
+        : [],
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       files: Array.isArray(row.files) ? row.files : [],
       payment: row.payment,

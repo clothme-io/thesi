@@ -1,3 +1,10 @@
+export type BrandCampaignGoalType =
+  | "experience"
+  | "growth"
+  | "product"
+  | "brand_partnership"
+  | "community";
+
 export type BrandCampaignType =
   | "tiktok"
   | "instagram_reels"
@@ -25,12 +32,14 @@ export interface BrandCampaignMilestone {
 export interface BrandCampaign {
   id: string;
   name: string;
+  campaignType: BrandCampaignGoalType;
   type: BrandCampaignType;
   status: BrandCampaignStatus;
   startDate: string;
   endDate: string;
   brief: string;
   deliverables: string;
+  exampleVideoLinks: string[];
   requirements: {
     niches: string[];
     minFollowersRange: string;
@@ -54,6 +63,23 @@ export interface BrandCampaignData {
   campaigns: BrandCampaign[];
 }
 
+export const BRAND_CAMPAIGN_GOAL_TYPE_LABELS: Record<BrandCampaignGoalType, string> = {
+  experience: "Experience Campaigns",
+  growth: "Growth Campaigns",
+  product: "Product Campaigns",
+  brand_partnership: "Brand Partnership Campaigns",
+  community: "Community Campaigns",
+};
+
+export const BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES: Record<BrandCampaignGoalType, string> = {
+  experience: "Creators test products or features before promoting them.",
+  growth: "Grow the business or app or platform.",
+  product: "Help brands sell products.",
+  brand_partnership: "Help brands achieve specific business goals.",
+  community: "Strengthen the community.",
+};
+
+/** Content format labels (applies to all campaign types). */
 export const BRAND_CAMPAIGN_TYPE_LABELS: Record<BrandCampaignType, string> = {
   tiktok: "TikTok",
   instagram_reels: "Instagram Reels",
@@ -100,4 +126,3 @@ export function getCampaignBudgetLabel(campaign: BrandCampaign): string {
       return "—";
   }
 }
-

@@ -47,6 +47,7 @@ export const marketplaceListing = thesiSchema.table('marketplace_listing', {
     .references(() => thesiUser.id, { onDelete: 'cascade' }),
   brandName: text('brand_name').notNull(),
   name: text('name').notNull(),
+  campaignType: text('campaign_type').notNull().default('experience'),
   type: text('type').notNull(),
   status: text('status').notNull(),
   startDate: date('start_date').notNull(),
@@ -54,6 +55,10 @@ export const marketplaceListing = thesiSchema.table('marketplace_listing', {
   applicationDeadline: date('application_deadline').notNull(),
   brief: text('brief').notNull().default(''),
   deliverables: text('deliverables').notNull().default(''),
+  exampleVideoLinks: jsonb('example_video_links')
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   requirements: jsonb('requirements').$type<string[]>().notNull().default([]),
   files: jsonb('files').$type<MarketplaceFileJson[]>().notNull().default([]),
   payment: jsonb('payment')

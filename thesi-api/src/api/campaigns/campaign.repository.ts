@@ -28,12 +28,14 @@ export type CampaignFileRow = {
 export type CampaignRecord = {
   id: string;
   name: string;
+  campaignType: UpsertCampaignDto['campaignType'];
   type: UpsertCampaignDto['type'];
   status: UpsertCampaignDto['status'];
   startDate: string;
   endDate: string;
   brief: string;
   deliverables: string;
+  exampleVideoLinks: string[];
   requirements: UpsertCampaignDto['requirements'];
   files: CampaignFileMeta[];
   payment: UpsertCampaignDto['payment'];
