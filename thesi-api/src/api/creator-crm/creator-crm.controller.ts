@@ -9,10 +9,20 @@ import {
   Patch,
   Post,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
+import { memoryStorage } from 'multer';
 import { CurrentUser } from 'src/shared/auth/current-user.decorator';
 import {
   type AuthJwtPayload,
@@ -20,7 +30,12 @@ import {
 } from 'src/shared/auth/jwt-auth.guard';
 import { CreatorCrmService } from './creator-crm.service';
 import {
+  CreateCrmCalendarEventDto,
+  CreateCrmContractDto,
+  CreateCrmDealDto,
   CreateCrmPaymentDto,
+  CreateCrmTaskDto,
+  UpdateCrmNotesDto,
   UpdateCrmPaymentDto,
   UpdateDealStageDto,
   UpdateTaskStatusDto,
@@ -40,6 +55,16 @@ export class CreatorCrmController {
     return { status: HttpStatus.OK, error: null, data };
   }
 
+  @Post('deals')
+  @ApiOperation({ summary: 'Create a CRM deal' })
+  async createDeal(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() dto: CreateCrmDealDto,
+  ) {
+    const data = await this.crm.createDeal(user.sub, dto);
+    return { status: HttpStatus.CREATED, error: null, data };
+  }
+
   @Patch('deals/:id/stage')
   @ApiOperation({ summary: 'Move a deal to a new pipeline stage' })
   async moveDealStage(
@@ -51,6 +76,16 @@ export class CreatorCrmController {
     return { status: HttpStatus.OK, error: null, data };
   }
 
+  @Post('tasks')
+  @ApiOperation({ summary: 'Create a CRM task' })
+  async createTask(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() dto: CreateCrmTaskDto,
+  ) {
+    const data = await this.crm.createTask(user.sub, dto);
+    return { status: HttpStatus.CREATED, error: null, data };
+  }
+
   @Patch('tasks/:id')
   @ApiOperation({ summary: 'Update a CRM task status' })
   async updateTaskStatus(
@@ -60,6 +95,81 @@ export class CreatorCrmController {
   ) {
     const data = await this.crm.updateTaskStatus(user.sub, id, dto.status);
     return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Patch('brands/:id/notes')
+  @ApiOperation({ summary: 'Update brand notes' })
+  async updateBrandNotes(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCrmNotesDto,
+  ) {
+    const data = await this.crm.updateBrandNotes(user.sub, id, dto.notes);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Patch('jobs/:id/notes')
+  @ApiOperation({ summary: 'Update job notes' })
+  async updateJobNotes(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateCrmNotesDto,
+  ) {
+    const data = await this.crm.updateJobNotes(user.sub, id, dto.notes);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('calendar-events')
+  @ApiOperation({ summary: 'Create a CRM calendar event' })
+  async createCalendarEvent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() dto: CreateCrmCalendarEventDto,
+  ) {
+    const data = await this.crm.createCalendarEvent(user.sub, dto);
+    return { status: HttpStatus.CREATED, error: null, data };
+  }
+
+  @Post('contracts')
+  @ApiOperation({ summary: 'Create a CRM contract (optional file upload)' })
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        brandId: { type: 'string', format: 'uuid' },
+        title: { type: 'string' },
+        jobId: { type: 'string', format: 'uuid' },
+        status: {
+          type: 'string',
+          enum: ['draft', 'sent', 'signed', 'expired'],
+        },
+        expiresAt: { type: 'string', example: '2026-12-31' },
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['brandId', 'title'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 25 * 1024 * 1024 },
+    }),
+  )
+  async createContract(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() dto: CreateCrmContractDto,
+    @UploadedFile()
+    file:
+      | {
+          buffer: Buffer;
+          originalname: string;
+          mimetype: string;
+          size: number;
+        }
+      | undefined,
+  ) {
+    const data = await this.crm.createContract(user.sub, dto, file);
+    return { status: HttpStatus.CREATED, error: null, data };
   }
 
   @Post('payments')

@@ -131,6 +131,134 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
     [authenticatedRequest],
   );
 
+  const createDeal = useCallback(
+    async (input: {
+      brandId: string;
+      title: string;
+      valueCents?: number;
+      stage?: DealStage;
+      expectedCloseDate?: string;
+      notes?: string;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/deals",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createTask = useCallback(
+    async (input: {
+      title: string;
+      brandId?: string;
+      jobId?: string;
+      dueDate?: string;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/tasks",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateBrandNotes = useCallback(
+    async (brandId: string, notes: string) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/brands/${brandId}/notes`,
+        { method: "PATCH", body: { notes } },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateJobNotes = useCallback(
+    async (jobId: string, notes: string) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/jobs/${jobId}/notes`,
+        { method: "PATCH", body: { notes } },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createCalendarEvent = useCallback(
+    async (input: {
+      title: string;
+      type: import("./types").CalendarEventType;
+      date: string;
+      brandId?: string;
+      jobId?: string;
+      notes?: string;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/calendar-events",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createContract = useCallback(
+    async (input: {
+      brandId: string;
+      title: string;
+      jobId?: string;
+      status?: import("./types").ContractStatus;
+      expiresAt?: string;
+      file?: File | null;
+    }) => {
+      setError("");
+      if (input.file) {
+        const formData = new FormData();
+        formData.append("brandId", input.brandId);
+        formData.append("title", input.title);
+        if (input.jobId) formData.append("jobId", input.jobId);
+        if (input.status) formData.append("status", input.status);
+        if (input.expiresAt) formData.append("expiresAt", input.expiresAt);
+        formData.append("file", input.file);
+        const next = await authenticatedRequest<CreatorCrmData>(
+          "/api/creator-crm/contracts",
+          { method: "POST", body: formData },
+        );
+        setData(next);
+        return next;
+      }
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/contracts",
+        {
+          method: "POST",
+          body: {
+            brandId: input.brandId,
+            title: input.title,
+            ...(input.jobId ? { jobId: input.jobId } : {}),
+            ...(input.status ? { status: input.status } : {}),
+            ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+          },
+        },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
   return {
     data,
     ready,
@@ -140,6 +268,12 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
     setTaskStatus,
     createInvoice,
     updateInvoice,
+    createDeal,
+    createTask,
+    updateBrandNotes,
+    updateJobNotes,
+    createCalendarEvent,
+    createContract,
   };
 }
 

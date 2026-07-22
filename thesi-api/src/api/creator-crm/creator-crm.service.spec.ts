@@ -292,6 +292,111 @@ class FakeCreatorCrmRepository implements CreatorCrmRepository {
     payment.updatedAt = new Date().toISOString();
     return payment;
   }
+
+  async updateBrandNotes(
+    _creatorUserId: string,
+    brandId: string,
+    notes: string,
+  ) {
+    const brand = this.brands.find((item) => item.id === brandId);
+    if (!brand) return null;
+    brand.notes = notes;
+    brand.updatedAt = new Date().toISOString();
+    return brand;
+  }
+
+  async updateJobNotes(_creatorUserId: string, jobId: string, notes: string) {
+    const job = this.jobs.find((item) => item.id === jobId);
+    if (!job) return null;
+    job.notes = notes;
+    job.updatedAt = new Date().toISOString();
+    return job;
+  }
+
+  async createTask(input: {
+    creatorUserId: string;
+    brandId?: string | null;
+    jobId?: string | null;
+    title: string;
+    dueDate?: string | null;
+    status?: CrmTaskRecord['status'];
+  }) {
+    const task: CrmTaskRecord = {
+      id: `task-${this.tasks.length + 1}`,
+      ...(input.brandId ? { brandId: input.brandId } : {}),
+      ...(input.jobId ? { jobId: input.jobId } : {}),
+      title: input.title,
+      dueDate: input.dueDate ?? '',
+      status: input.status ?? 'pending',
+      createdAt: new Date().toISOString(),
+    };
+    this.tasks.unshift(task);
+    return task;
+  }
+
+  async createCalendarEvent(input: {
+    creatorUserId: string;
+    brandId?: string | null;
+    jobId?: string | null;
+    title: string;
+    type: import('./creator-crm.repository').CrmCalendarEventRecord['type'];
+    date: string;
+    notes?: string;
+  }) {
+    return {
+      id: 'cal-1',
+      ...(input.brandId ? { brandId: input.brandId } : {}),
+      ...(input.jobId ? { jobId: input.jobId } : {}),
+      title: input.title,
+      type: input.type,
+      date: input.date,
+      notes: input.notes ?? '',
+    };
+  }
+
+  async createContract(input: {
+    creatorUserId: string;
+    brandId: string;
+    jobId?: string | null;
+    title: string;
+    status?: import('./creator-crm.repository').CrmContractRecord['status'];
+    fileName?: string | null;
+    storageProvider?: 'local' | 'bunny' | null;
+    storageKey?: string | null;
+    contentType?: string | null;
+    sizeBytes?: number | null;
+    expiresAt?: string | null;
+  }) {
+    const now = new Date().toISOString();
+    return {
+      id: 'contract-1',
+      brandId: input.brandId,
+      ...(input.jobId ? { jobId: input.jobId } : {}),
+      title: input.title,
+      status: input.status ?? 'draft',
+      ...(input.fileName ? { fileName: input.fileName } : {}),
+      ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  async getContract() {
+    return null;
+  }
+}
+
+class FakeFileStorage {
+  async upload(
+    _file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    key: string,
+  ) {
+    return { provider: 'local' as const, key };
+  }
+  async read() {
+    return Buffer.from('');
+  }
+  async delete() {}
 }
 
 describe('CreatorCrmService', () => {
@@ -341,7 +446,10 @@ describe('CreatorCrmService', () => {
       brief: 'Create TikToks',
       payment: { structure: 'flat_rate', flatAmountCents: 50000 },
     });
-    service = new CreatorCrmService(repository);
+    service = new CreatorCrmService(
+      repository,
+      new FakeFileStorage() as never,
+    );
   });
 
   it('moves a deal stage and records activity', async () => {

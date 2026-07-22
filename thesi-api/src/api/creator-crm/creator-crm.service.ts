@@ -5,12 +5,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { buildInvoicePdf } from 'src/api/billing/invoice-pdf';
+import {
+  FILE_STORAGE,
+  type FileStoragePort,
+  type UploadableFile,
+} from 'src/shared/storage/file-storage.port';
 import {
   CREATOR_CRM_REPOSITORY,
   type CreatorCrmAggregate,
   type CreatorCrmRepository,
   type CrmBrandRecord,
+  type CrmCalendarEventRecord,
+  type CrmContractRecord,
   type CrmDealRecord,
   type CrmPaymentRecord,
   type CrmTaskRecord,
@@ -25,6 +33,25 @@ const DEAL_STAGE_LABELS: Record<CrmDealRecord['stage'], string> = {
   won: 'Won',
   lost: 'Lost',
 };
+
+const MAX_CONTRACT_BYTES = 25 * 1024 * 1024;
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^\w.\-()+ ]+/g, '_').slice(0, 180) || 'contract';
+}
+
+function isAllowedContractMime(mime: string): boolean {
+  const normalized = mime.toLowerCase();
+  return (
+    normalized.startsWith('image/') ||
+    normalized === 'application/pdf' ||
+    normalized.includes('document') ||
+    normalized.includes('msword') ||
+    normalized.includes('officedocument') ||
+    normalized === 'application/zip' ||
+    normalized === 'text/plain'
+  );
+}
 
 function listingValueCents(payment: {
   structure: string;
@@ -52,10 +79,52 @@ export class CreatorCrmService {
   constructor(
     @Inject(CREATOR_CRM_REPOSITORY)
     private readonly crm: CreatorCrmRepository,
+    @Inject(FILE_STORAGE)
+    private readonly storage: FileStoragePort,
   ) {}
 
   async getCrm(userId: string): Promise<CreatorCrmAggregate> {
     await this.requireCreator(userId);
+    return this.crm.getAggregate(userId);
+  }
+
+  async createDeal(
+    userId: string,
+    input: {
+      brandId: string;
+      title: string;
+      valueCents?: number;
+      stage?: CrmDealRecord['stage'];
+      expectedCloseDate?: string;
+      notes?: string;
+    },
+  ): Promise<CreatorCrmAggregate> {
+    await this.requireCreator(userId);
+    const brand = await this.crm.getBrand(userId, input.brandId);
+    if (!brand) {
+      throw new NotFoundException('Brand not found');
+    }
+    const title = input.title.trim();
+    if (!title) {
+      throw new BadRequestException('title is required');
+    }
+    const stage = input.stage ?? 'lead';
+    const deal = await this.crm.createDeal({
+      creatorUserId: userId,
+      brandId: brand.id,
+      title,
+      valueCents: input.valueCents ?? 0,
+      stage,
+      expectedCloseDate: input.expectedCloseDate || null,
+      notes: input.notes?.trim() || '',
+    });
+    await this.crm.createActivity({
+      creatorUserId: userId,
+      brandId: brand.id,
+      dealId: deal.id,
+      type: 'deal_moved',
+      message: `Deal created in ${DEAL_STAGE_LABELS[stage]}: ${deal.title}`,
+    });
     return this.crm.getAggregate(userId);
   }
 
@@ -82,6 +151,51 @@ export class CreatorCrmService {
     return this.crm.getAggregate(userId);
   }
 
+  async createTask(
+    userId: string,
+    input: {
+      title: string;
+      brandId?: string;
+      jobId?: string;
+      dueDate?: string;
+    },
+  ): Promise<CreatorCrmAggregate> {
+    await this.requireCreator(userId);
+    const title = input.title.trim();
+    if (!title) {
+      throw new BadRequestException('title is required');
+    }
+
+    let brandId = input.brandId?.trim() || null;
+    let jobId = input.jobId?.trim() || null;
+
+    if (jobId) {
+      const job = await this.crm.getJob(userId, jobId);
+      if (!job) {
+        throw new NotFoundException('Job not found');
+      }
+      if (brandId && brandId !== job.brandId) {
+        throw new BadRequestException('Job does not belong to this brand');
+      }
+      brandId = brandId || job.brandId;
+    } else if (brandId) {
+      const brand = await this.crm.getBrand(userId, brandId);
+      if (!brand) {
+        throw new NotFoundException('Brand not found');
+      }
+    }
+
+    await this.crm.createTask({
+      creatorUserId: userId,
+      brandId,
+      jobId,
+      title,
+      dueDate: input.dueDate || null,
+      status: 'pending',
+    });
+    return this.crm.getAggregate(userId);
+  }
+
   async updateTaskStatus(
     userId: string,
     taskId: string,
@@ -92,6 +206,183 @@ export class CreatorCrmService {
     if (!task) {
       throw new NotFoundException('Task not found');
     }
+    return this.crm.getAggregate(userId);
+  }
+
+  async updateBrandNotes(
+    userId: string,
+    brandId: string,
+    notes: string,
+  ): Promise<CreatorCrmAggregate> {
+    await this.requireCreator(userId);
+    const brand = await this.crm.updateBrandNotes(
+      userId,
+      brandId,
+      notes.trim(),
+    );
+    if (!brand) {
+      throw new NotFoundException('Brand not found');
+    }
+    await this.crm.createActivity({
+      creatorUserId: userId,
+      brandId: brand.id,
+      type: 'note_added',
+      message: notes.trim()
+        ? 'Brand notes updated'
+        : 'Brand notes cleared',
+    });
+    return this.crm.getAggregate(userId);
+  }
+
+  async updateJobNotes(
+    userId: string,
+    jobId: string,
+    notes: string,
+  ): Promise<CreatorCrmAggregate> {
+    await this.requireCreator(userId);
+    const job = await this.crm.updateJobNotes(userId, jobId, notes.trim());
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+    await this.crm.createActivity({
+      creatorUserId: userId,
+      brandId: job.brandId,
+      jobId: job.id,
+      type: 'note_added',
+      message: notes.trim() ? 'Job notes updated' : 'Job notes cleared',
+    });
+    return this.crm.getAggregate(userId);
+  }
+
+  async createCalendarEvent(
+    userId: string,
+    input: {
+      title: string;
+      type: CrmCalendarEventRecord['type'];
+      date: string;
+      brandId?: string;
+      jobId?: string;
+      notes?: string;
+    },
+  ): Promise<CreatorCrmAggregate> {
+    await this.requireCreator(userId);
+    const title = input.title.trim();
+    if (!title) {
+      throw new BadRequestException('title is required');
+    }
+
+    let brandId = input.brandId?.trim() || null;
+    let jobId = input.jobId?.trim() || null;
+
+    if (jobId) {
+      const job = await this.crm.getJob(userId, jobId);
+      if (!job) {
+        throw new NotFoundException('Job not found');
+      }
+      if (brandId && brandId !== job.brandId) {
+        throw new BadRequestException('Job does not belong to this brand');
+      }
+      brandId = brandId || job.brandId;
+    } else if (brandId) {
+      const brand = await this.crm.getBrand(userId, brandId);
+      if (!brand) {
+        throw new NotFoundException('Brand not found');
+      }
+    }
+
+    await this.crm.createCalendarEvent({
+      creatorUserId: userId,
+      brandId,
+      jobId,
+      title,
+      type: input.type,
+      date: input.date,
+      notes: input.notes?.trim() || '',
+    });
+    return this.crm.getAggregate(userId);
+  }
+
+  async createContract(
+    userId: string,
+    input: {
+      brandId: string;
+      title: string;
+      jobId?: string;
+      status?: CrmContractRecord['status'];
+      expiresAt?: string;
+    },
+    file?: UploadableFile,
+  ): Promise<CreatorCrmAggregate> {
+    await this.requireCreator(userId);
+    const brand = await this.crm.getBrand(userId, input.brandId);
+    if (!brand) {
+      throw new NotFoundException('Brand not found');
+    }
+    const title = input.title.trim();
+    if (!title) {
+      throw new BadRequestException('title is required');
+    }
+
+    let jobId = input.jobId?.trim() || null;
+    if (jobId) {
+      const job = await this.crm.getJob(userId, jobId);
+      if (!job) {
+        throw new NotFoundException('Job not found');
+      }
+      if (job.brandId !== brand.id) {
+        throw new BadRequestException('Job does not belong to this brand');
+      }
+    }
+
+    let fileName: string | null = null;
+    let storageProvider: 'local' | 'bunny' | null = null;
+    let storageKey: string | null = null;
+    let contentType: string | null = null;
+    let sizeBytes: number | null = null;
+
+    if (file?.buffer?.length) {
+      if (file.size > MAX_CONTRACT_BYTES) {
+        throw new BadRequestException('File must be 25MB or smaller');
+      }
+      if (!isAllowedContractMime(file.mimetype || '')) {
+        throw new BadRequestException(
+          'Unsupported file type. Use images, PDF, ZIP, or common documents.',
+        );
+      }
+      const safeName = sanitizeFileName(file.originalname);
+      const key = `crm-contracts/${userId}/${randomUUID()}-${safeName}`;
+      const stored = await this.storage.upload(file, key);
+      fileName = safeName;
+      storageProvider = stored.provider;
+      storageKey = stored.key;
+      contentType = file.mimetype || 'application/octet-stream';
+      sizeBytes = file.size;
+    }
+
+    const contract = await this.crm.createContract({
+      creatorUserId: userId,
+      brandId: brand.id,
+      jobId,
+      title,
+      status: input.status ?? 'draft',
+      fileName,
+      storageProvider,
+      storageKey,
+      contentType,
+      sizeBytes,
+      expiresAt: input.expiresAt || null,
+    });
+
+    await this.crm.createActivity({
+      creatorUserId: userId,
+      brandId: brand.id,
+      jobId,
+      type: 'contract_uploaded',
+      message: fileName
+        ? `Contract uploaded: ${contract.title} (${fileName})`
+        : `Contract created: ${contract.title}`,
+    });
+
     return this.crm.getAggregate(userId);
   }
 

@@ -29,8 +29,11 @@ export function BrandDetailContent() {
   const params = useParams();
   const brandId = params.id as string;
   const { authenticatedRequest } = useAuth();
-  const { data, ready } = useCreatorCrm(authenticatedRequest);
+  const { data, ready, updateBrandNotes } = useCreatorCrm(authenticatedRequest);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+  const [notesDraft, setNotesDraft] = useState<string | null>(null);
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesError, setNotesError] = useState("");
 
   if (!ready) return null;
 
@@ -149,7 +152,45 @@ export function BrandDetailContent() {
 
         {tab === "Notes" && (
           <div className="crm-detail-panel">
-            <p>{brand.notes || "No notes yet."}</p>
+            <label className="crm-form-field">
+              <span>Brand notes</span>
+              <textarea
+                rows={8}
+                value={notesDraft ?? brand.notes}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                placeholder="Add notes about this brand relationship…"
+              />
+            </label>
+            {notesError && (
+              <p className="workspace-hint" style={{ marginBottom: 8 }}>
+                {notesError}
+              </p>
+            )}
+            <button
+              type="button"
+              className="crm-btn-primary"
+              disabled={
+                notesSaving ||
+                (notesDraft ?? brand.notes) === brand.notes
+              }
+              onClick={() => {
+                const nextNotes = notesDraft ?? brand.notes;
+                setNotesSaving(true);
+                setNotesError("");
+                void updateBrandNotes(brand.id, nextNotes)
+                  .then(() => setNotesDraft(null))
+                  .catch((requestError) => {
+                    setNotesError(
+                      requestError instanceof Error
+                        ? requestError.message
+                        : "Could not save notes",
+                    );
+                  })
+                  .finally(() => setNotesSaving(false));
+              }}
+            >
+              {notesSaving ? "Saving…" : "Save notes"}
+            </button>
           </div>
         )}
 

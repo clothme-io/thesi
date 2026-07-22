@@ -63,6 +63,10 @@ export type CrmContractRecord = {
   title: string;
   status: 'draft' | 'sent' | 'signed' | 'expired';
   fileName?: string;
+  storageProvider?: 'local' | 'bunny';
+  storageKey?: string;
+  contentType?: string;
+  sizeBytes?: number;
   signedAt?: string;
   expiresAt?: string;
   createdAt: string;
@@ -263,4 +267,48 @@ export interface CreatorCrmRepository {
       paidAt?: string | null;
     },
   ): Promise<CrmPaymentRecord | null>;
+  updateBrandNotes(
+    creatorUserId: string,
+    brandId: string,
+    notes: string,
+  ): Promise<CrmBrandRecord | null>;
+  updateJobNotes(
+    creatorUserId: string,
+    jobId: string,
+    notes: string,
+  ): Promise<CrmJobRecord | null>;
+  createTask(input: {
+    creatorUserId: string;
+    brandId?: string | null;
+    jobId?: string | null;
+    title: string;
+    dueDate?: string | null;
+    status?: CrmTaskRecord['status'];
+  }): Promise<CrmTaskRecord>;
+  createCalendarEvent(input: {
+    creatorUserId: string;
+    brandId?: string | null;
+    jobId?: string | null;
+    title: string;
+    type: CrmCalendarEventRecord['type'];
+    date: string;
+    notes?: string;
+  }): Promise<CrmCalendarEventRecord>;
+  createContract(input: {
+    creatorUserId: string;
+    brandId: string;
+    jobId?: string | null;
+    title: string;
+    status?: CrmContractRecord['status'];
+    fileName?: string | null;
+    storageProvider?: 'local' | 'bunny' | null;
+    storageKey?: string | null;
+    contentType?: string | null;
+    sizeBytes?: number | null;
+    expiresAt?: string | null;
+  }): Promise<CrmContractRecord>;
+  getContract(
+    creatorUserId: string,
+    contractId: string,
+  ): Promise<CrmContractRecord | null>;
 }

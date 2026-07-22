@@ -9,6 +9,8 @@ import type {
   CreatorCrmRepository,
   CrmActivityRecord,
   CrmBrandRecord,
+  CrmCalendarEventRecord,
+  CrmContractRecord,
   CrmDealRecord,
   CrmJobRecord,
   CrmPaymentRecord,
@@ -120,18 +122,7 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
         createdAt: iso(row.createdAt),
         updatedAt: iso(row.updatedAt),
       })),
-      contracts: contracts.map((row) => ({
-        id: row.id,
-        brandId: row.brandId,
-        ...(row.jobId ? { jobId: row.jobId } : {}),
-        title: row.title,
-        status: row.status as CreatorCrmAggregate['contracts'][number]['status'],
-        ...(row.fileName ? { fileName: row.fileName } : {}),
-        ...(row.signedAt ? { signedAt: iso(row.signedAt) } : {}),
-        ...(row.expiresAt ? { expiresAt: dateStr(row.expiresAt) } : {}),
-        createdAt: iso(row.createdAt),
-        updatedAt: iso(row.updatedAt),
-      })),
+      contracts: contracts.map((row) => this.toContract(row)),
       payments: payments.map((row) => this.toPayment(row)),
       calendarEvents: calendarEvents.map((row) => ({
         id: row.id,
@@ -539,6 +530,161 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
       )
       .returning();
     return row ? this.toPayment(row) : null;
+  }
+
+  async updateBrandNotes(
+    creatorUserId: string,
+    brandId: string,
+    notes: string,
+  ) {
+    const [row] = await this.db
+      .update(schema.crmBrand)
+      .set({ notes, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.crmBrand.creatorUserId, creatorUserId),
+          eq(schema.crmBrand.id, brandId),
+        ),
+      )
+      .returning();
+    return row ? this.toBrand(row) : null;
+  }
+
+  async updateJobNotes(creatorUserId: string, jobId: string, notes: string) {
+    const [row] = await this.db
+      .update(schema.crmJob)
+      .set({ notes, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.crmJob.creatorUserId, creatorUserId),
+          eq(schema.crmJob.id, jobId),
+        ),
+      )
+      .returning();
+    return row ? this.toJob(row) : null;
+  }
+
+  async createTask(input: {
+    creatorUserId: string;
+    brandId?: string | null;
+    jobId?: string | null;
+    title: string;
+    dueDate?: string | null;
+    status?: CrmTaskRecord['status'];
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmTask)
+      .values({
+        creatorUserId: input.creatorUserId,
+        brandId: input.brandId ?? null,
+        jobId: input.jobId ?? null,
+        title: input.title,
+        dueDate: input.dueDate || null,
+        status: input.status ?? 'pending',
+      })
+      .returning();
+    return this.toTask(row);
+  }
+
+  async createCalendarEvent(input: {
+    creatorUserId: string;
+    brandId?: string | null;
+    jobId?: string | null;
+    title: string;
+    type: CrmCalendarEventRecord['type'];
+    date: string;
+    notes?: string;
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmCalendarEvent)
+      .values({
+        creatorUserId: input.creatorUserId,
+        brandId: input.brandId ?? null,
+        jobId: input.jobId ?? null,
+        title: input.title,
+        type: input.type,
+        date: input.date,
+        notes: input.notes ?? '',
+      })
+      .returning();
+    return {
+      id: row.id,
+      ...(row.brandId ? { brandId: row.brandId } : {}),
+      ...(row.jobId ? { jobId: row.jobId } : {}),
+      title: row.title,
+      type: row.type as CrmCalendarEventRecord['type'],
+      date: dateStr(row.date),
+      notes: row.notes,
+    };
+  }
+
+  async createContract(input: {
+    creatorUserId: string;
+    brandId: string;
+    jobId?: string | null;
+    title: string;
+    status?: CrmContractRecord['status'];
+    fileName?: string | null;
+    storageProvider?: 'local' | 'bunny' | null;
+    storageKey?: string | null;
+    contentType?: string | null;
+    sizeBytes?: number | null;
+    expiresAt?: string | null;
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmContract)
+      .values({
+        creatorUserId: input.creatorUserId,
+        brandId: input.brandId,
+        jobId: input.jobId ?? null,
+        title: input.title,
+        status: input.status ?? 'draft',
+        fileName: input.fileName ?? null,
+        storageProvider: input.storageProvider ?? null,
+        storageKey: input.storageKey ?? null,
+        contentType: input.contentType ?? null,
+        sizeBytes: input.sizeBytes ?? null,
+        expiresAt: input.expiresAt || null,
+      })
+      .returning();
+    return this.toContract(row);
+  }
+
+  async getContract(creatorUserId: string, contractId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.crmContract)
+      .where(
+        and(
+          eq(schema.crmContract.creatorUserId, creatorUserId),
+          eq(schema.crmContract.id, contractId),
+        ),
+      )
+      .limit(1);
+    return row ? this.toContract(row) : null;
+  }
+
+  private toContract(
+    row: typeof schema.crmContract.$inferSelect,
+  ): CrmContractRecord {
+    return {
+      id: row.id,
+      brandId: row.brandId,
+      ...(row.jobId ? { jobId: row.jobId } : {}),
+      title: row.title,
+      status: row.status as CrmContractRecord['status'],
+      ...(row.fileName ? { fileName: row.fileName } : {}),
+      ...(row.storageProvider
+        ? { storageProvider: row.storageProvider as 'local' | 'bunny' }
+        : {}),
+      ...(row.storageKey ? { storageKey: row.storageKey } : {}),
+      ...(row.contentType ? { contentType: row.contentType } : {}),
+      ...(row.sizeBytes != null ? { sizeBytes: row.sizeBytes } : {}),
+      ...(row.signedAt ? { signedAt: iso(row.signedAt) } : {}),
+      ...(row.expiresAt ? { expiresAt: dateStr(row.expiresAt) } : {}),
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
+    };
   }
 
   private toJob(row: typeof schema.crmJob.$inferSelect): CrmJobRecord {
