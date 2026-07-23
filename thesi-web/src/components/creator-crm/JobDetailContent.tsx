@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/context/AuthProvider";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import {
   useCreatorCrm,
   getJobById,
@@ -22,12 +23,18 @@ import {
   CONTRACT_STATUS_LABELS,
   TASK_STATUS_LABELS,
 } from "@/lib/creator-crm/types";
+import { ActivityTimeline } from "./ActivityTimeline";
+import { CustomFieldsEditor } from "./CustomFieldsEditor";
 
 export function JobDetailContent() {
   const params = useParams();
   const jobId = params.id as string;
   const { authenticatedRequest } = useAuth();
-  const { data, ready } = useCreatorCrm(authenticatedRequest);
+  const { data, ready, updateJobNotes, upsertEntityFieldValues } =
+    useCreatorCrm(authenticatedRequest);
+  const [notesDraft, setNotesDraft] = useState<string | null>(null);
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [notesError, setNotesError] = useState("");
 
   if (!ready) return null;
 
@@ -138,7 +145,63 @@ export function JobDetailContent() {
             )}
 
             <h3 style={{ marginTop: 24 }}>Notes</h3>
-            <p>{job.notes || "No notes yet."}</p>
+            <label className="crm-form-field">
+              <span>Job notes</span>
+              <textarea
+                rows={6}
+                value={notesDraft ?? job.notes}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                placeholder="Add notes about this job…"
+              />
+            </label>
+            {notesError && (
+              <p className="workspace-hint" style={{ marginBottom: 8 }}>
+                {notesError}
+              </p>
+            )}
+            <button
+              type="button"
+              className="crm-btn-primary"
+              disabled={
+                notesSaving || (notesDraft ?? job.notes) === job.notes
+              }
+              onClick={() => {
+                const nextNotes = notesDraft ?? job.notes;
+                setNotesSaving(true);
+                setNotesError("");
+                void updateJobNotes(job.id, nextNotes)
+                  .then(() => setNotesDraft(null))
+                  .catch((requestError) => {
+                    setNotesError(
+                      requestError instanceof Error
+                        ? requestError.message
+                        : "Could not save notes",
+                    );
+                  })
+                  .finally(() => setNotesSaving(false));
+              }}
+            >
+              {notesSaving ? "Saving…" : "Save notes"}
+            </button>
+
+            <CustomFieldsEditor
+              fields={data.customFields.filter(
+                (field) => field.targetType === "job",
+              )}
+              values={
+                data.entityFieldValues.find(
+                  (row) =>
+                    row.entityType === "job" && row.entityId === job.id,
+                )?.values ?? {}
+              }
+              onSave={async (values) => {
+                await upsertEntityFieldValues({
+                  entityType: "job",
+                  entityId: job.id,
+                  values,
+                });
+              }}
+            />
           </div>
 
           <div>
@@ -172,19 +235,7 @@ export function JobDetailContent() {
               )}
             </div>
 
-            <div className="crm-detail-panel">
-              <h3>Activity</h3>
-              {activities.length === 0 ? (
-                <p className="crm-contact-sub">No activity yet.</p>
-              ) : (
-                activities.map((activity) => (
-                  <div key={activity.id} className="crm-activity-item">
-                    <strong>{activity.message}</strong>
-                    <span>{new Date(activity.createdAt).toLocaleString()}</span>
-                  </div>
-                ))
-              )}
-            </div>
+            <ActivityTimeline activities={activities} title="Activity" />
           </div>
         </div>
       </div>

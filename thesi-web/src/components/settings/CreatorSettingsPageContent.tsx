@@ -104,6 +104,31 @@ export function CreatorSettingsPageContent() {
           </section>
 
           <section className="workspace-section">
+            <h3>Workspace</h3>
+            <div className="settings-security">
+              <div>
+                <strong>Team</strong>
+                <p>Invite agency collaborators to your CRM workspace.</p>
+              </div>
+              <Link href="/app/settings/team" className="crm-btn-secondary">
+                Manage team
+              </Link>
+            </div>
+            <div className="settings-security" style={{ marginTop: 12 }}>
+              <div>
+                <strong>Integrations</strong>
+                <p>Connect Gmail / Outlook and calendars into the CRM timeline.</p>
+              </div>
+              <Link
+                href="/app/settings/integrations"
+                className="crm-btn-secondary"
+              >
+                Manage integrations
+              </Link>
+            </div>
+          </section>
+
+          <section className="workspace-section">
             <h3>Security</h3>
             <div className="settings-security">
               <div>

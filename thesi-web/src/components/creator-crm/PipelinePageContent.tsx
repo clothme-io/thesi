@@ -5,14 +5,27 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthProvider";
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
-import { DEAL_STAGES, DEAL_STAGE_LABELS, formatMoney, type DealStage } from "@/lib/creator-crm/types";
+import {
+  DEAL_STAGES,
+  DEAL_STAGE_LABELS,
+  formatMoney,
+  type DealStage,
+} from "@/lib/creator-crm/types";
+import { exportDealsCsv } from "@/lib/creator-crm/csv";
+import { AddDealDrawer } from "./AddDealDrawer";
+import { CsvImportDrawer } from "./CsvImportDrawer";
 
 export function PipelinePageContent() {
   const { authenticatedRequest } = useAuth();
-  const { data, ready, moveDeal, error } = useCreatorCrm(authenticatedRequest);
+  const { data, ready, moveDeal, createDeal, importCsv, error } =
+    useCreatorCrm(authenticatedRequest);
   const [draggingDealId, setDraggingDealId] = useState<string | null>(null);
-  const [dropTargetStage, setDropTargetStage] = useState<DealStage | null>(null);
+  const [dropTargetStage, setDropTargetStage] = useState<DealStage | null>(
+    null,
+  );
   const [actionError, setActionError] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   if (!ready) return null;
 
@@ -36,9 +49,31 @@ export function PipelinePageContent() {
     <>
       <header className="app-topbar">
         <h1>Deal Pipeline</h1>
-        <button type="button" className="crm-btn-primary">
-          + Add deal
-        </button>
+        <div className="crm-topbar-actions">
+          <button
+            type="button"
+            className="crm-btn-secondary"
+            onClick={() =>
+              exportDealsCsv(data.deals, data.brands, data.people)
+            }
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            className="crm-btn-secondary"
+            onClick={() => setImportOpen(true)}
+          >
+            Import CSV
+          </button>
+          <button
+            type="button"
+            className="crm-btn-primary"
+            onClick={() => setDrawerOpen(true)}
+          >
+            + Add deal
+          </button>
+        </div>
       </header>
 
       <div className="app-content">
@@ -48,11 +83,16 @@ export function PipelinePageContent() {
           </p>
         )}
         <p className="crm-contact-sub" style={{ marginBottom: 16 }}>
-          Drag deals between columns to update stage.
+          Drag deals between columns to update stage. Moving a deal to{" "}
+          <strong>Won</strong> creates a job if one does not already exist.
         </p>
         <div className="crm-pipeline">
           {DEAL_STAGES.map((stage) => {
             const deals = data.deals.filter((d) => d.stage === stage);
+            const columnValue = deals.reduce(
+              (sum, deal) => sum + deal.valueCents,
+              0,
+            );
             const isDropTarget = dropTargetStage === stage;
 
             return (
@@ -66,7 +106,9 @@ export function PipelinePageContent() {
                 }}
                 onDragLeave={(e) => {
                   if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                  setDropTargetStage((current) => (current === stage ? null : current));
+                  setDropTargetStage((current) =>
+                    current === stage ? null : current,
+                  );
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -77,13 +119,15 @@ export function PipelinePageContent() {
                 <h3>
                   {DEAL_STAGE_LABELS[stage]} ({deals.length})
                 </h3>
+                <p className="crm-pipeline-column-value">
+                  {formatMoney(columnValue)}
+                </p>
                 {deals.map((deal) => {
                   const brand = data.brands.find((b) => b.id === deal.brandId);
-                  const isDragging = draggingDealId === deal.id;
                   return (
                     <div
                       key={deal.id}
-                      className={`crm-pipeline-card crm-pipeline-card--draggable ${isDragging ? "crm-pipeline-card--dragging" : ""}`}
+                      className={`crm-pipeline-card ${draggingDealId === deal.id ? "crm-pipeline-card--dragging" : ""}`}
                       draggable
                       onDragStart={(e) => {
                         e.dataTransfer.setData("text/deal-id", deal.id);
@@ -96,17 +140,19 @@ export function PipelinePageContent() {
                       }}
                     >
                       <strong>{deal.title}</strong>
-                      <span>{brand?.name}</span>
-                      <span className="crm-money">{formatMoney(deal.valueCents)}</span>
-                      <Link
-                        href={CRM_ROUTES.brand(deal.brandId)}
-                        className="auth-link"
-                        style={{ fontSize: 12 }}
-                        draggable={false}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        View brand →
-                      </Link>
+                      <span>
+                        {brand ? (
+                          <Link href={CRM_ROUTES.brand(brand.id)}>
+                            {brand.name}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </span>
+                      <span>{formatMoney(deal.valueCents)}</span>
+                      {deal.expectedCloseDate ? (
+                        <span>Close {deal.expectedCloseDate}</span>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -115,6 +161,23 @@ export function PipelinePageContent() {
           })}
         </div>
       </div>
+
+      <AddDealDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        brands={data.brands}
+        people={data.people}
+        onSubmit={async (input) => {
+          await createDeal(input);
+        }}
+      />
+      <CsvImportDrawer
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={async (payload) => {
+          await importCsv(payload);
+        }}
+      />
     </>
   );
 }
