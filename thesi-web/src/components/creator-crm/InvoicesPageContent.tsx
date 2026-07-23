@@ -150,6 +150,11 @@ export function InvoicesPageContent() {
           </p>
         ) : null}
 
+        <p className="crm-invoice-hint">
+          <strong>Mark as sent</strong> only tracks that you sent an invoice. It
+          does not email the brand. Download the PDF and send it yourself.
+        </p>
+
         <div className="crm-dashboard-grid" style={{ marginBottom: 24 }}>
           <div className="app-stat-card">
             <span>Unpaid</span>
@@ -252,12 +257,19 @@ export function InvoicesPageContent() {
                             <button
                               type="button"
                               className="crm-btn-secondary"
+                              title="Tracks status only — does not email the brand"
                               onClick={() =>
                                 setStatus(payment.id, "invoice_sent")
                               }
                             >
-                              Mark sent
+                              Mark as sent
                             </button>
+                          ) : null}
+                          {payment.status === "invoice_sent" && payment.sentAt ? (
+                            <span className="workspace-hint">
+                              Marked sent{" "}
+                              {new Date(payment.sentAt).toLocaleDateString()}
+                            </span>
                           ) : null}
                           {payment.status !== "paid" ? (
                             <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { useCreatorCrm } from "@/lib/creator-crm/storage";
 import { AddTaskDrawer } from "./AddTaskDrawer";
@@ -11,11 +11,29 @@ export function TasksPageContent() {
     useCreatorCrm(authenticatedRequest);
   const [actionError, setActionError] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [filterBrandId, setFilterBrandId] = useState("");
+  const [filterJobId, setFilterJobId] = useState("");
+
+  const filteredJobs = useMemo(
+    () =>
+      filterBrandId
+        ? data.jobs.filter((job) => job.brandId === filterBrandId)
+        : data.jobs,
+    [data.jobs, filterBrandId],
+  );
+
+  const filteredTasks = useMemo(() => {
+    return data.tasks.filter((task) => {
+      if (filterBrandId && task.brandId !== filterBrandId) return false;
+      if (filterJobId && task.jobId !== filterJobId) return false;
+      return true;
+    });
+  }, [data.tasks, filterBrandId, filterJobId]);
 
   if (!ready) return null;
 
-  const pending = data.tasks.filter((t) => t.status === "pending");
-  const done = data.tasks.filter((t) => t.status === "done");
+  const pending = filteredTasks.filter((t) => t.status === "pending");
+  const done = filteredTasks.filter((t) => t.status === "done");
 
   async function toggleTask(taskId: string, current: "pending" | "done") {
     setActionError("");
@@ -49,6 +67,40 @@ export function TasksPageContent() {
             {actionError || error}
           </p>
         )}
+        <div className="crm-filters">
+          <label className="crm-form-field">
+            <span>Brand</span>
+            <select
+              value={filterBrandId}
+              onChange={(e) => {
+                setFilterBrandId(e.target.value);
+                setFilterJobId("");
+              }}
+            >
+              <option value="">All brands</option>
+              {data.brands.map((brand) => (
+                <option key={brand.id} value={brand.id}>
+                  {brand.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="crm-form-field">
+            <span>Job</span>
+            <select
+              value={filterJobId}
+              onChange={(e) => setFilterJobId(e.target.value)}
+            >
+              <option value="">All jobs</option>
+              {filteredJobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <h2 className="crm-section-title">Due & pending</h2>
         {pending.length === 0 && (
           <p className="crm-contact-sub">No pending tasks.</p>
@@ -70,6 +122,9 @@ export function TasksPageContent() {
                   {brand ? ` · ${brand.name}` : ""}
                   {task.dueDate ? ` · Due ${task.dueDate}` : ""}
                 </span>
+                {task.body ? (
+                  <span className="crm-task-body">{task.body}</span>
+                ) : null}
               </span>
             </label>
           );

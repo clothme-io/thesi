@@ -10,6 +10,7 @@ export interface AddTaskDrawerProps {
   jobs: Job[];
   onSubmit: (input: {
     title: string;
+    body?: string;
     brandId?: string;
     jobId?: string;
     dueDate?: string;
@@ -24,6 +25,7 @@ export function AddTaskDrawer({
   onSubmit,
 }: AddTaskDrawerProps) {
   const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [brandId, setBrandId] = useState("");
   const [jobId, setJobId] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -37,6 +39,7 @@ export function AddTaskDrawer({
   useEffect(() => {
     if (!open) return;
     setTitle("");
+    setBody("");
     setBrandId("");
     setJobId("");
     setDueDate("");
@@ -63,6 +66,7 @@ export function AddTaskDrawer({
     try {
       await onSubmit({
         title: title.trim(),
+        ...(body.trim() ? { body: body.trim() } : {}),
         ...(brandId ? { brandId } : {}),
         ...(jobId ? { jobId } : {}),
         ...(dueDate ? { dueDate } : {}),
@@ -112,6 +116,15 @@ export function AddTaskDrawer({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Send invoice to client"
+            />
+          </label>
+          <label className="crm-form-field">
+            <span>Details</span>
+            <textarea
+              rows={3}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="Optional notes for this task"
             />
           </label>
           <label className="crm-form-field">

@@ -13,6 +13,9 @@ const CRM_NAV = [
   { href: CRM_ROUTES.invoices, label: "Invoices", match: (path: string) => path.startsWith(CRM_ROUTES.invoices) },
   { href: CRM_ROUTES.calendar, label: "Calendar", match: (path: string) => path.startsWith(CRM_ROUTES.calendar) },
   { href: CRM_ROUTES.tasks, label: "Tasks", match: (path: string) => path.startsWith(CRM_ROUTES.tasks) },
+  { href: CRM_ROUTES.objects, label: "Objects", match: (path: string) => path.startsWith(CRM_ROUTES.objects) },
+  { href: CRM_ROUTES.dataModel, label: "Data model", match: (path: string) => path.startsWith(CRM_ROUTES.dataModel) },
+  { href: CRM_ROUTES.workflows, label: "Workflows", match: (path: string) => path.startsWith(CRM_ROUTES.workflows) },
 ];
 
 export function CrmSubnav() {

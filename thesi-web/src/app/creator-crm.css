@@ -239,6 +239,32 @@
   border-bottom: none;
 }
 
+.crm-activity-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.crm-activity-type {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.crm-activity-time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .crm-activity-item strong {
   display: block;
   font-size: 14px;
@@ -248,6 +274,178 @@
 .crm-activity-item span {
   font-size: 12px;
   color: var(--muted);
+}
+
+.crm-activity-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.crm-activity-links a {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.crm-people-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.crm-person-card {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.crm-person-card strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.crm-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.crm-filters .crm-form-field {
+  min-width: 180px;
+  flex: 1;
+}
+
+.crm-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.crm-save-view-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.crm-save-view-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.crm-saved-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.crm-saved-view {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.crm-saved-view-apply,
+.crm-saved-view-remove {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.crm-saved-view-apply {
+  padding: 6px 10px 6px 12px;
+}
+
+.crm-saved-view-remove {
+  padding: 6px 10px 6px 4px;
+  color: var(--muted);
+}
+
+.crm-saved-view-remove:hover {
+  color: #dc2626;
+}
+
+.crm-pipeline-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.crm-pipeline-widget-header h3 {
+  margin: 0;
+}
+
+.crm-pipeline-widget {
+  display: grid;
+  gap: 12px;
+}
+
+.crm-pipeline-widget-row {
+  display: grid;
+  gap: 6px;
+}
+
+.crm-pipeline-widget-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.crm-pipeline-widget-label span {
+  color: var(--muted);
+}
+
+.crm-pipeline-widget-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.crm-pipeline-widget-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink);
+  min-width: 0;
+}
+
+.crm-pipeline-column-value {
+  margin: -4px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crm-task-body {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.crm-invoice-hint {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .crm-calendar-grid {

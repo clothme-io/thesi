@@ -8,12 +8,14 @@ export interface AddDealDrawerProps {
   open: boolean;
   onClose: () => void;
   brands: Brand[];
+  people: import("@/lib/creator-crm/types").BrandPerson[];
   onSubmit: (input: {
     brandId: string;
     title: string;
     valueCents: number;
     stage: DealStage;
     expectedCloseDate?: string;
+    primaryContactId?: string;
     notes?: string;
   }) => Promise<void>;
 }
@@ -22,6 +24,7 @@ export function AddDealDrawer({
   open,
   onClose,
   brands,
+  people,
   onSubmit,
 }: AddDealDrawerProps) {
   const [brandId, setBrandId] = useState("");
@@ -29,9 +32,14 @@ export function AddDealDrawer({
   const [valueDollars, setValueDollars] = useState("");
   const [stage, setStage] = useState<DealStage>("lead");
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
+  const [primaryContactId, setPrimaryContactId] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  const brandPeople = brandId
+    ? people.filter((person) => person.brandId === brandId)
+    : [];
 
   useEffect(() => {
     if (!open) return;
@@ -40,6 +48,7 @@ export function AddDealDrawer({
     setValueDollars("");
     setStage("lead");
     setExpectedCloseDate("");
+    setPrimaryContactId("");
     setNotes("");
     setFeedback(null);
   }, [open, brands]);
@@ -69,6 +78,7 @@ export function AddDealDrawer({
         valueCents: Number.isFinite(dollars) ? Math.round(dollars * 100) : 0,
         stage,
         ...(expectedCloseDate ? { expectedCloseDate } : {}),
+        ...(primaryContactId ? { primaryContactId } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
       });
       onClose();
@@ -118,7 +128,13 @@ export function AddDealDrawer({
             <>
               <label className="crm-form-field">
                 <span>Brand</span>
-                <select value={brandId} onChange={(e) => setBrandId(e.target.value)}>
+                <select
+                  value={brandId}
+                  onChange={(e) => {
+                    setBrandId(e.target.value);
+                    setPrimaryContactId("");
+                  }}
+                >
                   {brands.map((brand) => (
                     <option key={brand.id} value={brand.id}>
                       {brand.name}
@@ -165,6 +181,21 @@ export function AddDealDrawer({
                   value={expectedCloseDate}
                   onChange={(e) => setExpectedCloseDate(e.target.value)}
                 />
+              </label>
+              <label className="crm-form-field">
+                <span>Primary contact</span>
+                <select
+                  value={primaryContactId}
+                  onChange={(e) => setPrimaryContactId(e.target.value)}
+                >
+                  <option value="">Brand account contact</option>
+                  {brandPeople.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.name}
+                      {person.roleTitle ? ` (${person.roleTitle})` : ""}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="crm-form-field">
                 <span>Notes</span>

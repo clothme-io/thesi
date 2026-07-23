@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, ne, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
@@ -8,14 +8,24 @@ import type {
   CreatorCrmAggregate,
   CreatorCrmRepository,
   CrmActivityRecord,
+  CrmBrandPersonRecord,
   CrmBrandRecord,
   CrmCalendarEventRecord,
   CrmContractRecord,
+  CrmCustomFieldRecord,
+  CrmCustomFieldType,
+  CrmCustomObjectRecord,
+  CrmCustomRecordRow,
   CrmDealRecord,
+  CrmEntityFieldValuesRecord,
+  CrmFieldTargetType,
   CrmJobRecord,
   CrmPaymentRecord,
   CrmTaskRecord,
   CrmUser,
+  CrmWorkflowActionType,
+  CrmWorkflowRecord,
+  CrmWorkflowTriggerType,
   MarketplaceListingForCrm,
 } from './creator-crm.repository';
 
@@ -53,6 +63,7 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
   async getAggregate(creatorUserId: string): Promise<CreatorCrmAggregate> {
     const [
       brands,
+      people,
       deals,
       jobs,
       contracts,
@@ -60,12 +71,23 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
       calendarEvents,
       tasks,
       activities,
+      customObjects,
+      customFields,
+      customRecords,
+      entityFieldValues,
+      workflows,
+      workflowActions,
     ] = await Promise.all([
       this.db
         .select()
         .from(schema.crmBrand)
         .where(eq(schema.crmBrand.creatorUserId, creatorUserId))
         .orderBy(desc(schema.crmBrand.updatedAt)),
+      this.db
+        .select()
+        .from(schema.crmBrandPerson)
+        .where(eq(schema.crmBrandPerson.creatorUserId, creatorUserId))
+        .orderBy(desc(schema.crmBrandPerson.updatedAt)),
       this.db
         .select()
         .from(schema.crmDeal)
@@ -101,10 +123,40 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
         .from(schema.crmActivity)
         .where(eq(schema.crmActivity.creatorUserId, creatorUserId))
         .orderBy(desc(schema.crmActivity.createdAt)),
+      this.db
+        .select()
+        .from(schema.crmCustomObject)
+        .where(eq(schema.crmCustomObject.creatorUserId, creatorUserId))
+        .orderBy(desc(schema.crmCustomObject.updatedAt)),
+      this.db
+        .select()
+        .from(schema.crmCustomField)
+        .where(eq(schema.crmCustomField.creatorUserId, creatorUserId))
+        .orderBy(schema.crmCustomField.position),
+      this.db
+        .select()
+        .from(schema.crmCustomRecord)
+        .where(eq(schema.crmCustomRecord.creatorUserId, creatorUserId))
+        .orderBy(desc(schema.crmCustomRecord.updatedAt)),
+      this.db
+        .select()
+        .from(schema.crmEntityFieldValues)
+        .where(eq(schema.crmEntityFieldValues.creatorUserId, creatorUserId)),
+      this.db
+        .select()
+        .from(schema.crmWorkflow)
+        .where(eq(schema.crmWorkflow.creatorUserId, creatorUserId))
+        .orderBy(desc(schema.crmWorkflow.updatedAt)),
+      this.db
+        .select()
+        .from(schema.crmWorkflowAction)
+        .where(eq(schema.crmWorkflowAction.creatorUserId, creatorUserId))
+        .orderBy(schema.crmWorkflowAction.position),
     ]);
 
     return {
       brands: brands.map((row) => this.toBrand(row)),
+      people: people.map((row) => this.toPerson(row)),
       deals: deals.map((row) => this.toDeal(row)),
       jobs: jobs.map((row) => ({
         id: row.id,
@@ -143,6 +195,18 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
         message: row.message,
         createdAt: iso(row.createdAt),
       })),
+      customObjects: customObjects.map((row) => this.toCustomObject(row)),
+      customFields: customFields.map((row) => this.toCustomField(row)),
+      customRecords: customRecords.map((row) => this.toCustomRecord(row)),
+      entityFieldValues: entityFieldValues.map((row) =>
+        this.toEntityFieldValues(row),
+      ),
+      workflows: workflows.map((row) =>
+        this.toWorkflow(
+          row,
+          workflowActions.filter((action) => action.workflowId === row.id),
+        ),
+      ),
     };
   }
 
@@ -330,6 +394,7 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
     creatorUserId: string;
     brandId: string;
     marketplaceListingId?: string | null;
+    primaryContactId?: string | null;
     title: string;
     valueCents: number;
     stage: CrmDealRecord['stage'];
@@ -342,6 +407,7 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
         creatorUserId: input.creatorUserId,
         brandId: input.brandId,
         marketplaceListingId: input.marketplaceListingId ?? null,
+        primaryContactId: input.primaryContactId ?? null,
         title: input.title,
         valueCents: input.valueCents,
         stage: input.stage,
@@ -350,6 +416,152 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
       })
       .returning();
     return this.toDeal(row);
+  }
+
+  async updateDeal(
+    creatorUserId: string,
+    dealId: string,
+    patch: {
+      title?: string;
+      valueCents?: number;
+      expectedCloseDate?: string | null;
+      notes?: string;
+      primaryContactId?: string | null;
+      stage?: CrmDealRecord['stage'];
+    },
+  ) {
+    const updates: Partial<typeof schema.crmDeal.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (patch.title !== undefined) updates.title = patch.title;
+    if (patch.valueCents !== undefined) updates.valueCents = patch.valueCents;
+    if (patch.expectedCloseDate !== undefined) {
+      updates.expectedCloseDate = patch.expectedCloseDate || null;
+    }
+    if (patch.notes !== undefined) updates.notes = patch.notes;
+    if (patch.primaryContactId !== undefined) {
+      updates.primaryContactId = patch.primaryContactId;
+    }
+    if (patch.stage !== undefined) updates.stage = patch.stage;
+
+    const [row] = await this.db
+      .update(schema.crmDeal)
+      .set(updates)
+      .where(
+        and(
+          eq(schema.crmDeal.creatorUserId, creatorUserId),
+          eq(schema.crmDeal.id, dealId),
+        ),
+      )
+      .returning();
+    return row ? this.toDeal(row) : null;
+  }
+
+  async getBrandPerson(creatorUserId: string, personId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.crmBrandPerson)
+      .where(
+        and(
+          eq(schema.crmBrandPerson.creatorUserId, creatorUserId),
+          eq(schema.crmBrandPerson.id, personId),
+        ),
+      )
+      .limit(1);
+    return row ? this.toPerson(row) : null;
+  }
+
+  async createBrandPerson(input: {
+    creatorUserId: string;
+    brandId: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    roleTitle?: string;
+    isPrimary?: boolean;
+    notes?: string;
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmBrandPerson)
+      .values({
+        creatorUserId: input.creatorUserId,
+        brandId: input.brandId,
+        name: input.name,
+        email: input.email ?? '',
+        phone: input.phone ?? '',
+        roleTitle: input.roleTitle ?? '',
+        isPrimary: input.isPrimary ?? false,
+        notes: input.notes ?? '',
+      })
+      .returning();
+    return this.toPerson(row);
+  }
+
+  async updateBrandPerson(
+    creatorUserId: string,
+    personId: string,
+    patch: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      roleTitle?: string;
+      isPrimary?: boolean;
+      notes?: string;
+    },
+  ) {
+    const updates: Partial<typeof schema.crmBrandPerson.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (patch.name !== undefined) updates.name = patch.name;
+    if (patch.email !== undefined) updates.email = patch.email;
+    if (patch.phone !== undefined) updates.phone = patch.phone;
+    if (patch.roleTitle !== undefined) updates.roleTitle = patch.roleTitle;
+    if (patch.isPrimary !== undefined) updates.isPrimary = patch.isPrimary;
+    if (patch.notes !== undefined) updates.notes = patch.notes;
+
+    const [row] = await this.db
+      .update(schema.crmBrandPerson)
+      .set(updates)
+      .where(
+        and(
+          eq(schema.crmBrandPerson.creatorUserId, creatorUserId),
+          eq(schema.crmBrandPerson.id, personId),
+        ),
+      )
+      .returning();
+    return row ? this.toPerson(row) : null;
+  }
+
+  async deleteBrandPerson(creatorUserId: string, personId: string) {
+    const deleted = await this.db
+      .delete(schema.crmBrandPerson)
+      .where(
+        and(
+          eq(schema.crmBrandPerson.creatorUserId, creatorUserId),
+          eq(schema.crmBrandPerson.id, personId),
+        ),
+      )
+      .returning({ id: schema.crmBrandPerson.id });
+    return deleted.length > 0;
+  }
+
+  async clearPrimaryPeopleForBrand(
+    creatorUserId: string,
+    brandId: string,
+    exceptPersonId?: string,
+  ) {
+    const conditions = [
+      eq(schema.crmBrandPerson.creatorUserId, creatorUserId),
+      eq(schema.crmBrandPerson.brandId, brandId),
+      eq(schema.crmBrandPerson.isPrimary, true),
+    ];
+    if (exceptPersonId) {
+      conditions.push(ne(schema.crmBrandPerson.id, exceptPersonId));
+    }
+    await this.db
+      .update(schema.crmBrandPerson)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(and(...conditions));
   }
 
   async getBrand(creatorUserId: string, brandId: string) {
@@ -407,6 +619,20 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
       .orderBy(desc(schema.crmDeal.updatedAt))
       .limit(1);
     return row ? this.toDeal(row) : null;
+  }
+
+  async findJobByDealId(creatorUserId: string, dealId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.crmJob)
+      .where(
+        and(
+          eq(schema.crmJob.creatorUserId, creatorUserId),
+          eq(schema.crmJob.dealId, dealId),
+        ),
+      )
+      .limit(1);
+    return row ? this.toJob(row) : null;
   }
 
   async createJob(input: {
@@ -569,6 +795,7 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
     brandId?: string | null;
     jobId?: string | null;
     title: string;
+    body?: string;
     dueDate?: string | null;
     status?: CrmTaskRecord['status'];
   }) {
@@ -579,6 +806,7 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
         brandId: input.brandId ?? null,
         jobId: input.jobId ?? null,
         title: input.title,
+        body: input.body ?? '',
         dueDate: input.dueDate || null,
         status: input.status ?? 'pending',
       })
@@ -743,10 +971,30 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
     return {
       id: row.id,
       brandId: row.brandId,
+      ...(row.primaryContactId
+        ? { primaryContactId: row.primaryContactId }
+        : {}),
       title: row.title,
       valueCents: row.valueCents,
       stage: row.stage as CrmDealRecord['stage'],
       expectedCloseDate: dateStr(row.expectedCloseDate),
+      notes: row.notes,
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
+    };
+  }
+
+  private toPerson(
+    row: typeof schema.crmBrandPerson.$inferSelect,
+  ): CrmBrandPersonRecord {
+    return {
+      id: row.id,
+      brandId: row.brandId,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      roleTitle: row.roleTitle,
+      isPrimary: Boolean(row.isPrimary),
       notes: row.notes,
       createdAt: iso(row.createdAt),
       updatedAt: iso(row.updatedAt),
@@ -759,9 +1007,485 @@ export class PostgresCreatorCrmRepository implements CreatorCrmRepository {
       ...(row.brandId ? { brandId: row.brandId } : {}),
       ...(row.jobId ? { jobId: row.jobId } : {}),
       title: row.title,
+      body: row.body ?? '',
       dueDate: dateStr(row.dueDate),
       status: row.status as CrmTaskRecord['status'],
       createdAt: iso(row.createdAt),
     };
+  }
+
+  private toCustomObject(
+    row: typeof schema.crmCustomObject.$inferSelect,
+  ): CrmCustomObjectRecord {
+    return {
+      id: row.id,
+      name: row.name,
+      apiName: row.apiName,
+      description: row.description,
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
+    };
+  }
+
+  private toCustomField(
+    row: typeof schema.crmCustomField.$inferSelect,
+  ): CrmCustomFieldRecord {
+    return {
+      id: row.id,
+      targetType: row.targetType as CrmFieldTargetType,
+      ...(row.targetObjectId ? { targetObjectId: row.targetObjectId } : {}),
+      name: row.name,
+      apiName: row.apiName,
+      fieldType: row.fieldType as CrmCustomFieldType,
+      options: Array.isArray(row.options) ? row.options : [],
+      required: Boolean(row.required),
+      position: row.position,
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
+    };
+  }
+
+  private toEntityFieldValues(
+    row: typeof schema.crmEntityFieldValues.$inferSelect,
+  ): CrmEntityFieldValuesRecord {
+    return {
+      id: row.id,
+      entityType: row.entityType as CrmEntityFieldValuesRecord['entityType'],
+      entityId: row.entityId,
+      values:
+        row.values && typeof row.values === 'object' && !Array.isArray(row.values)
+          ? (row.values as Record<string, string | number | boolean | null>)
+          : {},
+      updatedAt: iso(row.updatedAt),
+    };
+  }
+
+  private toCustomRecord(
+    row: typeof schema.crmCustomRecord.$inferSelect,
+  ): CrmCustomRecordRow {
+    return {
+      id: row.id,
+      objectId: row.objectId,
+      title: row.title,
+      values:
+        row.values && typeof row.values === 'object' && !Array.isArray(row.values)
+          ? (row.values as Record<string, string | number | boolean | null>)
+          : {},
+      ...(row.brandId ? { brandId: row.brandId } : {}),
+      ...(row.dealId ? { dealId: row.dealId } : {}),
+      ...(row.jobId ? { jobId: row.jobId } : {}),
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
+    };
+  }
+
+  private toWorkflow(
+    row: typeof schema.crmWorkflow.$inferSelect,
+    actions: Array<typeof schema.crmWorkflowAction.$inferSelect>,
+  ): CrmWorkflowRecord {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      enabled: Boolean(row.enabled),
+      triggerType: row.triggerType as CrmWorkflowTriggerType,
+      triggerConfig:
+        row.triggerConfig && typeof row.triggerConfig === 'object'
+          ? (row.triggerConfig as Record<string, unknown>)
+          : {},
+      actions: actions
+        .slice()
+        .sort((a, b) => a.position - b.position)
+        .map((action) => ({
+          id: action.id,
+          workflowId: action.workflowId,
+          position: action.position,
+          actionType: action.actionType as CrmWorkflowActionType,
+          actionConfig:
+            action.actionConfig && typeof action.actionConfig === 'object'
+              ? (action.actionConfig as Record<string, unknown>)
+              : {},
+          createdAt: iso(action.createdAt),
+        })),
+      createdAt: iso(row.createdAt),
+      updatedAt: iso(row.updatedAt),
+    };
+  }
+
+  async createCustomObject(input: {
+    creatorUserId: string;
+    name: string;
+    apiName: string;
+    description?: string;
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmCustomObject)
+      .values({
+        creatorUserId: input.creatorUserId,
+        name: input.name,
+        apiName: input.apiName,
+        description: input.description ?? '',
+      })
+      .returning();
+    return this.toCustomObject(row);
+  }
+
+  async updateCustomObject(
+    creatorUserId: string,
+    objectId: string,
+    patch: { name?: string; description?: string },
+  ) {
+    const [row] = await this.db
+      .update(schema.crmCustomObject)
+      .set({
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.description !== undefined
+          ? { description: patch.description }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.crmCustomObject.creatorUserId, creatorUserId),
+          eq(schema.crmCustomObject.id, objectId),
+        ),
+      )
+      .returning();
+    return row ? this.toCustomObject(row) : null;
+  }
+
+  async deleteCustomObject(creatorUserId: string, objectId: string) {
+    const deleted = await this.db
+      .delete(schema.crmCustomObject)
+      .where(
+        and(
+          eq(schema.crmCustomObject.creatorUserId, creatorUserId),
+          eq(schema.crmCustomObject.id, objectId),
+        ),
+      )
+      .returning({ id: schema.crmCustomObject.id });
+    return deleted.length > 0;
+  }
+
+  async getCustomObject(creatorUserId: string, objectId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.crmCustomObject)
+      .where(
+        and(
+          eq(schema.crmCustomObject.creatorUserId, creatorUserId),
+          eq(schema.crmCustomObject.id, objectId),
+        ),
+      )
+      .limit(1);
+    return row ? this.toCustomObject(row) : null;
+  }
+
+  async createCustomField(input: {
+    creatorUserId: string;
+    targetType: CrmFieldTargetType;
+    targetObjectId?: string | null;
+    name: string;
+    apiName: string;
+    fieldType: CrmCustomFieldType;
+    options?: string[];
+    required?: boolean;
+    position?: number;
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmCustomField)
+      .values({
+        creatorUserId: input.creatorUserId,
+        targetType: input.targetType,
+        targetObjectId: input.targetObjectId ?? null,
+        name: input.name,
+        apiName: input.apiName,
+        fieldType: input.fieldType,
+        options: input.options ?? [],
+        required: input.required ?? false,
+        position: input.position ?? 0,
+      })
+      .returning();
+    return this.toCustomField(row);
+  }
+
+  async deleteCustomField(creatorUserId: string, fieldId: string) {
+    const deleted = await this.db
+      .delete(schema.crmCustomField)
+      .where(
+        and(
+          eq(schema.crmCustomField.creatorUserId, creatorUserId),
+          eq(schema.crmCustomField.id, fieldId),
+        ),
+      )
+      .returning({ id: schema.crmCustomField.id });
+    return deleted.length > 0;
+  }
+
+  async upsertEntityFieldValues(input: {
+    creatorUserId: string;
+    entityType: 'brand' | 'deal' | 'job';
+    entityId: string;
+    values: Record<string, string | number | boolean | null>;
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmEntityFieldValues)
+      .values({
+        creatorUserId: input.creatorUserId,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        values: input.values,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.crmEntityFieldValues.creatorUserId,
+          schema.crmEntityFieldValues.entityType,
+          schema.crmEntityFieldValues.entityId,
+        ],
+        set: {
+          values: input.values,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return this.toEntityFieldValues(row);
+  }
+
+  async createCustomRecord(input: {
+    creatorUserId: string;
+    objectId: string;
+    title: string;
+    values?: Record<string, string | number | boolean | null>;
+    brandId?: string | null;
+    dealId?: string | null;
+    jobId?: string | null;
+  }) {
+    const [row] = await this.db
+      .insert(schema.crmCustomRecord)
+      .values({
+        creatorUserId: input.creatorUserId,
+        objectId: input.objectId,
+        title: input.title,
+        values: input.values ?? {},
+        brandId: input.brandId ?? null,
+        dealId: input.dealId ?? null,
+        jobId: input.jobId ?? null,
+      })
+      .returning();
+    return this.toCustomRecord(row);
+  }
+
+  async updateCustomRecord(
+    creatorUserId: string,
+    recordId: string,
+    patch: {
+      title?: string;
+      values?: Record<string, string | number | boolean | null>;
+      brandId?: string | null;
+      dealId?: string | null;
+      jobId?: string | null;
+    },
+  ) {
+    const [row] = await this.db
+      .update(schema.crmCustomRecord)
+      .set({
+        ...(patch.title !== undefined ? { title: patch.title } : {}),
+        ...(patch.values !== undefined ? { values: patch.values } : {}),
+        ...(patch.brandId !== undefined ? { brandId: patch.brandId } : {}),
+        ...(patch.dealId !== undefined ? { dealId: patch.dealId } : {}),
+        ...(patch.jobId !== undefined ? { jobId: patch.jobId } : {}),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.crmCustomRecord.creatorUserId, creatorUserId),
+          eq(schema.crmCustomRecord.id, recordId),
+        ),
+      )
+      .returning();
+    return row ? this.toCustomRecord(row) : null;
+  }
+
+  async deleteCustomRecord(creatorUserId: string, recordId: string) {
+    const deleted = await this.db
+      .delete(schema.crmCustomRecord)
+      .where(
+        and(
+          eq(schema.crmCustomRecord.creatorUserId, creatorUserId),
+          eq(schema.crmCustomRecord.id, recordId),
+        ),
+      )
+      .returning({ id: schema.crmCustomRecord.id });
+    return deleted.length > 0;
+  }
+
+  async getCustomRecord(creatorUserId: string, recordId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.crmCustomRecord)
+      .where(
+        and(
+          eq(schema.crmCustomRecord.creatorUserId, creatorUserId),
+          eq(schema.crmCustomRecord.id, recordId),
+        ),
+      )
+      .limit(1);
+    return row ? this.toCustomRecord(row) : null;
+  }
+
+  async createWorkflow(input: {
+    creatorUserId: string;
+    name: string;
+    description?: string;
+    enabled?: boolean;
+    triggerType: CrmWorkflowTriggerType;
+    triggerConfig?: Record<string, unknown>;
+    actions: Array<{
+      actionType: CrmWorkflowActionType;
+      actionConfig?: Record<string, unknown>;
+      position?: number;
+    }>;
+  }) {
+    const [workflow] = await this.db
+      .insert(schema.crmWorkflow)
+      .values({
+        creatorUserId: input.creatorUserId,
+        name: input.name,
+        description: input.description ?? '',
+        enabled: input.enabled ?? true,
+        triggerType: input.triggerType,
+        triggerConfig: input.triggerConfig ?? {},
+      })
+      .returning();
+
+    const actions =
+      input.actions.length === 0
+        ? []
+        : await this.db
+            .insert(schema.crmWorkflowAction)
+            .values(
+              input.actions.map((action, index) => ({
+                creatorUserId: input.creatorUserId,
+                workflowId: workflow.id,
+                position: action.position ?? index,
+                actionType: action.actionType,
+                actionConfig: action.actionConfig ?? {},
+              })),
+            )
+            .returning();
+
+    return this.toWorkflow(workflow, actions);
+  }
+
+  async updateWorkflow(
+    creatorUserId: string,
+    workflowId: string,
+    patch: {
+      name?: string;
+      description?: string;
+      enabled?: boolean;
+      triggerType?: CrmWorkflowTriggerType;
+      triggerConfig?: Record<string, unknown>;
+      actions?: Array<{
+        actionType: CrmWorkflowActionType;
+        actionConfig?: Record<string, unknown>;
+        position?: number;
+      }>;
+    },
+  ) {
+    const [workflow] = await this.db
+      .update(schema.crmWorkflow)
+      .set({
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.description !== undefined
+          ? { description: patch.description }
+          : {}),
+        ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        ...(patch.triggerType !== undefined
+          ? { triggerType: patch.triggerType }
+          : {}),
+        ...(patch.triggerConfig !== undefined
+          ? { triggerConfig: patch.triggerConfig }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.crmWorkflow.creatorUserId, creatorUserId),
+          eq(schema.crmWorkflow.id, workflowId),
+        ),
+      )
+      .returning();
+    if (!workflow) return null;
+
+    let actions = await this.db
+      .select()
+      .from(schema.crmWorkflowAction)
+      .where(eq(schema.crmWorkflowAction.workflowId, workflowId))
+      .orderBy(schema.crmWorkflowAction.position);
+
+    if (patch.actions) {
+      await this.db
+        .delete(schema.crmWorkflowAction)
+        .where(eq(schema.crmWorkflowAction.workflowId, workflowId));
+      actions =
+        patch.actions.length === 0
+          ? []
+          : await this.db
+              .insert(schema.crmWorkflowAction)
+              .values(
+                patch.actions.map((action, index) => ({
+                  creatorUserId,
+                  workflowId,
+                  position: action.position ?? index,
+                  actionType: action.actionType,
+                  actionConfig: action.actionConfig ?? {},
+                })),
+              )
+              .returning();
+    }
+
+    return this.toWorkflow(workflow, actions);
+  }
+
+  async deleteWorkflow(creatorUserId: string, workflowId: string) {
+    const deleted = await this.db
+      .delete(schema.crmWorkflow)
+      .where(
+        and(
+          eq(schema.crmWorkflow.creatorUserId, creatorUserId),
+          eq(schema.crmWorkflow.id, workflowId),
+        ),
+      )
+      .returning({ id: schema.crmWorkflow.id });
+    return deleted.length > 0;
+  }
+
+  async listEnabledWorkflowsByTrigger(
+    creatorUserId: string,
+    triggerType: CrmWorkflowTriggerType,
+  ) {
+    const workflows = await this.db
+      .select()
+      .from(schema.crmWorkflow)
+      .where(
+        and(
+          eq(schema.crmWorkflow.creatorUserId, creatorUserId),
+          eq(schema.crmWorkflow.triggerType, triggerType),
+          eq(schema.crmWorkflow.enabled, true),
+        ),
+      );
+    if (workflows.length === 0) return [];
+    const actions = await this.db
+      .select()
+      .from(schema.crmWorkflowAction)
+      .where(eq(schema.crmWorkflowAction.creatorUserId, creatorUserId));
+    return workflows.map((row) =>
+      this.toWorkflow(
+        row,
+        actions.filter((action) => action.workflowId === row.id),
+      ),
+    );
   }
 }

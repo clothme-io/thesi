@@ -7,6 +7,7 @@ import type {
   PaymentStatus,
   TaskStatus,
 } from "./types";
+import { DEAL_STAGES } from "./types";
 
 type AuthenticatedRequest = <T>(
   path: string,
@@ -18,6 +19,7 @@ type AuthenticatedRequest = <T>(
 
 const EMPTY: CreatorCrmData = {
   brands: [],
+  people: [],
   deals: [],
   jobs: [],
   contracts: [],
@@ -25,7 +27,24 @@ const EMPTY: CreatorCrmData = {
   calendarEvents: [],
   tasks: [],
   activities: [],
+  customObjects: [],
+  customFields: [],
+  customRecords: [],
+  entityFieldValues: [],
+  workflows: [],
 };
+
+function normalizeCrmData(next: CreatorCrmData): CreatorCrmData {
+  return {
+    ...EMPTY,
+    ...next,
+    customObjects: next.customObjects ?? [],
+    customFields: next.customFields ?? [],
+    customRecords: next.customRecords ?? [],
+    entityFieldValues: next.entityFieldValues ?? [],
+    workflows: next.workflows ?? [],
+  };
+}
 
 export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
   const [data, setData] = useState<CreatorCrmData>(EMPTY);
@@ -35,8 +54,9 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
   const reload = useCallback(async () => {
     setError("");
     const next = await authenticatedRequest<CreatorCrmData>("/api/creator-crm");
-    setData(next);
-    return next;
+    const normalized = normalizeCrmData(next);
+    setData(normalized);
+    return normalized;
   }, [authenticatedRequest]);
 
   useEffect(() => {
@@ -45,7 +65,7 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
     setError("");
     authenticatedRequest<CreatorCrmData>("/api/creator-crm")
       .then((next) => {
-        if (active) setData(next);
+        if (active) setData(normalizeCrmData(next));
       })
       .catch((requestError) => {
         if (active) {
@@ -138,6 +158,7 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
       valueCents?: number;
       stage?: DealStage;
       expectedCloseDate?: string;
+      primaryContactId?: string;
       notes?: string;
     }) => {
       setError("");
@@ -151,9 +172,32 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
     [authenticatedRequest],
   );
 
+  const updateDeal = useCallback(
+    async (
+      dealId: string,
+      patch: {
+        title?: string;
+        valueCents?: number;
+        expectedCloseDate?: string;
+        primaryContactId?: string | null;
+        notes?: string;
+      },
+    ) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/deals/${dealId}`,
+        { method: "PATCH", body: patch },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
   const createTask = useCallback(
     async (input: {
       title: string;
+      body?: string;
       brandId?: string;
       jobId?: string;
       dueDate?: string;
@@ -162,6 +206,65 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
       const next = await authenticatedRequest<CreatorCrmData>(
         "/api/creator-crm/tasks",
         { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createBrandPerson = useCallback(
+    async (
+      brandId: string,
+      input: {
+        name: string;
+        email?: string;
+        phone?: string;
+        roleTitle?: string;
+        isPrimary?: boolean;
+        notes?: string;
+      },
+    ) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/brands/${brandId}/people`,
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateBrandPerson = useCallback(
+    async (
+      personId: string,
+      patch: {
+        name?: string;
+        email?: string;
+        phone?: string;
+        roleTitle?: string;
+        isPrimary?: boolean;
+        notes?: string;
+      },
+    ) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/people/${personId}`,
+        { method: "PATCH", body: patch },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const deleteBrandPerson = useCallback(
+    async (personId: string) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/people/${personId}`,
+        { method: "DELETE" },
       );
       setData(next);
       return next;
@@ -259,6 +362,232 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
     [authenticatedRequest],
   );
 
+  const importCsv = useCallback(
+    async (payload: {
+      brands?: Array<Record<string, unknown>>;
+      deals?: Array<Record<string, unknown>>;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/import",
+        { method: "POST", body: payload },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createCustomObject = useCallback(
+    async (input: { name: string; apiName?: string; description?: string }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/custom-objects",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateCustomObject = useCallback(
+    async (
+      id: string,
+      patch: { name?: string; description?: string },
+    ) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/custom-objects/${id}`,
+        { method: "PATCH", body: patch },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const deleteCustomObject = useCallback(
+    async (id: string) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/custom-objects/${id}`,
+        { method: "DELETE" },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createCustomField = useCallback(
+    async (input: {
+      targetType: "brand" | "deal" | "job" | "custom_object";
+      targetObjectId?: string;
+      name: string;
+      apiName?: string;
+      fieldType: "text" | "number" | "date" | "boolean" | "select";
+      options?: string[];
+      required?: boolean;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/custom-fields",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const deleteCustomField = useCallback(
+    async (id: string) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/custom-fields/${id}`,
+        { method: "DELETE" },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const upsertEntityFieldValues = useCallback(
+    async (input: {
+      entityType: "brand" | "deal" | "job";
+      entityId: string;
+      values: Record<string, string | number | boolean | null>;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/entity-field-values",
+        { method: "PUT", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createCustomRecord = useCallback(
+    async (input: {
+      objectId: string;
+      title: string;
+      values?: Record<string, string | number | boolean | null>;
+      brandId?: string;
+      dealId?: string;
+      jobId?: string;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/custom-records",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateCustomRecord = useCallback(
+    async (
+      id: string,
+      patch: {
+        title?: string;
+        values?: Record<string, string | number | boolean | null>;
+        brandId?: string | null;
+        dealId?: string | null;
+        jobId?: string | null;
+      },
+    ) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/custom-records/${id}`,
+        { method: "PATCH", body: patch },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const deleteCustomRecord = useCallback(
+    async (id: string) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/custom-records/${id}`,
+        { method: "DELETE" },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const createWorkflow = useCallback(
+    async (input: {
+      name: string;
+      description?: string;
+      enabled?: boolean;
+      triggerType: string;
+      triggerConfig?: Record<string, unknown>;
+      actions: Array<{
+        actionType: string;
+        actionConfig?: Record<string, unknown>;
+      }>;
+    }) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        "/api/creator-crm/workflows",
+        { method: "POST", body: input },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateWorkflow = useCallback(
+    async (
+      id: string,
+      patch: {
+        name?: string;
+        description?: string;
+        enabled?: boolean;
+        triggerType?: string;
+        triggerConfig?: Record<string, unknown>;
+        actions?: Array<{
+          actionType: string;
+          actionConfig?: Record<string, unknown>;
+        }>;
+      },
+    ) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/workflows/${id}`,
+        { method: "PATCH", body: patch },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
+  const deleteWorkflow = useCallback(
+    async (id: string) => {
+      setError("");
+      const next = await authenticatedRequest<CreatorCrmData>(
+        `/api/creator-crm/workflows/${id}`,
+        { method: "DELETE" },
+      );
+      setData(next);
+      return next;
+    },
+    [authenticatedRequest],
+  );
+
   return {
     data,
     ready,
@@ -269,12 +598,33 @@ export function useCreatorCrm(authenticatedRequest: AuthenticatedRequest) {
     createInvoice,
     updateInvoice,
     createDeal,
+    updateDeal,
     createTask,
+    createBrandPerson,
+    updateBrandPerson,
+    deleteBrandPerson,
     updateBrandNotes,
     updateJobNotes,
     createCalendarEvent,
     createContract,
+    importCsv,
+    createCustomObject,
+    updateCustomObject,
+    deleteCustomObject,
+    createCustomField,
+    deleteCustomField,
+    upsertEntityFieldValues,
+    createCustomRecord,
+    updateCustomRecord,
+    deleteCustomRecord,
+    createWorkflow,
+    updateWorkflow,
+    deleteWorkflow,
   };
+}
+
+export function getPeopleForBrand(data: CreatorCrmData, brandId: string) {
+  return data.people.filter((person) => person.brandId === brandId);
 }
 
 export function getBrandById(data: CreatorCrmData, id: string) {
@@ -352,6 +702,16 @@ export function getDashboardMetrics(data: CreatorCrmData) {
   const contentThisWeek = data.calendarEvents.filter(
     (e) => e.date >= today && e.date <= weekEndStr,
   );
+  const pipelineByStage = DEAL_STAGES.filter(
+    (stage) => stage !== "won" && stage !== "lost",
+  ).map((stage) => {
+    const deals = data.deals.filter((deal) => deal.stage === stage);
+    return {
+      stage,
+      count: deals.length,
+      valueCents: deals.reduce((sum, deal) => sum + deal.valueCents, 0),
+    };
+  });
 
   return {
     activeJobs,
@@ -362,5 +722,6 @@ export function getDashboardMetrics(data: CreatorCrmData) {
     expectedRevenue,
     tasksDueToday,
     contentThisWeek,
+    pipelineByStage,
   };
 }

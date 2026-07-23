@@ -12,12 +12,18 @@ export function CreatorDashboard() {
   if (!ready) return null;
 
   const metrics = getDashboardMetrics(data);
+  const maxStageValue = Math.max(
+    1,
+    ...metrics.pipelineByStage.map((row) => row.valueCents),
+  );
 
   return (
     <>
       <header className="app-topbar">
         <h1>Dashboard</h1>
-        <span style={{ color: "var(--muted)", fontSize: 14 }}>Creator dashboard</span>
+        <span style={{ color: "var(--muted)", fontSize: 14 }}>
+          Creator dashboard
+        </span>
       </header>
 
       <div className="app-content">
@@ -32,7 +38,9 @@ export function CreatorDashboard() {
           </div>
           <div className="app-stat-card">
             <span>Overdue payments</span>
-            <strong className="crm-money--overdue">{metrics.overduePayments.length}</strong>
+            <strong className="crm-money--overdue">
+              {metrics.overduePayments.length}
+            </strong>
           </div>
           <div className="app-stat-card">
             <span>Deals in pipeline</span>
@@ -51,6 +59,39 @@ export function CreatorDashboard() {
             <strong>{metrics.contentThisWeek.length}</strong>
           </div>
         </div>
+
+        <section className="crm-list-card" style={{ marginBottom: 20 }}>
+          <div className="crm-pipeline-widget-header">
+            <h3>Pipeline value by stage</h3>
+            <Link href={CRM_ROUTES.pipeline} className="auth-link">
+              Open pipeline →
+            </Link>
+          </div>
+          <div className="crm-pipeline-widget">
+            {metrics.pipelineByStage.map((row) => (
+              <div key={row.stage} className="crm-pipeline-widget-row">
+                <div className="crm-pipeline-widget-label">
+                  <strong>{DEAL_STAGE_LABELS[row.stage]}</strong>
+                  <span>
+                    {row.count} deal{row.count === 1 ? "" : "s"} ·{" "}
+                    {formatMoney(row.valueCents)}
+                  </span>
+                </div>
+                <div className="crm-pipeline-widget-track">
+                  <div
+                    className="crm-pipeline-widget-fill"
+                    style={{
+                      width: `${Math.max(
+                        row.valueCents > 0 ? 6 : 0,
+                        (row.valueCents / maxStageValue) * 100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <div className="crm-dashboard-list">
           <section className="crm-list-card">
@@ -83,7 +124,10 @@ export function CreatorDashboard() {
                 return (
                   <div key={payment.id} className="crm-list-item">
                     <span>
-                      {brand?.name} · <span className="crm-money--overdue">{formatMoney(payment.amountCents)}</span>
+                      {brand?.name} ·{" "}
+                      <span className="crm-money--overdue">
+                        {formatMoney(payment.amountCents)}
+                      </span>
                     </span>
                     <span>Due {payment.dueDate}</span>
                   </div>
@@ -105,7 +149,11 @@ export function CreatorDashboard() {
                 </div>
               );
             })}
-            <Link href={CRM_ROUTES.pipeline} className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
+            <Link
+              href={CRM_ROUTES.pipeline}
+              className="auth-link"
+              style={{ display: "inline-block", marginTop: 12 }}
+            >
               View pipeline →
             </Link>
           </section>
@@ -122,7 +170,11 @@ export function CreatorDashboard() {
                 </div>
               ))
             )}
-            <Link href={CRM_ROUTES.tasks} className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
+            <Link
+              href={CRM_ROUTES.tasks}
+              className="auth-link"
+              style={{ display: "inline-block", marginTop: 12 }}
+            >
               View all tasks →
             </Link>
           </section>
@@ -135,7 +187,11 @@ export function CreatorDashboard() {
                 <span>{event.date}</span>
               </div>
             ))}
-            <Link href={CRM_ROUTES.calendar} className="auth-link" style={{ display: "inline-block", marginTop: 12 }}>
+            <Link
+              href={CRM_ROUTES.calendar}
+              className="auth-link"
+              style={{ display: "inline-block", marginTop: 12 }}
+            >
               Open calendar →
             </Link>
           </section>

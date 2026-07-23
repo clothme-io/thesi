@@ -9,4 +9,8 @@ export const CRM_ROUTES = {
   invoices: "/app/tools/invoices",
   calendar: "/app/crm/calendar",
   tasks: "/app/crm/tasks",
+  dataModel: "/app/crm/data-model",
+  workflows: "/app/crm/workflows",
+  objects: "/app/crm/objects",
+  object: (id: string) => `/app/crm/objects/${id}`,
 } as const;
