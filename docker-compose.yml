@@ -23,6 +23,7 @@ services:
       JWT_REFRESH_SECRET: thesi-local-refresh-secret-change-before-production
       ADMIN_API_KEY: thesi-local-admin-key-change-before-production
       THESI_WEB_URL: http://localhost:3010
+      AUTH_FORCE_PASSWORD_CHANGE: "true"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
