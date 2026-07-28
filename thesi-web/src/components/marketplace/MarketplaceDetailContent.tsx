@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthProvider";
@@ -10,6 +10,8 @@ import {
   getListingById,
   hasApplied,
   isInCrm,
+  fetchListingApplications,
+  respondToListingApplication,
 } from "@/lib/marketplace/storage";
 import { listingInviteCampaignId, listingToInviteCriteria } from "@/lib/marketplace/invite-criteria";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
@@ -20,7 +22,9 @@ import {
   LISTING_TYPE_LABELS,
   PAYMENT_STRUCTURE_LABELS,
   LISTING_STATUS_LABELS,
+  APPLICATION_STATUS_LABELS,
   formatListingPayment,
+  type MarketplaceBrandApplication,
 } from "@/lib/marketplace/types";
 
 export function MarketplaceDetailContent() {
@@ -39,8 +43,47 @@ export function MarketplaceDetailContent() {
   const [toast, setToast] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [applicants, setApplicants] = useState<MarketplaceBrandApplication[]>([]);
+  const [applicantsReady, setApplicantsReady] = useState(!isBrand);
+  const [applicantsError, setApplicantsError] = useState("");
+  const [respondingApplicationId, setRespondingApplicationId] = useState<string | null>(
+    null,
+  );
 
-  if (!ready || (isBrand && !invitesReady)) return null;
+  useEffect(() => {
+    if (!isBrand || !listingId) {
+      setApplicants([]);
+      setApplicantsReady(true);
+      return;
+    }
+    let active = true;
+    setApplicantsReady(false);
+    setApplicantsError("");
+    fetchListingApplications(authenticatedRequest, listingId)
+      .then((next) => {
+        if (active) setApplicants(next);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setApplicants([]);
+          setApplicantsError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Could not load applicants",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setApplicantsReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest, isBrand, listingId, data.listings]);
+
+  if (!ready || (isBrand && !invitesReady) || (isBrand && !applicantsReady)) {
+    return null;
+  }
 
   const listing = getListingById(data, listingId);
   if (!listing) {
@@ -108,6 +151,40 @@ export function MarketplaceDetailContent() {
     }
   };
 
+  const handleRespond = async (
+    applicationId: string,
+    decision: "accepted" | "rejected",
+  ) => {
+    setRespondingApplicationId(applicationId);
+    setActionError("");
+    try {
+      const updated = await respondToListingApplication(
+        authenticatedRequest,
+        listing.id,
+        applicationId,
+        decision,
+      );
+      setApplicants((prev) =>
+        prev.map((application) =>
+          application.id === applicationId
+            ? { ...application, status: updated.status }
+            : application,
+        ),
+      );
+      showToast(
+        decision === "accepted" ? "Application accepted." : "Application rejected.",
+      );
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not update application",
+      );
+    } finally {
+      setRespondingApplicationId(null);
+    }
+  };
+
   return (
     <>
       <header className="app-topbar">
@@ -140,7 +217,14 @@ export function MarketplaceDetailContent() {
                 </button>
               )}
               {applied ? (
-                <span className="marketplace-badge marketplace-badge--applied">Applied</span>
+                <span className="marketplace-badge marketplace-badge--applied">
+                  {
+                    APPLICATION_STATUS_LABELS[
+                      data.applications.find((a) => a.listingId === listing.id)?.status ??
+                        "pending"
+                    ]
+                  }
+                </span>
               ) : (
                 <button type="button" className="crm-btn-primary" onClick={() => setShowApply(true)}>
                   Apply
@@ -220,6 +304,77 @@ export function MarketplaceDetailContent() {
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {isBrand && (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Applicants ({applicants.length})</h3>
+                  {applicantsError && (
+                    <p className="workspace-hint" style={{ marginBottom: 12 }}>
+                      {applicantsError}
+                    </p>
+                  )}
+                  {applicants.length === 0 ? (
+                    <p className="crm-contact-sub">
+                      No applications yet. Creators who apply will appear here with their pitch.
+                    </p>
+                  ) : (
+                    <ul className="marketplace-requirements" style={{ listStyle: "none", padding: 0 }}>
+                      {applicants.map((application) => (
+                        <li
+                          key={application.id}
+                          style={{
+                            marginBottom: 16,
+                            paddingBottom: 16,
+                            borderBottom: "1px solid var(--line, #e5e5e5)",
+                          }}
+                        >
+                          <div className="crm-meta-row" style={{ marginBottom: 8 }}>
+                            <span>
+                              <strong>{application.creatorName}</strong>
+                              <span className="crm-contact-sub" style={{ marginLeft: 8 }}>
+                                {application.creatorEmail}
+                              </span>
+                              <span className="crm-tag" style={{ marginLeft: 8 }}>
+                                {APPLICATION_STATUS_LABELS[application.status ?? "pending"]}
+                              </span>
+                            </span>
+                            <span className="crm-contact-sub">
+                              {new Date(application.appliedAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <p style={{ margin: "0 0 10px" }}>{application.pitch}</p>
+                          {(application.status ?? "pending") === "pending" && (
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button
+                                type="button"
+                                className="crm-btn-primary"
+                                disabled={respondingApplicationId === application.id}
+                                onClick={() =>
+                                  void handleRespond(application.id, "accepted")
+                                }
+                              >
+                                {respondingApplicationId === application.id
+                                  ? "Saving…"
+                                  : "Accept"}
+                              </button>
+                              <button
+                                type="button"
+                                className="crm-btn-secondary"
+                                disabled={respondingApplicationId === application.id}
+                                onClick={() =>
+                                  void handleRespond(application.id, "rejected")
+                                }
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
             </section>
 

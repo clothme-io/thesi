@@ -7,6 +7,7 @@ import {
 import type { CampaignRecord } from '../campaigns/campaign.repository';
 import type {
   MarketplaceApplicationRecord,
+  MarketplaceBrandApplicationRecord,
   MarketplaceListingRecord,
   MarketplaceRepository,
   MarketplaceUser,
@@ -18,7 +19,13 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
   user: MarketplaceUser | null = null;
   brandName: string | null = 'Acme Brand';
   listings: MarketplaceListingRecord[] = [];
-  applications: MarketplaceApplicationRecord[] = [];
+  applications: Array<
+    MarketplaceApplicationRecord & {
+      creatorUserId: string;
+      creatorName?: string;
+      creatorEmail?: string;
+    }
+  > = [];
   crmLinks = new Set<string>();
 
   async getUser() {
@@ -33,6 +40,11 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
     const existing = this.listings.find(
       (listing) => listing.campaignId === input.campaign.id,
     );
+    const status =
+      input.campaign.status === 'paused' ||
+      input.campaign.status === 'completed'
+        ? 'closed'
+        : 'open';
     const listing: MarketplaceListingRecord = {
       id: existing?.id ?? `listing-${input.campaign.id}`,
       name: input.campaign.name,
@@ -41,7 +53,7 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
       campaignId: input.campaign.id,
       campaignType: input.campaign.campaignType,
       type: input.campaign.type,
-      status: 'open',
+      status,
       startDate: input.campaign.startDate,
       endDate: input.campaign.endDate,
       applicationDeadline: input.campaign.startDate,
@@ -86,8 +98,26 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
     return this.listings.find((listing) => listing.id === listingId) ?? null;
   }
 
-  async listApplicationsForCreator() {
-    return this.applications;
+  async listApplicationsForCreator(creatorUserId: string) {
+    return this.applications.filter((app) => app.creatorUserId === creatorUserId);
+  }
+
+  async listApplicationsForListing(
+    listingId: string,
+  ): Promise<MarketplaceBrandApplicationRecord[]> {
+    return this.applications
+      .filter((app) => app.listingId === listingId)
+      .map((app) => ({
+        id: app.id,
+        listingId: app.listingId,
+        pitch: app.pitch,
+        appliedAt: app.appliedAt,
+        addedToCrm: app.addedToCrm,
+        status: app.status ?? 'pending',
+        creatorUserId: app.creatorUserId,
+        creatorName: app.creatorName || 'Creator',
+        creatorEmail: app.creatorEmail || 'creator@example.com',
+      }));
   }
 
   async listCrmLinkedListingIds(creatorUserId: string) {
@@ -96,8 +126,11 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
       .map((key) => key.split(':')[1]!);
   }
 
-  async hasApplied(listingId: string, _creatorUserId: string) {
-    return this.applications.some((app) => app.listingId === listingId);
+  async hasApplied(listingId: string, creatorUserId: string) {
+    return this.applications.some(
+      (app) =>
+        app.listingId === listingId && app.creatorUserId === creatorUserId,
+    );
   }
 
   async createApplication(input: {
@@ -106,18 +139,62 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
     pitch: string;
     addedToCrm: boolean;
   }) {
-    const application: MarketplaceApplicationRecord = {
+    const application = {
       id: `${input.creatorUserId}-app-${this.applications.length + 1}`,
       listingId: input.listingId,
       pitch: input.pitch,
       appliedAt: new Date().toISOString(),
       addedToCrm: input.addedToCrm,
+      status: 'pending' as const,
+      creatorUserId: input.creatorUserId,
+      creatorName: 'Creator',
+      creatorEmail: 'creator@example.com',
     };
     this.applications.push(application);
     if (input.addedToCrm) {
       await this.linkCrm(input.creatorUserId, input.listingId);
     }
-    return application;
+    return {
+      id: application.id,
+      listingId: application.listingId,
+      pitch: application.pitch,
+      appliedAt: application.appliedAt,
+      addedToCrm: application.addedToCrm,
+      status: application.status,
+    };
+  }
+
+  async getApplicationById(applicationId: string) {
+    const application = this.applications.find((app) => app.id === applicationId);
+    if (!application) return null;
+    return {
+      id: application.id,
+      listingId: application.listingId,
+      pitch: application.pitch,
+      appliedAt: application.appliedAt,
+      addedToCrm: application.addedToCrm,
+      status: application.status ?? 'pending',
+      creatorUserId: application.creatorUserId,
+    };
+  }
+
+  async updateApplicationStatus(
+    applicationId: string,
+    status: 'accepted' | 'rejected',
+  ) {
+    const application = this.applications.find((app) => app.id === applicationId);
+    if (!application || (application.status ?? 'pending') !== 'pending') {
+      return null;
+    }
+    application.status = status;
+    return {
+      id: application.id,
+      listingId: application.listingId,
+      pitch: application.pitch,
+      appliedAt: application.appliedAt,
+      addedToCrm: application.addedToCrm,
+      status,
+    };
   }
 
   async linkCrm(creatorUserId: string, listingId: string) {
@@ -127,16 +204,21 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
 
 describe('MarketplaceService', () => {
   let repository: FakeMarketplaceRepository;
+  let inbox: { notifySelf: jest.Mock };
   let service: MarketplaceService;
 
   beforeEach(() => {
     repository = new FakeMarketplaceRepository();
+    inbox = {
+      notifySelf: jest.fn().mockResolvedValue({}),
+    };
     const creatorCrm = {
       addListingToPipeline: jest.fn().mockResolvedValue(undefined),
     };
     service = new MarketplaceService(
       repository,
       creatorCrm as never,
+      inbox as never,
     );
   });
 
@@ -162,7 +244,36 @@ describe('MarketplaceService', () => {
     expect(repository.listings).toHaveLength(0);
   });
 
-  it('lets creators apply once', async () => {
+  it('keeps marketplace listing when campaign is paused or completed', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand',
+      companyName: 'Acme',
+    };
+    const campaign = sampleCampaign({
+      postToMarketplace: true,
+      status: 'active',
+    });
+    await service.syncFromCampaign('brand-1', campaign);
+    expect(repository.listings).toHaveLength(1);
+
+    await service.syncFromCampaign('brand-1', {
+      ...campaign,
+      status: 'paused',
+    });
+    expect(repository.listings).toHaveLength(1);
+    expect(repository.listings[0]?.status).toBe('closed');
+
+    await service.syncFromCampaign('brand-1', {
+      ...campaign,
+      status: 'completed',
+    });
+    expect(repository.listings).toHaveLength(1);
+    expect(repository.listings[0]?.status).toBe('closed');
+  });
+
+  it('lets creators apply once and notifies the brand', async () => {
     repository.user = {
       id: 'creator-1',
       role: 'creator',
@@ -204,9 +315,146 @@ describe('MarketplaceService', () => {
         crmLinkedListingIds: ['listing-1'],
       }),
     );
+    expect(inbox.notifySelf).toHaveBeenCalledWith(
+      'brand-1',
+      expect.objectContaining({
+        type: 'application_received',
+        href: '/app/marketplace/listing-1',
+      }),
+    );
 
     await expect(
       service.apply('creator-1', 'listing-1', 'Again', false),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('lists applicants for listing owners', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand',
+      companyName: 'Acme',
+    };
+    repository.listings = [
+      {
+        id: 'listing-1',
+        name: 'Summer',
+        brandName: 'Acme',
+        ownerUserId: 'brand-1',
+        campaignId: 'campaign-1',
+        campaignType: 'experience',
+        type: 'tiktok',
+        status: 'open',
+        startDate: '2026-07-01',
+        endDate: '2026-08-01',
+        applicationDeadline: '2026-07-01',
+        brief: 'Brief',
+        deliverables: '1 video',
+        exampleVideoLinks: [],
+        requirements: [],
+        files: [],
+        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        location: 'Remote',
+        remoteOk: true,
+        slots: 5,
+        applicantsCount: 1,
+        postedAt: new Date().toISOString(),
+      },
+    ];
+    repository.applications = [
+      {
+        id: 'app-1',
+        listingId: 'listing-1',
+        pitch: 'Hello pitch',
+        appliedAt: new Date().toISOString(),
+        addedToCrm: true,
+        status: 'pending',
+        creatorUserId: 'creator-1',
+        creatorName: 'Alex',
+        creatorEmail: 'alex@example.com',
+      },
+    ];
+
+    await expect(
+      service.listListingApplications('brand-1', 'listing-1'),
+    ).resolves.toEqual({
+      applications: [
+        expect.objectContaining({
+          pitch: 'Hello pitch',
+          creatorName: 'Alex',
+          creatorEmail: 'alex@example.com',
+          status: 'pending',
+        }),
+      ],
+    });
+  });
+
+  it('lets brands accept or reject applications and notifies the creator', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand',
+      companyName: 'Acme',
+    };
+    repository.listings = [
+      {
+        id: 'listing-1',
+        name: 'Summer',
+        brandName: 'Acme',
+        ownerUserId: 'brand-1',
+        campaignId: 'campaign-1',
+        campaignType: 'experience',
+        type: 'tiktok',
+        status: 'open',
+        startDate: '2026-07-01',
+        endDate: '2026-08-01',
+        applicationDeadline: '2026-07-01',
+        brief: 'Brief',
+        deliverables: '1 video',
+        exampleVideoLinks: [],
+        requirements: [],
+        files: [],
+        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        location: 'Remote',
+        remoteOk: true,
+        slots: 5,
+        applicantsCount: 1,
+        postedAt: new Date().toISOString(),
+      },
+    ];
+    repository.applications = [
+      {
+        id: 'app-1',
+        listingId: 'listing-1',
+        pitch: 'Hello pitch',
+        appliedAt: new Date().toISOString(),
+        addedToCrm: true,
+        status: 'pending',
+        creatorUserId: 'creator-1',
+        creatorName: 'Alex',
+        creatorEmail: 'alex@example.com',
+      },
+    ];
+
+    await expect(
+      service.respondToApplication('brand-1', 'listing-1', 'app-1', 'accepted'),
+    ).resolves.toEqual({
+      application: expect.objectContaining({
+        id: 'app-1',
+        status: 'accepted',
+      }),
+    });
+    expect(inbox.notifySelf).toHaveBeenCalledWith(
+      'creator-1',
+      expect.objectContaining({
+        type: 'application_status',
+        title: 'Application accepted: Summer',
+        href: '/app/marketplace/listing-1',
+      }),
+    );
+
+    await expect(
+      service.respondToApplication('brand-1', 'listing-1', 'app-1', 'rejected'),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 

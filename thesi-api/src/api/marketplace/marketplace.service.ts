@@ -7,10 +7,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreatorCrmService } from 'src/api/creator-crm/creator-crm.service';
+import { InboxService } from 'src/api/inbox/inbox.service';
 import type { CampaignRecord } from '../campaigns/campaign.repository';
 import {
   MARKETPLACE_REPOSITORY,
   type MarketplaceApplicationRecord,
+  type MarketplaceBrandApplicationRecord,
   type MarketplaceCampaignSync,
   type MarketplaceListingRecord,
   type MarketplaceRepository,
@@ -23,16 +25,25 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     @Inject(MARKETPLACE_REPOSITORY)
     private readonly marketplace: MarketplaceRepository,
     private readonly creatorCrm: CreatorCrmService,
+    private readonly inbox: InboxService,
   ) {}
 
   async syncFromCampaign(
     ownerUserId: string,
     campaign: CampaignRecord,
   ): Promise<void> {
-    if (!campaign.postToMarketplace || campaign.status !== 'active') {
+    // True unpublish (or never posted): remove listing.
+    if (!campaign.postToMarketplace) {
       await this.marketplace.deleteListingByCampaignId(campaign.id);
       return;
     }
+    // Draft campaigns are not marketplace-visible yet.
+    if (campaign.status === 'draft') {
+      await this.marketplace.deleteListingByCampaignId(campaign.id);
+      return;
+    }
+    // Active / paused / completed: upsert so applicants are preserved when
+    // paused or completed (listing status resolves to closed).
     const brandName =
       (await this.marketplace.getBrandDisplayName(ownerUserId)) || 'Your Brand';
     await this.marketplace.upsertListingFromCampaign({
@@ -78,6 +89,26 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     return listing;
   }
 
+  async listListingApplications(
+    userId: string,
+    listingId: string,
+  ): Promise<{ applications: MarketplaceBrandApplicationRecord[] }> {
+    const user = await this.requireUser(userId);
+    if (user.role !== 'brand') {
+      throw new ForbiddenException('Brand account required');
+    }
+    const listing = await this.marketplace.getById(listingId);
+    if (!listing) {
+      throw new NotFoundException('Listing not found');
+    }
+    if (listing.ownerUserId !== userId) {
+      throw new ForbiddenException('You can only view applicants for your listings');
+    }
+    const applications =
+      await this.marketplace.listApplicationsForListing(listingId);
+    return { applications };
+  }
+
   async apply(
     userId: string,
     listingId: string,
@@ -111,9 +142,73 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     if (addToCrm) {
       await this.creatorCrm.addListingToPipeline(user.id, listingId);
     }
+
+    await this.inbox.notifySelf(listing.ownerUserId, {
+      type: 'application_received',
+      title: `New application: ${listing.name}`,
+      body: `${user.fullName} applied to "${listing.name}". Open the listing to review their pitch.`,
+      href: `/app/marketplace/${listing.id}`,
+      campaignId: listing.campaignId,
+      audience: 'brand',
+    });
+
     const crmLinkedListingIds =
       await this.marketplace.listCrmLinkedListingIds(user.id);
     return { application, crmLinkedListingIds };
+  }
+
+  async respondToApplication(
+    userId: string,
+    listingId: string,
+    applicationId: string,
+    decision: 'accepted' | 'rejected',
+  ): Promise<{ application: MarketplaceApplicationRecord }> {
+    const user = await this.requireUser(userId);
+    if (user.role !== 'brand') {
+      throw new ForbiddenException('Brand account required');
+    }
+    if (decision !== 'accepted' && decision !== 'rejected') {
+      throw new BadRequestException('decision must be accepted or rejected');
+    }
+
+    const listing = await this.marketplace.getById(listingId);
+    if (!listing) {
+      throw new NotFoundException('Listing not found');
+    }
+    if (listing.ownerUserId !== userId) {
+      throw new ForbiddenException(
+        'You can only respond to applications on your listings',
+      );
+    }
+
+    const existing =
+      await this.marketplace.getApplicationById(applicationId);
+    if (!existing || existing.listingId !== listingId) {
+      throw new NotFoundException('Application not found');
+    }
+    if (existing.status !== 'pending') {
+      throw new ConflictException(`Application already ${existing.status}`);
+    }
+
+    const application = await this.marketplace.updateApplicationStatus(
+      applicationId,
+      decision,
+    );
+    if (!application) {
+      throw new ConflictException('Application already responded to');
+    }
+
+    const verb = decision === 'accepted' ? 'accepted' : 'rejected';
+    await this.inbox.notifySelf(existing.creatorUserId, {
+      type: 'application_status',
+      title: `Application ${verb}: ${listing.name}`,
+      body: `${listing.brandName} ${verb} your application to "${listing.name}".`,
+      href: `/app/marketplace/${listing.id}`,
+      campaignId: listing.campaignId,
+      audience: 'creator',
+    });
+
+    return { application };
   }
 
   async linkToCrm(

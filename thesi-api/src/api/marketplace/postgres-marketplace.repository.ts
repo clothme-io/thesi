@@ -5,6 +5,7 @@ import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import type {
   MarketplaceApplicationRecord,
+  MarketplaceBrandApplicationRecord,
   MarketplaceListingRecord,
   MarketplaceRepository,
   MarketplaceUser,
@@ -123,6 +124,48 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       pitch: row.pitch,
       appliedAt: row.appliedAt.toISOString(),
       addedToCrm: row.addedToCrm,
+      status: row.status as MarketplaceApplicationRecord['status'],
+    }));
+  }
+
+  async listApplicationsForListing(
+    listingId: string,
+  ): Promise<MarketplaceBrandApplicationRecord[]> {
+    const rows = await this.db
+      .select({
+        id: schema.marketplaceApplication.id,
+        listingId: schema.marketplaceApplication.listingId,
+        pitch: schema.marketplaceApplication.pitch,
+        appliedAt: schema.marketplaceApplication.appliedAt,
+        addedToCrm: schema.marketplaceApplication.addedToCrm,
+        status: schema.marketplaceApplication.status,
+        creatorUserId: schema.marketplaceApplication.creatorUserId,
+        creatorName: schema.thesiUser.fullName,
+        creatorEmail: schema.thesiUser.email,
+        displayName: schema.creatorProfile.displayName,
+      })
+      .from(schema.marketplaceApplication)
+      .innerJoin(
+        schema.thesiUser,
+        eq(schema.thesiUser.id, schema.marketplaceApplication.creatorUserId),
+      )
+      .leftJoin(
+        schema.creatorProfile,
+        eq(schema.creatorProfile.userId, schema.marketplaceApplication.creatorUserId),
+      )
+      .where(eq(schema.marketplaceApplication.listingId, listingId))
+      .orderBy(desc(schema.marketplaceApplication.appliedAt));
+
+    return rows.map((row) => ({
+      id: row.id,
+      listingId: row.listingId,
+      pitch: row.pitch,
+      appliedAt: row.appliedAt.toISOString(),
+      addedToCrm: row.addedToCrm,
+      status: row.status as MarketplaceApplicationRecord['status'],
+      creatorUserId: row.creatorUserId,
+      creatorName: row.displayName?.trim() || row.creatorName,
+      creatorEmail: row.creatorEmail,
     }));
   }
 
@@ -175,6 +218,57 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       pitch: row.pitch,
       appliedAt: row.appliedAt.toISOString(),
       addedToCrm: row.addedToCrm,
+      status: row.status as MarketplaceApplicationRecord['status'],
+    };
+  }
+
+  async getApplicationById(
+    applicationId: string,
+  ): Promise<
+    | (MarketplaceApplicationRecord & {
+        creatorUserId: string;
+      })
+    | null
+  > {
+    const [row] = await this.db
+      .select()
+      .from(schema.marketplaceApplication)
+      .where(eq(schema.marketplaceApplication.id, applicationId))
+      .limit(1);
+    if (!row) return null;
+    return {
+      id: row.id,
+      listingId: row.listingId,
+      pitch: row.pitch,
+      appliedAt: row.appliedAt.toISOString(),
+      addedToCrm: row.addedToCrm,
+      status: row.status as MarketplaceApplicationRecord['status'],
+      creatorUserId: row.creatorUserId,
+    };
+  }
+
+  async updateApplicationStatus(
+    applicationId: string,
+    status: 'accepted' | 'rejected',
+  ): Promise<MarketplaceApplicationRecord | null> {
+    const [row] = await this.db
+      .update(schema.marketplaceApplication)
+      .set({ status })
+      .where(
+        and(
+          eq(schema.marketplaceApplication.id, applicationId),
+          eq(schema.marketplaceApplication.status, 'pending'),
+        ),
+      )
+      .returning();
+    if (!row) return null;
+    return {
+      id: row.id,
+      listingId: row.listingId,
+      pitch: row.pitch,
+      appliedAt: row.appliedAt.toISOString(),
+      addedToCrm: row.addedToCrm,
+      status: row.status as MarketplaceApplicationRecord['status'],
     };
   }
 

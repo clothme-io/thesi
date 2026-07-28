@@ -37,12 +37,21 @@ export type MarketplaceListingRecord = {
   postedAt: string;
 };
 
+export type MarketplaceApplicationStatus = 'pending' | 'accepted' | 'rejected';
+
 export type MarketplaceApplicationRecord = {
   id: string;
   listingId: string;
   pitch: string;
   appliedAt: string;
   addedToCrm: boolean;
+  status: MarketplaceApplicationStatus;
+};
+
+export type MarketplaceBrandApplicationRecord = MarketplaceApplicationRecord & {
+  creatorUserId: string;
+  creatorName: string;
+  creatorEmail: string;
 };
 
 export type UpsertListingFromCampaignInput = {
@@ -64,6 +73,9 @@ export interface MarketplaceRepository {
   listApplicationsForCreator(
     creatorUserId: string,
   ): Promise<MarketplaceApplicationRecord[]>;
+  listApplicationsForListing(
+    listingId: string,
+  ): Promise<MarketplaceBrandApplicationRecord[]>;
   listCrmLinkedListingIds(creatorUserId: string): Promise<string[]>;
   hasApplied(listingId: string, creatorUserId: string): Promise<boolean>;
   createApplication(input: {
@@ -72,6 +84,18 @@ export interface MarketplaceRepository {
     pitch: string;
     addedToCrm: boolean;
   }): Promise<MarketplaceApplicationRecord>;
+  getApplicationById(
+    applicationId: string,
+  ): Promise<
+    | (MarketplaceApplicationRecord & {
+        creatorUserId: string;
+      })
+    | null
+  >;
+  updateApplicationStatus(
+    applicationId: string,
+    status: Exclude<MarketplaceApplicationStatus, 'pending'>,
+  ): Promise<MarketplaceApplicationRecord | null>;
   linkCrm(creatorUserId: string, listingId: string): Promise<void>;
 }
 

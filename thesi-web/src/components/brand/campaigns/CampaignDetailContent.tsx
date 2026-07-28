@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
-import { downloadCampaignFile, getCampaignById, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
+import {
+  downloadCampaignFile,
+  getCampaignById,
+  useBrandCampaigns,
+  type CampaignInput,
+} from "@/lib/brand-campaigns/storage";
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_PAYMENT_LABELS,
@@ -12,9 +17,29 @@ import {
   BRAND_CAMPAIGN_TYPE_LABELS,
   formatMoney,
   getCampaignBudgetLabel,
+  type BrandCampaign,
+  type BrandCampaignStatus,
 } from "@/lib/brand-campaigns/types";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
+
+function toCampaignInput(campaign: BrandCampaign): CampaignInput {
+  return {
+    name: campaign.name,
+    campaignType: campaign.campaignType,
+    type: campaign.type,
+    status: campaign.status,
+    startDate: campaign.startDate,
+    endDate: campaign.endDate,
+    brief: campaign.brief,
+    deliverables: campaign.deliverables,
+    exampleVideoLinks: campaign.exampleVideoLinks,
+    requirements: campaign.requirements,
+    files: campaign.files,
+    payment: campaign.payment,
+    postToMarketplace: campaign.postToMarketplace,
+  };
+}
 
 type CreatorPayout = {
   id: string;
@@ -35,11 +60,13 @@ const PAYOUT_STATUS_LABELS: Record<CreatorPayout["status"], string> = {
 export function CampaignDetailContent() {
   const { id } = useParams<{ id: string }>();
   const { session, authenticatedRequest, authenticatedBinaryRequest } = useAuth();
-  const { data, ready, error } = useBrandCampaigns(authenticatedRequest);
+  const { data, ready, error, updateCampaign } = useBrandCampaigns(authenticatedRequest);
   const { data: inviteData, ready: invitesReady, reload: reloadInvites } =
     useInvites(authenticatedRequest);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [downloadError, setDownloadError] = useState("");
+  const [lifecycleError, setLifecycleError] = useState("");
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [payouts, setPayouts] = useState<CreatorPayout[]>([]);
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
@@ -113,6 +140,38 @@ export function CampaignDetailContent() {
     }
   };
 
+  const applyLifecycle = async (patch: {
+    status?: BrandCampaignStatus;
+    postToMarketplace?: boolean;
+  }) => {
+    setLifecycleBusy(true);
+    setLifecycleError("");
+    try {
+      await updateCampaign(campaign.id, {
+        ...toCampaignInput(campaign),
+        ...patch,
+      });
+    } catch (requestError) {
+      setLifecycleError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not update campaign",
+      );
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const canPublish =
+    campaign.status === "draft" ||
+    (campaign.status === "active" && !campaign.postToMarketplace);
+  const canResume = campaign.status === "paused";
+  const canPause = campaign.status === "active";
+  const canComplete =
+    campaign.status === "active" || campaign.status === "paused";
+  const canUnpublish =
+    campaign.postToMarketplace && campaign.status !== "draft";
+
   return (
     <>
       <header className="app-topbar">
@@ -122,7 +181,59 @@ export function CampaignDetailContent() {
           </Link>
           <h1 style={{ marginTop: 4 }}>{campaign.name}</h1>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {canPublish && (
+            <button
+              type="button"
+              className="crm-btn-primary"
+              disabled={lifecycleBusy}
+              onClick={() =>
+                void applyLifecycle({ status: "active", postToMarketplace: true })
+              }
+            >
+              {campaign.status === "draft" ? "Publish" : "Post to marketplace"}
+            </button>
+          )}
+          {canResume && (
+            <button
+              type="button"
+              className="crm-btn-primary"
+              disabled={lifecycleBusy}
+              onClick={() => void applyLifecycle({ status: "active" })}
+            >
+              Resume
+            </button>
+          )}
+          {canPause && (
+            <button
+              type="button"
+              className="crm-btn-secondary"
+              disabled={lifecycleBusy}
+              onClick={() => void applyLifecycle({ status: "paused" })}
+            >
+              Pause
+            </button>
+          )}
+          {canComplete && (
+            <button
+              type="button"
+              className="crm-btn-secondary"
+              disabled={lifecycleBusy}
+              onClick={() => void applyLifecycle({ status: "completed" })}
+            >
+              Mark complete
+            </button>
+          )}
+          {canUnpublish && (
+            <button
+              type="button"
+              className="crm-btn-secondary"
+              disabled={lifecycleBusy}
+              onClick={() => void applyLifecycle({ postToMarketplace: false })}
+            >
+              Unpublish
+            </button>
+          )}
           <button type="button" className="crm-btn-secondary" onClick={() => setInviteOpen(true)}>
             Invite creators
           </button>
@@ -132,6 +243,11 @@ export function CampaignDetailContent() {
         </div>
       </header>
       <div className="app-content">
+        {lifecycleError && (
+          <p className="workspace-hint" style={{ marginBottom: 16 }}>
+            {lifecycleError}
+          </p>
+        )}
         <div className="crm-detail-grid">
           <div className="crm-detail-panel">
             <h3>Campaign summary</h3>

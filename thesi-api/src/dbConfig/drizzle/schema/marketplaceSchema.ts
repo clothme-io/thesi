@@ -88,6 +88,7 @@ export const marketplaceApplication = thesiSchema.table(
       .notNull()
       .references(() => thesiUser.id, { onDelete: 'cascade' }),
     pitch: text('pitch').notNull(),
+    status: text('status').notNull().default('pending'),
     addedToCrm: boolean('added_to_crm').notNull().default(false),
     appliedAt: timestamp('applied_at', { withTimezone: true })
       .notNull()

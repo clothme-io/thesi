@@ -11,6 +11,7 @@ import {
   LISTING_TYPE_LABELS,
   PAYMENT_STRUCTURE_LABELS,
   LISTING_STATUS_LABELS,
+  APPLICATION_STATUS_LABELS,
   formatListingPayment,
   type MarketplaceListingType,
   type PaymentStructure,
@@ -159,7 +160,8 @@ export function MarketplacePageContent() {
             </div>
           ) : (
             filtered.map((listing) => {
-              const applied = data.applications.some((a) => a.listingId === listing.id);
+              const application = data.applications.find((a) => a.listingId === listing.id);
+              const applied = Boolean(application);
               const inCrm = data.crmLinkedListingIds.includes(listing.id);
               return (
                 <Link
@@ -174,7 +176,11 @@ export function MarketplacePageContent() {
                     {isBrand && listing.campaignId && (
                       <span className="marketplace-badge marketplace-badge--crm">Your campaign</span>
                     )}
-                    {!isBrand && applied && <span className="marketplace-badge">Applied</span>}
+                    {!isBrand && applied && (
+                      <span className="marketplace-badge">
+                        {APPLICATION_STATUS_LABELS[application?.status ?? "pending"]}
+                      </span>
+                    )}
                     {!isBrand && inCrm && <span className="marketplace-badge marketplace-badge--crm">In CRM</span>}
                   </div>
                   <h2>{listing.name}</h2>
