@@ -14,7 +14,7 @@ import {
   type AuthJwtPayload,
   JwtAuthGuard,
 } from 'src/shared/auth/jwt-auth.guard';
-import { ApplyToListingDto } from './dto/marketplace.dto';
+import { ApplyToListingDto, RespondToApplicationDto } from './dto/marketplace.dto';
 import { MarketplaceService } from './marketplace.service';
 
 @ApiTags('marketplace')
@@ -38,6 +38,37 @@ export class MarketplaceController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     const data = await this.marketplace.getListing(user.sub, id);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Get('listings/:id/applications')
+  @ApiOperation({
+    summary: 'List applications for a brand-owned marketplace listing',
+  })
+  async listApplications(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.marketplace.listListingApplications(user.sub, id);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('listings/:id/applications/:applicationId/respond')
+  @ApiOperation({
+    summary: 'Accept or reject a marketplace application as the listing owner',
+  })
+  async respondToApplication(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Body() dto: RespondToApplicationDto,
+  ) {
+    const data = await this.marketplace.respondToApplication(
+      user.sub,
+      id,
+      applicationId,
+      dto.decision,
+    );
     return { status: HttpStatus.OK, error: null, data };
   }
 

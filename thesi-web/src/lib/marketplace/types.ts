@@ -62,12 +62,21 @@ export interface MarketplaceListing {
   postedAt: string;
 }
 
+export type MarketplaceApplicationStatus = "pending" | "accepted" | "rejected";
+
 export interface MarketplaceApplication {
   id: string;
   listingId: string;
   pitch: string;
   appliedAt: string;
   addedToCrm: boolean;
+  status: MarketplaceApplicationStatus;
+}
+
+export interface MarketplaceBrandApplication extends MarketplaceApplication {
+  creatorUserId: string;
+  creatorName: string;
+  creatorEmail: string;
 }
 
 export interface MarketplaceData {
@@ -98,6 +107,12 @@ export const LISTING_STATUS_LABELS: Record<MarketplaceListingStatus, string> = {
   open: "Open",
   closing_soon: "Closing Soon",
   closed: "Closed",
+};
+
+export const APPLICATION_STATUS_LABELS: Record<MarketplaceApplicationStatus, string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  rejected: "Rejected",
 };
 
 export function formatListingPayment(payment: MarketplacePayment): string {

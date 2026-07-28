@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class ApplyToListingDto {
   @ApiProperty()
@@ -11,4 +17,10 @@ export class ApplyToListingDto {
   @IsOptional()
   @IsBoolean()
   addToCrm?: boolean;
+}
+
+export class RespondToApplicationDto {
+  @ApiProperty({ enum: ['accepted', 'rejected'] })
+  @IsIn(['accepted', 'rejected'])
+  decision: 'accepted' | 'rejected';
 }

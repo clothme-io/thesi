@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
   MarketplaceApplication,
+  MarketplaceBrandApplication,
   MarketplaceData,
   MarketplaceListing,
 } from "./types";
@@ -143,4 +144,29 @@ export function hasApplied(data: MarketplaceData, listingId: string) {
 
 export function isInCrm(data: MarketplaceData, listingId: string) {
   return data.crmLinkedListingIds.includes(listingId);
+}
+
+export async function fetchListingApplications(
+  authenticatedRequest: AuthenticatedRequest,
+  listingId: string,
+) {
+  const data = await authenticatedRequest<{
+    applications: MarketplaceBrandApplication[];
+  }>(`/api/marketplace/listings/${listingId}/applications`);
+  return data.applications;
+}
+
+export async function respondToListingApplication(
+  authenticatedRequest: AuthenticatedRequest,
+  listingId: string,
+  applicationId: string,
+  decision: "accepted" | "rejected",
+) {
+  const data = await authenticatedRequest<{
+    application: MarketplaceApplication;
+  }>(`/api/marketplace/listings/${listingId}/applications/${applicationId}/respond`, {
+    method: "POST",
+    body: { decision },
+  });
+  return data.application;
 }
