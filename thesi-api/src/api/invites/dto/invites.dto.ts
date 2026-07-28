@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
@@ -42,6 +43,17 @@ export class CreateCampaignInviteDto {
   @ApiProperty()
   @IsBoolean()
   external: boolean;
+}
+
+export class RespondCampaignInviteDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(120)
+  campaignId: string;
+
+  @ApiProperty({ enum: ['accepted', 'declined'] })
+  @IsIn(['accepted', 'declined'])
+  decision: 'accepted' | 'declined';
 }
 
 export class CreatePlatformBrandInviteDto {

@@ -12,6 +12,7 @@ export type InviteUser = {
 export type CampaignInviteRecord = {
   id: string;
   campaignId: string;
+  brandUserId: string;
   campaignName: string;
   brandName: string;
   creatorId?: string;
@@ -72,9 +73,18 @@ export interface InvitesRepository {
     campaignId: string,
     creatorEmail: string,
   ): Promise<CampaignInviteRecord | null>;
+  findCampaignInviteForCreator(
+    campaignId: string,
+    creatorUserId: string,
+    creatorEmail: string,
+  ): Promise<CampaignInviteRecord | null>;
   createCampaignInvite(
     input: CreateCampaignInviteInput,
   ): Promise<CampaignInviteRecord>;
+  updateCampaignInviteStatus(
+    inviteId: string,
+    status: Exclude<InviteStatus, 'sent'>,
+  ): Promise<CampaignInviteRecord | null>;
   setCampaignInviteNovuTransactionId(
     inviteId: string,
     transactionId: string,

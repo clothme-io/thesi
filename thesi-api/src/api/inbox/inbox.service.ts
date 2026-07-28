@@ -211,6 +211,47 @@ export class InboxService {
     return { delivered: true };
   }
 
+  async notifyCampaignInviteResponse(
+    creatorUserId: string,
+    input: {
+      brandUserId: string;
+      campaignId: string;
+      campaignName: string;
+      creatorName: string;
+      decision: 'accepted' | 'declined';
+    },
+  ): Promise<void> {
+    const creator = await this.requireUser(creatorUserId);
+    if (creator.role !== 'creator') {
+      throw new ForbiddenException('Creator account required');
+    }
+
+    const verb = input.decision === 'accepted' ? 'accepted' : 'declined';
+    const thread = await this.inbox.ensureThread(
+      input.brandUserId,
+      creatorUserId,
+    );
+    await this.inbox.createMessage({
+      threadId: thread.id,
+      senderUserId: creatorUserId,
+      recipientUserId: input.brandUserId,
+      subject: `Invite ${verb}: ${input.campaignName}`,
+      content: `${input.creatorName} ${verb} the invite for "${input.campaignName}".`,
+      kind: 'message',
+      campaignId: input.campaignId,
+    });
+
+    await this.inbox.createNotification({
+      userId: input.brandUserId,
+      type: 'application_status',
+      title: `Invite ${verb}: ${input.campaignName}`,
+      body: `${input.creatorName} ${verb} your campaign invite for "${input.campaignName}".`,
+      href: '/app/inbox',
+      campaignId: input.campaignId,
+      audience: 'brand',
+    });
+  }
+
   private async requireUser(userId: string): Promise<InboxUser> {
     const user = await this.inbox.getUser(userId);
     if (!user) {

@@ -17,6 +17,7 @@ import { listingInviteCampaignId, listingToInviteCriteria } from "@/lib/marketpl
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
+import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
 import { BRAND_CAMPAIGN_GOAL_TYPE_LABELS } from "@/lib/brand-campaigns/types";
 import {
   LISTING_TYPE_LABELS,
@@ -510,7 +511,9 @@ export function MarketplaceDetailContent() {
                           </span>
                         )}
                       </span>
-                      <span>{invite.status}</span>
+                      <span className="crm-tag">
+                        {INVITE_STATUS_LABELS[invite.status]}
+                      </span>
                     </div>
                   ))
                 )}

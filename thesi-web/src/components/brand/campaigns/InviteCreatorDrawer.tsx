@@ -11,6 +11,7 @@ import {
 import { matchCreatorsToCampaign } from "@/lib/invites/matching";
 import { sendCampaignInvite } from "@/lib/invites/send-campaign-invite";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
+import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
 import type { CampaignInviteCriteria } from "@/lib/invites/types";
 
 type DrawerTab = "matched" | "external";
@@ -254,7 +255,17 @@ export function InviteCreatorDrawer({
                               {creator.followerRange} · {creator.location}
                             </span>
                           </span>
-                          {invited && <span className="crm-tag">Invited</span>}
+                          {invited && (
+                            <span className="crm-tag">
+                              {INVITE_STATUS_LABELS[
+                                campaignInvites.find(
+                                  (invite) =>
+                                    invite.creatorEmail.toLowerCase() ===
+                                    creator.email.toLowerCase(),
+                                )?.status ?? "sent"
+                              ]}
+                            </span>
+                          )}
                         </label>
                       </li>
                     );
@@ -292,7 +303,9 @@ export function InviteCreatorDrawer({
                         {invite.creatorName !== invite.creatorEmail.split("@")[0] && (
                           <span className="invite-external-sent-name">{invite.creatorName}</span>
                         )}
-                        <span className="invite-external-sent-status">{invite.status}</span>
+                        <span className="invite-external-sent-status">
+                          {INVITE_STATUS_LABELS[invite.status]}
+                        </span>
                       </li>
                     ))}
                   </ul>

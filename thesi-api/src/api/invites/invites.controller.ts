@@ -16,6 +16,7 @@ import {
 import {
   CreateCampaignInviteDto,
   CreatePlatformBrandInviteDto,
+  RespondCampaignInviteDto,
 } from './dto/invites.dto';
 import { InvitesService } from './invites.service';
 
@@ -33,6 +34,33 @@ export class InvitesController {
     @Query('campaignId') campaignId?: string,
   ) {
     const data = await this.invites.listCampaignInvites(user.sub, campaignId);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Get('campaign/received')
+  @ApiOperation({
+    summary: 'Get the current creator invite for a campaign (status)',
+  })
+  async getReceivedCampaignInvite(
+    @CurrentUser() user: AuthJwtPayload,
+    @Query('campaignId') campaignId: string,
+  ) {
+    const data = await this.invites.getReceivedCampaignInvite(
+      user.sub,
+      campaignId,
+    );
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('campaign/respond')
+  @ApiOperation({
+    summary: 'Creator accepts or declines a campaign invite',
+  })
+  async respondToCampaignInvite(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() dto: RespondCampaignInviteDto,
+  ) {
+    const data = await this.invites.respondToCampaignInvite(user.sub, dto);
     return { status: HttpStatus.OK, error: null, data };
   }
 

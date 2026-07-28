@@ -21,6 +21,7 @@ import {
   type BrandCampaignStatus,
 } from "@/lib/brand-campaigns/types";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
+import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 
 function toCampaignInput(campaign: BrandCampaign): CampaignInput {
@@ -354,7 +355,9 @@ export function CampaignDetailContent() {
                         )}
                       </span>
                       <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span>{invite.status}</span>
+                        <span className="crm-tag">
+                          {INVITE_STATUS_LABELS[invite.status]}
+                        </span>
                         {canPay && invite.creatorId && (
                           <button
                             type="button"
