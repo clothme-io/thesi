@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from 'src/api/auth/auth.module';
 import { BillingModule } from 'src/api/billing/billing.module';
 import { ConnectModule } from 'src/api/connect/connect.module';
+import { InvitesModule } from 'src/api/invites/invites.module';
 import { MarketplaceModule } from 'src/api/marketplace/marketplace.module';
 import { FILE_STORAGE } from 'src/shared/storage/file-storage.port';
 import { ConfigurableFileStorage } from 'src/shared/storage/file-storage';
@@ -11,7 +12,13 @@ import { CampaignsService } from './campaigns.service';
 import { PostgresCampaignRepository } from './postgres-campaign.repository';
 
 @Module({
-  imports: [AuthModule, MarketplaceModule, BillingModule, ConnectModule],
+  imports: [
+    AuthModule,
+    MarketplaceModule,
+    BillingModule,
+    ConnectModule,
+    InvitesModule,
+  ],
   controllers: [CampaignsController],
   providers: [
     CampaignsService,

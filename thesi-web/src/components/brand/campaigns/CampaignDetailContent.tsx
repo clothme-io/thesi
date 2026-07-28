@@ -335,6 +335,7 @@ export function CampaignDetailContent() {
                   const canPay =
                     Boolean(invite.creatorId) &&
                     !invite.external &&
+                    invite.status === "accepted" &&
                     payout?.status !== "transferred";
                   return (
                     <div className="crm-meta-row" key={invite.id}>

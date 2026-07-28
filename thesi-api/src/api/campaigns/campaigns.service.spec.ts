@@ -239,6 +239,7 @@ describe('CampaignsService', () => {
   };
   let stripe: { chargeOffSession: jest.Mock; createTransfer: jest.Mock };
   let connect: { getCreatorPayoutReadiness: jest.Mock };
+  let invites: { listCampaignInvites: jest.Mock };
 
   beforeEach(() => {
     repository = new FakeCampaignRepository();
@@ -264,12 +265,24 @@ describe('CampaignsService', () => {
         accountId: 'acct_local_creator',
       }),
     };
+    invites = {
+      listCampaignInvites: jest.fn().mockResolvedValue([
+        {
+          id: 'invite-1',
+          campaignId: 'campaign-1',
+          creatorId: 'creator-9',
+          external: false,
+          status: 'accepted',
+        },
+      ]),
+    };
     service = new CampaignsService(
       repository,
       storage,
       billing as unknown as BillingService,
       stripe as unknown as StripeService,
       connect as unknown as ConnectService,
+      invites as never,
     );
   });
 
@@ -394,6 +407,15 @@ describe('CampaignsService', () => {
         payment: { model: 'flat_rate', flatRateCents: 80_000 },
       }),
     );
+    invites.listCampaignInvites.mockResolvedValue([
+      {
+        id: 'invite-1',
+        campaignId: campaign.id,
+        creatorId: 'creator-9',
+        external: false,
+        status: 'accepted',
+      },
+    ]);
 
     const payout = await service.payCreator('brand-1', campaign.id, {
       creatorUserId: 'creator-9',
@@ -407,6 +429,27 @@ describe('CampaignsService', () => {
         destinationAccountId: 'acct_local_creator',
       }),
     );
+    expect(billing.recordPlatformFeeInvoice).not.toHaveBeenCalled();
+  });
+
+  it('blocks payouts until the creator accepts the campaign invite', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create('brand-1', sampleCampaign());
+    invites.listCampaignInvites.mockResolvedValue([
+      {
+        id: 'invite-1',
+        campaignId: campaign.id,
+        creatorId: 'creator-9',
+        external: false,
+        status: 'sent',
+      },
+    ]);
+
+    await expect(
+      service.payCreator('brand-1', campaign.id, {
+        creatorUserId: 'creator-9',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('blocks payouts when the creator is not Connect-ready', async () => {
@@ -417,6 +460,15 @@ describe('CampaignsService', () => {
       reason: 'Creator must finish Stripe payout setup',
     });
     const campaign = await service.create('brand-1', sampleCampaign());
+    invites.listCampaignInvites.mockResolvedValue([
+      {
+        id: 'invite-1',
+        campaignId: campaign.id,
+        creatorId: 'creator-9',
+        external: false,
+        status: 'accepted',
+      },
+    ]);
 
     await expect(
       service.payCreator('brand-1', campaign.id, {
