@@ -7,17 +7,19 @@ import {
 } from './platform-fee.util';
 
 describe('calculatePlatformFeeCents', () => {
-  it('charges 2% when below $250 cap', () => {
-    expect(calculatePlatformFeeCents(1_000_000)).toBe(20_000); // 2% of $10,000
+  it('charges 2% when below $79 cap', () => {
     expect(calculatePlatformFeeCents(100_000)).toBe(2_000); // 2% of $1,000
+    expect(calculatePlatformFeeCents(200_000)).toBe(4_000); // 2% of $2,000
+    expect(calculatePlatformFeeCents(395_000)).toBe(7_900); // 2% of $3,950 = break-even
   });
 
-  it('caps at $250 when 2% exceeds cap', () => {
+  it('caps at $79 when 2% exceeds cap', () => {
+    expect(calculatePlatformFeeCents(1_000_000)).toBe(PLATFORM_FEE_CAP_CENTS); // 2% of $10k = $200 → cap
     expect(calculatePlatformFeeCents(20_000_000)).toBe(PLATFORM_FEE_CAP_CENTS); // 2% of $200k = $4k → cap
-    expect(calculatePlatformFeeCents(1_250_001)).toBe(PLATFORM_FEE_CAP_CENTS); // just over break-even
+    expect(calculatePlatformFeeCents(395_001)).toBe(PLATFORM_FEE_CAP_CENTS); // just over break-even
   });
 
-  it('charges exactly $250 at break-even payout', () => {
+  it('charges exactly $79 at break-even payout', () => {
     const breakEven = PLATFORM_FEE_CAP_CENTS / PLATFORM_FEE_RATE;
     expect(calculatePlatformFeeCents(breakEven)).toBe(PLATFORM_FEE_CAP_CENTS);
   });

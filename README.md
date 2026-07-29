@@ -65,7 +65,7 @@ npm run dev
 
 ## Platform fee
 
-Campaign platform fee = **min($250, 2% of total brand-to-creator payout)**.
+Campaign platform fee = **min($79, 2% of total brand-to-creator payout)**.
 
 Implemented in `thesi-api/src/shared/platform-fee/platform-fee.util.ts`.
 

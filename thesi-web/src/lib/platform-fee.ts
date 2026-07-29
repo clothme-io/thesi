@@ -1,4 +1,4 @@
-export const PLATFORM_FEE_CAP_CENTS = 25_000;
+export const PLATFORM_FEE_CAP_CENTS = 7_900;
 export const PLATFORM_FEE_RATE = 0.02;
 
 export function calculatePlatformFeeCents(totalPayoutCents: number): number {
