@@ -74,7 +74,11 @@ vi.mock("@/lib/brand-campaigns/storage", async () => {
       updateCampaign,
       reload: vi.fn(),
       createCampaign: vi.fn(),
-      uploadCampaignFile: vi.fn(),
+      uploadCampaignFile: vi.fn().mockResolvedValue({
+        id: "file-1",
+        name: "brief.pdf",
+        sizeLabel: "1 KB",
+      }),
       deleteCampaignFile: vi.fn(),
     }),
   };
@@ -187,5 +191,35 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         }),
       );
     });
+  });
+
+  it("saves edited draft fields", async () => {
+    activeCampaign = buildCampaign({
+      status: "draft",
+      name: "Monthly Retainer",
+      brief: "Old brief",
+      postToMarketplace: true,
+    });
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    const user = userEvent.setup();
+    render(<CampaignDetailContent />);
+
+    const nameInput = await screen.findByDisplayValue("Monthly Retainer");
+    await user.clear(nameInput);
+    await user.type(nameInput, "Updated Retainer");
+
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() => {
+      expect(updateCampaign).toHaveBeenCalledWith(
+        "campaign-1",
+        expect.objectContaining({
+          status: "draft",
+          name: "Updated Retainer",
+          brief: "Old brief",
+        }),
+      );
+    });
+    expect(await screen.findByText("Draft saved")).toBeInTheDocument();
   });
 });

@@ -116,13 +116,46 @@
   transition: background 0.12s;
 }
 
+.crm-table tbody tr:nth-child(odd) {
+  background: #fff;
+}
+
+.crm-table tbody tr:nth-child(even) {
+  background: #f3f6f8;
+}
+
 .crm-table tbody tr:hover {
-  background: var(--surface);
+  background: #e8eef2;
 }
 
 .crm-contact-name {
   font-weight: 700;
   color: var(--ink);
+}
+
+.campaign-file-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campaign-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.campaign-file-item--pending {
+  background: #f0f7ff;
+  border-color: #c5daf0;
 }
 
 .crm-contact-sub {

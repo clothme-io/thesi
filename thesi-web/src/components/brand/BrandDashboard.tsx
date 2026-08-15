@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useBrandCampaigns, getBrandDashboardMetrics } from "@/lib/brand-campaigns/storage";
+import { useBrandCampaigns, getBrandDashboardMetrics, campaignMarketplaceLabel } from "@/lib/brand-campaigns/storage";
 import { getCampaignBudgetLabel } from "@/lib/brand-campaigns/types";
 import { useAuth } from "@/context/AuthProvider";
 
@@ -73,7 +73,7 @@ export function BrandDashboard() {
                       {campaign.startDate} → {campaign.endDate}
                     </td>
                     <td>{getCampaignBudgetLabel(campaign)}</td>
-                    <td>{campaign.postToMarketplace ? "Posted" : "Private"}</td>
+                    <td>{campaignMarketplaceLabel(campaign)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -352,7 +352,7 @@ describe('CampaignsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('collects a platform fee when activating a campaign', async () => {
+  it('temporarily skips platform fee when activating a campaign', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     const campaign = await service.create(
       'brand-1',
@@ -364,26 +364,44 @@ describe('CampaignsService', () => {
     );
 
     expect(campaign.status).toBe('active');
-    expect(stripe.chargeOffSession).toHaveBeenCalledWith(
-      expect.objectContaining({ amountCents: 2_000 }),
-    );
-    expect(repository.fees.get(campaign.id)?.status).toBe('paid');
-    expect(billing.recordPlatformFeeInvoice).toHaveBeenCalled();
+    expect(stripe.chargeOffSession).not.toHaveBeenCalled();
+    expect(repository.fees.has(campaign.id)).toBe(false);
+    expect(billing.recordPlatformFeeInvoice).not.toHaveBeenCalled();
   });
 
-  it('requires a default card when Stripe charge context is missing', async () => {
+  it('does not collect a platform fee when saving a draft with marketplace enabled', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     billing.resolveChargeContext.mockResolvedValue(null);
 
-    await expect(
-      service.create(
-        'brand-1',
-        sampleCampaign({
-          status: 'active',
-          payment: { model: 'flat_rate', flatRateCents: 50_000 },
-        }),
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        status: 'draft',
+        postToMarketplace: true,
+        payment: { model: 'flat_rate', flatRateCents: 100_000 },
+      }),
+    );
+
+    expect(campaign.status).toBe('draft');
+    expect(campaign.postToMarketplace).toBe(true);
+    expect(stripe.chargeOffSession).not.toHaveBeenCalled();
+    expect(repository.fees.has(campaign.id)).toBe(false);
+  });
+
+  it('allows activate without a default card while platform fee is disabled', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    billing.resolveChargeContext.mockResolvedValue(null);
+
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        status: 'active',
+        payment: { model: 'flat_rate', flatRateCents: 50_000 },
+      }),
+    );
+
+    expect(campaign.status).toBe('active');
+    expect(stripe.chargeOffSession).not.toHaveBeenCalled();
   });
 
   it('charges the brand and transfers to a ready creator', async () => {

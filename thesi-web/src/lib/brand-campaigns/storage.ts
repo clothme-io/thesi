@@ -178,7 +178,11 @@ export function getCampaignById(
 export function getBrandDashboardMetrics(data: BrandCampaignData) {
   const active = data.campaigns.filter((c) => c.status === "active");
   const draft = data.campaigns.filter((c) => c.status === "draft");
-  const posted = data.campaigns.filter((c) => c.postToMarketplace);
+  // Drafts can have postToMarketplace=true as intent ("when published") but are
+  // not listed on the marketplace until status is active (or later lifecycle).
+  const posted = data.campaigns.filter(
+    (c) => c.postToMarketplace && c.status !== "draft",
+  );
   return {
     total: data.campaigns.length,
     active: active.length,
@@ -186,4 +190,10 @@ export function getBrandDashboardMetrics(data: BrandCampaignData) {
     posted: posted.length,
     closingSoon: active.filter((c) => c.endDate <= "2026-08-01").length,
   };
+}
+
+export function campaignMarketplaceLabel(campaign: BrandCampaign): string {
+  if (!campaign.postToMarketplace) return "Private";
+  if (campaign.status === "draft") return "When published";
+  return "Posted";
 }

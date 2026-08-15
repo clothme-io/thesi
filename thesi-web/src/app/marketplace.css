@@ -162,6 +162,112 @@
   margin-bottom: 16px;
 }
 
+.marketplace-panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.marketplace-panel h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.marketplace-section-block {
+  margin-top: 28px;
+}
+
+.marketplace-section-block:first-of-type {
+  margin-top: 8px;
+}
+
+.marketplace-section-block h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.marketplace-pay-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f0f7ff 0%, #eef6f2 100%);
+  border: 1px solid #d5e4f2;
+}
+
+.marketplace-pay-callout-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.marketplace-pay-callout-value {
+  display: block;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.marketplace-criteria-grid {
+  margin: 12px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.marketplace-criteria-item {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.marketplace-criteria-item dt {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.marketplace-criteria-item dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.marketplace-link-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.marketplace-applicant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.marketplace-applicant-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
 .marketplace-tag {
   padding: 4px 10px;
   border-radius: 8px;
@@ -227,6 +333,10 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.marketplace-detail-side .marketplace-panel {
+  margin: 0;
 }
 
 .marketplace-toast {

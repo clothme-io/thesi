@@ -56,20 +56,24 @@ export function resolveListingStatus(
 }
 
 function buildRequirements(campaign: CampaignRecord): string[] {
-  const reqs: string[] = [];
-  if (campaign.requirements.niches.length) {
-    reqs.push(...campaign.requirements.niches);
+  const rows: string[] = [];
+  const { niches, minFollowersRange, platforms, location } =
+    campaign.requirements;
+  if (niches.length) {
+    rows.push(`Niches: ${niches.join(', ')}`);
   }
-  if (campaign.requirements.minFollowersRange) {
-    reqs.push(`${campaign.requirements.minFollowersRange} followers`);
+  if (minFollowersRange?.trim()) {
+    rows.push(`Minimum followers: ${minFollowersRange.trim()}`);
   }
-  if (campaign.requirements.platforms.length) {
-    reqs.push(...campaign.requirements.platforms);
+  if (platforms.length) {
+    rows.push(`Platforms: ${platforms.join(', ')}`);
   }
-  if (campaign.requirements.location) {
-    reqs.push(campaign.requirements.location);
+  if (location?.trim()) {
+    rows.push(`Location: ${location.trim()}`);
   }
-  return reqs.length ? reqs : ['See campaign brief'];
+  return rows.length
+    ? rows
+    : ['See campaign brief for full creator criteria.'];
 }
 
 function campaignPaymentToListingPayment(

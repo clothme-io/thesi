@@ -430,7 +430,10 @@ export class CampaignsService {
   }
 
   private requiresPlatformFee(dto: UpsertCampaignDto): boolean {
-    return dto.status === 'active' || dto.postToMarketplace;
+    // Temporarily disabled — payment UX removed from create/publish for now.
+    // Re-enable: return dto.status === 'active';
+    void dto;
+    return false;
   }
 
   private async collectPlatformFee(

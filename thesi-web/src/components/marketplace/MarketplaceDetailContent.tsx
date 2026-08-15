@@ -14,6 +14,7 @@ import {
   respondToListingApplication,
 } from "@/lib/marketplace/storage";
 import { listingInviteCampaignId, listingToInviteCriteria } from "@/lib/marketplace/invite-criteria";
+import { requirementRowsFromListing } from "@/lib/marketplace/requirements";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
@@ -102,6 +103,8 @@ export function MarketplaceDetailContent() {
   const brandName = session?.user.fullName ?? listing.brandName;
   const inviteCampaignId = listingInviteCampaignId(listing);
   const invites = isBrand ? getInvitesForCampaign(inviteData, inviteCampaignId) : [];
+  const requirementRows = requirementRowsFromListing(listing);
+  const paymentSummary = formatListingPayment(listing.payment);
 
   const refreshInvites = () => {
     void reloadInvites(inviteCampaignId);
@@ -243,7 +246,7 @@ export function MarketplaceDetailContent() {
         )}
         <div className="marketplace-detail-grid">
           <div className="marketplace-detail-main">
-            <section className="workspace-section">
+            <section className="marketplace-panel">
               <div className="marketplace-detail-badges">
                 <span className={`marketplace-status marketplace-status--${listing.status}`}>
                   {LISTING_STATUS_LABELS[listing.status]}
@@ -252,20 +255,41 @@ export function MarketplaceDetailContent() {
                   {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??
                     listing.campaignType}
                 </span>
-                <span className="marketplace-tag">{LISTING_TYPE_LABELS[listing.type]}</span>
-                <span className="marketplace-tag">{PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}</span>
+                <span className="marketplace-tag">
+                  {LISTING_TYPE_LABELS[listing.type]}
+                </span>
               </div>
 
-              <h3>Brief</h3>
-              <p className="marketplace-brief">{listing.brief}</p>
+              <div className="marketplace-pay-callout">
+                <div>
+                  <span className="marketplace-pay-callout-label">Creator payout</span>
+                  <strong className="marketplace-pay-callout-value">
+                    {paymentSummary}
+                  </strong>
+                  <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
+                    {PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}
+                    {listing.payment.notes ? ` · ${listing.payment.notes}` : ""}
+                  </p>
+                </div>
+              </div>
 
-              <h3 style={{ marginTop: 24 }}>Deliverables</h3>
-              <p>{listing.deliverables}</p>
+              <div className="marketplace-section-block">
+                <h3>Campaign brief</h3>
+                <p className="marketplace-brief">{listing.brief || "No brief provided."}</p>
+              </div>
+
+              <div className="marketplace-section-block">
+                <h3>What you’ll create</h3>
+                <p>{listing.deliverables || "See brief for deliverables."}</p>
+              </div>
 
               {(listing.exampleVideoLinks?.length ?? 0) > 0 && (
-                <>
-                  <h3 style={{ marginTop: 24 }}>Example videos</h3>
-                  <ul className="marketplace-requirements">
+                <div className="marketplace-section-block">
+                  <h3>Example videos</h3>
+                  <p className="workspace-hint" style={{ marginTop: 0 }}>
+                    Reference style and quality the brand is looking for.
+                  </p>
+                  <ul className="marketplace-link-list">
                     {listing.exampleVideoLinks.map((link) => (
                       <li key={link}>
                         <a href={link} target="_blank" rel="noreferrer">
@@ -274,41 +298,51 @@ export function MarketplaceDetailContent() {
                       </li>
                     ))}
                   </ul>
-                </>
+                </div>
               )}
 
-              <h3 style={{ marginTop: 24 }}>Requirements</h3>
-              <ul className="marketplace-requirements">
-                {listing.requirements.map((req) => (
-                  <li key={req}>{req}</li>
-                ))}
-              </ul>
-
-              <h3 style={{ marginTop: 24 }}>Files</h3>
-              {listing.files.length === 0 ? (
-                <p className="crm-contact-sub">No files attached.</p>
-              ) : (
-                <ul className="marketplace-files">
-                  {listing.files.map((file) => (
-                    <li key={file.id} className="marketplace-file">
-                      <span className="marketplace-file-icon" aria-hidden="true">
-                        📎
-                      </span>
-                      <span>
-                        <strong>{file.name}</strong>
-                        <small>{file.sizeLabel}</small>
-                      </span>
-                      <button type="button" className="inbox-btn-text" disabled>
-                        Download
-                      </button>
-                    </li>
+              <div className="marketplace-section-block">
+                <h3>Who should apply</h3>
+                <p className="workspace-hint" style={{ marginTop: 0 }}>
+                  Creator criteria for this campaign.
+                </p>
+                <dl className="marketplace-criteria-grid">
+                  {requirementRows.map((row) => (
+                    <div className="marketplace-criteria-item" key={`${row.label}-${row.value}`}>
+                      <dt>{row.label}</dt>
+                      <dd>{row.value}</dd>
+                    </div>
                   ))}
-                </ul>
-              )}
+                </dl>
+              </div>
+
+              <div className="marketplace-section-block">
+                <h3>Files from the brand</h3>
+                {listing.files.length === 0 ? (
+                  <p className="crm-contact-sub">No files attached.</p>
+                ) : (
+                  <ul className="marketplace-files">
+                    {listing.files.map((file) => (
+                      <li key={file.id} className="marketplace-file">
+                        <span className="marketplace-file-icon" aria-hidden="true">
+                          📎
+                        </span>
+                        <span>
+                          <strong>{file.name}</strong>
+                          <small>{file.sizeLabel}</small>
+                        </span>
+                        <button type="button" className="inbox-btn-text" disabled>
+                          Download
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
               {isBrand && (
-                <>
-                  <h3 style={{ marginTop: 24 }}>Applicants ({applicants.length})</h3>
+                <div className="marketplace-section-block">
+                  <h3>Applicants ({applicants.length})</h3>
                   {applicantsError && (
                     <p className="workspace-hint" style={{ marginBottom: 12 }}>
                       {applicantsError}
@@ -319,16 +353,9 @@ export function MarketplaceDetailContent() {
                       No applications yet. Creators who apply will appear here with their pitch.
                     </p>
                   ) : (
-                    <ul className="marketplace-requirements" style={{ listStyle: "none", padding: 0 }}>
+                    <ul className="marketplace-applicant-list">
                       {applicants.map((application) => (
-                        <li
-                          key={application.id}
-                          style={{
-                            marginBottom: 16,
-                            paddingBottom: 16,
-                            borderBottom: "1px solid var(--line, #e5e5e5)",
-                          }}
-                        >
+                        <li key={application.id} className="marketplace-applicant-card">
                           <div className="crm-meta-row" style={{ marginBottom: 8 }}>
                             <span>
                               <strong>{application.creatorName}</strong>
@@ -374,19 +401,19 @@ export function MarketplaceDetailContent() {
                       ))}
                     </ul>
                   )}
-                </>
+                </div>
               )}
             </section>
 
-            <section className="workspace-section">
-              <h3>Payment</h3>
+            <section className="marketplace-panel">
+              <h3>Payment details</h3>
               <div className="crm-meta-row">
                 <span>Structure</span>
                 <span>{PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}</span>
               </div>
               <div className="crm-meta-row">
-                <span>Summary</span>
-                <span className="crm-money">{formatListingPayment(listing.payment)}</span>
+                <span>Payout summary</span>
+                <span className="crm-money">{paymentSummary}</span>
               </div>
               {listing.payment.structure === "milestone" && listing.payment.milestones && (
                 <div className="marketplace-milestones">
@@ -450,18 +477,18 @@ export function MarketplaceDetailContent() {
           </div>
 
           <aside className="marketplace-detail-side">
-            <section className="workspace-section">
-              <h3>Campaign details</h3>
+            <section className="marketplace-panel">
+              <h3>Timeline & slots</h3>
               <div className="crm-meta-row">
                 <span>Brand</span>
                 <span>{listing.brandName}</span>
               </div>
               <div className="crm-meta-row">
-                <span>Start date</span>
+                <span>Campaign starts</span>
                 <span>{listing.startDate}</span>
               </div>
               <div className="crm-meta-row">
-                <span>End date</span>
+                <span>Campaign ends</span>
                 <span>{listing.endDate}</span>
               </div>
               <div className="crm-meta-row">
@@ -469,21 +496,17 @@ export function MarketplaceDetailContent() {
                 <span>{listing.applicationDeadline}</span>
               </div>
               <div className="crm-meta-row">
-                <span>Location</span>
-                <span>{listing.remoteOk ? `Remote · ${listing.location}` : listing.location}</span>
-              </div>
-              <div className="crm-meta-row">
-                <span>Slots</span>
+                <span>Open slots</span>
                 <span>{listing.slots}</span>
               </div>
               <div className="crm-meta-row">
-                <span>Applicants</span>
+                <span>Applicants so far</span>
                 <span>{listing.applicantsCount}</span>
               </div>
             </section>
 
             {listing.brandId && !isBrand && (
-              <section className="workspace-section">
+              <section className="marketplace-panel">
                 <h3>Brand CRM</h3>
                 <p className="crm-contact-sub" style={{ marginBottom: 12 }}>
                   This brand is in your CRM. View their profile or pipeline deal.
@@ -495,7 +518,7 @@ export function MarketplaceDetailContent() {
             )}
 
             {isBrand && (
-              <section className="workspace-section">
+              <section className="marketplace-panel">
                 <h3>Invites sent</h3>
                 {invites.length === 0 ? (
                   <p className="crm-contact-sub">No creator invites sent for this listing yet.</p>

@@ -21,18 +21,53 @@ const NICHE_KEYWORDS = [
 ];
 
 export function listingToInviteCriteria(listing: MarketplaceListing): CampaignInviteCriteria {
-  const reqText = listing.requirements.join(" ");
-  const followerMatch = reqText.match(/\d+k\+?/i);
+  const niches: string[] = [];
+  let minFollowersRange = "";
+  let location = listing.remoteOk ? listing.location || "Remote" : listing.location;
+  let platforms = TYPE_PLATFORMS[listing.type] ?? [];
 
-  const niches = NICHE_KEYWORDS.filter((niche) =>
-    listing.requirements.some((req) => req.toLowerCase().includes(niche.toLowerCase())),
-  );
+  for (const req of listing.requirements) {
+    const labeled = req.match(/^([^:]+):\s*(.+)$/);
+    if (labeled) {
+      const label = labeled[1].trim().toLowerCase();
+      const value = labeled[2].trim();
+      if (label.startsWith("niche")) {
+        niches.push(
+          ...value
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean),
+        );
+      } else if (label.includes("follower")) {
+        minFollowersRange = value;
+      } else if (label.startsWith("platform")) {
+        platforms = value
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean);
+      } else if (label.startsWith("location")) {
+        location = value;
+      }
+      continue;
+    }
+
+    const followerMatch = req.match(/(\d+k?\+?)\s*followers?/i);
+    if (followerMatch) {
+      minFollowersRange = followerMatch[1];
+      continue;
+    }
+
+    const matchedNiche = NICHE_KEYWORDS.find((niche) =>
+      req.toLowerCase().includes(niche.toLowerCase()),
+    );
+    if (matchedNiche) niches.push(matchedNiche);
+  }
 
   return {
     niches,
-    minFollowersRange: followerMatch?.[0] ?? "",
-    location: listing.remoteOk ? listing.location || "Remote" : listing.location,
-    platforms: TYPE_PLATFORMS[listing.type] ?? [],
+    minFollowersRange,
+    location,
+    platforms,
   };
 }
 

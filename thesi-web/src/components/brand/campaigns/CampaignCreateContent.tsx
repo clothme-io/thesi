@@ -100,6 +100,7 @@ export function CampaignCreateContent() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
   const [attachedFiles, setAttachedFiles] = useState<
     Array<{ id: string; name: string; sizeLabel: string }>
   >([]);
@@ -150,11 +151,10 @@ export function CampaignCreateContent() {
   };
 
   const saveDraft = async (): Promise<{ id: string; name: string }> => {
-    if (draftRef.current) {
-      await flushPendingUploads(draftRef.current.id);
-      return draftRef.current;
-    }
-    const campaign = await createCampaign(buildCampaignPayload("draft"));
+    const payload = buildCampaignPayload("draft");
+    const campaign = draftRef.current
+      ? await updateCampaign(draftRef.current.id, payload)
+      : await createCampaign(payload);
     const context = { id: campaign.id, name: campaign.name };
     draftRef.current = context;
     setInviteContext(context);
@@ -165,8 +165,10 @@ export function CampaignCreateContent() {
   const handleSaveDraft = async () => {
     setSaving(true);
     setError("");
+    setSaveMessage("");
     try {
-      await saveDraft();
+      const context = await saveDraft();
+      setSaveMessage(`Draft saved — ${context.name}`);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -178,29 +180,21 @@ export function CampaignCreateContent() {
     }
   };
 
-  const handleCreate = async () => {
+  const handlePublish = async () => {
     setSaving(true);
     setError("");
+    setSaveMessage("");
     const payload = buildCampaignPayload("active");
     const userId = session?.user.id ?? "dev-user-1";
 
     try {
-      if (inviteContext) {
-        const campaign = await updateCampaign(inviteContext.id, payload);
-        const uploaded = await flushPendingUploads(campaign.id);
-        await publishCampaignToMarketplace(
-          {
-            ...campaign,
-            files: [...uploaded, ...campaign.files],
-          },
-          userId,
-          brandName,
-          authenticatedRequest,
-        );
-        router.push(`/app/campaigns/${campaign.id}`);
-        return;
-      }
-      const campaign = await createCampaign(payload);
+      const existingId = draftRef.current?.id ?? inviteContext?.id;
+      const campaign = existingId
+        ? await updateCampaign(existingId, payload)
+        : await createCampaign(payload);
+      const context = { id: campaign.id, name: campaign.name };
+      draftRef.current = context;
+      setInviteContext(context);
       const uploaded = await flushPendingUploads(campaign.id);
       await publishCampaignToMarketplace(
         {
@@ -216,7 +210,7 @@ export function CampaignCreateContent() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Could not create campaign",
+          : "Could not publish campaign",
       );
     } finally {
       setSaving(false);
@@ -226,6 +220,7 @@ export function CampaignCreateContent() {
   const handleInvite = async () => {
     setSaving(true);
     setError("");
+    setSaveMessage("");
     try {
       const context = await saveDraft();
       setInviteContext(context);
@@ -250,18 +245,35 @@ export function CampaignCreateContent() {
           </Link>
           <h1 style={{ marginTop: 4 }}>New campaign</h1>
         </div>
-        <button
-          className="crm-btn-primary"
-          type="button"
-          onClick={handleSaveDraft}
-          disabled={saving}
-        >
-          Save draft
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            className="crm-btn-secondary"
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={saving}
+          >
+            {saving ? "Saving…" : "Save draft"}
+          </button>
+          <button
+            className="crm-btn-primary"
+            type="button"
+            onClick={handlePublish}
+            disabled={saving}
+          >
+            {saving ? "Working…" : "Publish"}
+          </button>
+        </div>
       </header>
       <div className="app-content">
         {(error || loadError) && (
-          <p className="workspace-hint">{error || loadError}</p>
+          <p className="workspace-hint" role="alert">
+            {error || loadError}
+          </p>
+        )}
+        {saveMessage && !error && (
+          <p className="workspace-hint" role="status">
+            {saveMessage}
+          </p>
         )}
         <div className="workspace-form">
           <section className="workspace-section">
@@ -453,16 +465,16 @@ export function CampaignCreateContent() {
                 <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
                   {feeCents > 0
                     ? feeCapped
-                      ? `Capped at ${formatCents(PLATFORM_FEE_CAP_CENTS)} (2% of creator payout).`
-                      : `2% of estimated creator payout (${formatCents(payoutCents)}).`
-                    : "Set a creator payout amount to calculate the activation fee."}
+                      ? `Preview: capped at ${formatCents(PLATFORM_FEE_CAP_CENTS)} (2% of creator payout).`
+                      : `Preview: 2% of estimated creator payout (${formatCents(payoutCents)}).`
+                    : "Set a creator payout amount to preview the future activation fee."}
                 </p>
                 <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
-                  Charged from your default card when you create/activate or post
-                  to the marketplace. Drafts are free.
+                  Payment is turned off for now — Publish will not charge your
+                  card.
                 </p>
               </div>
-              <span className="crm-tag">Due on activate</span>
+              <span className="crm-tag">Not charged yet</span>
             </div>
           </section>
 
@@ -488,22 +500,59 @@ export function CampaignCreateContent() {
                     const selected = Array.from(e.target.files ?? []);
                     if (selected.length === 0) return;
                     setPendingFiles((prev) => [...prev, ...selected]);
+                    setSaveMessage(
+                      selected.length === 1
+                        ? `Added ${selected[0].name} — save or publish to upload`
+                        : `Added ${selected.length} files — save or publish to upload`,
+                    );
                     e.target.value = "";
                   }}
                 />
               </label>
               {(pendingFiles.length > 0 || attachedFiles.length > 0) && (
                 <div className="workspace-field workspace-field--full">
-                  <span>Selected files</span>
-                  <ul className="workspace-hint" style={{ margin: 0, paddingLeft: 18 }}>
+                  <span>
+                    Files ({attachedFiles.length + pendingFiles.length})
+                  </span>
+                  <ul className="campaign-file-list">
                     {attachedFiles.map((file) => (
-                      <li key={file.id}>
-                        {file.name} ({file.sizeLabel})
+                      <li key={file.id} className="campaign-file-item">
+                        <div>
+                          <strong>{file.name}</strong>
+                          <span className="workspace-hint">
+                            {" "}
+                            · {file.sizeLabel}
+                          </span>
+                        </div>
+                        <span className="crm-tag">Uploaded</span>
                       </li>
                     ))}
-                    {pendingFiles.map((file) => (
-                      <li key={`${file.name}-${file.size}-${file.lastModified}`}>
-                        {file.name} (pending upload)
+                    {pendingFiles.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        className="campaign-file-item campaign-file-item--pending"
+                      >
+                        <div>
+                          <strong>{file.name}</strong>
+                          <span className="workspace-hint">
+                            {" "}
+                            · {(file.size / 1024).toFixed(1)} KB
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span className="crm-tag">Ready to upload</span>
+                          <button
+                            type="button"
+                            className="inbox-btn-text"
+                            onClick={() =>
+                              setPendingFiles((prev) =>
+                                prev.filter((_, i) => i !== index),
+                              )
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -522,16 +571,20 @@ export function CampaignCreateContent() {
               Invite creators
             </button>
             <button
-              className="crm-btn-primary"
+              className="crm-btn-secondary"
               type="button"
-              onClick={handleCreate}
+              onClick={handleSaveDraft}
               disabled={saving}
             >
-              {saving
-                ? "Working…"
-                : feeCents > 0
-                  ? `Pay ${formatCents(feeCents)} & create`
-                  : "Create campaign"}
+              {saving ? "Saving…" : "Save draft"}
+            </button>
+            <button
+              className="crm-btn-primary"
+              type="button"
+              onClick={handlePublish}
+              disabled={saving}
+            >
+              {saving ? "Working…" : "Publish"}
             </button>
           </div>
         </div>

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
-import { useBrandCampaigns } from "@/lib/brand-campaigns/storage";
+import { useBrandCampaigns, campaignMarketplaceLabel } from "@/lib/brand-campaigns/storage";
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_STATUS_LABELS,
@@ -21,6 +22,7 @@ const STATUS_FILTERS: Array<BrandCampaignStatus | "all"> = [
 ];
 
 export function CampaignsPageContent() {
+  const router = useRouter();
   const { authenticatedRequest } = useAuth();
   const { data, ready, error } = useBrandCampaigns(authenticatedRequest);
   const [query, setQuery] = useState("");
@@ -86,9 +88,28 @@ export function CampaignsPageContent() {
             </thead>
             <tbody>
               {campaigns.map((campaign) => (
-                <tr key={campaign.id}>
+                <tr
+                  key={campaign.id}
+                  className="crm-table-row-link"
+                  style={{ cursor: "pointer" }}
+                  tabIndex={0}
+                  role="link"
+                  aria-label={`Open campaign ${campaign.name}`}
+                  onClick={() => router.push(`/app/campaigns/${campaign.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(`/app/campaigns/${campaign.id}`);
+                    }
+                  }}
+                >
                   <td>
-                    <Link href={`/app/campaigns/${campaign.id}`}>{campaign.name}</Link>
+                    <Link
+                      href={`/app/campaigns/${campaign.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {campaign.name}
+                    </Link>
                   </td>
                   <td>
                     {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType] ??
@@ -99,7 +120,7 @@ export function CampaignsPageContent() {
                   <td>{campaign.startDate}</td>
                   <td>{campaign.endDate}</td>
                   <td>{getCampaignBudgetLabel(campaign)}</td>
-                  <td>{campaign.postToMarketplace ? "Posted" : "Private"}</td>
+                  <td>{campaignMarketplaceLabel(campaign)}</td>
                 </tr>
               ))}
             </tbody>

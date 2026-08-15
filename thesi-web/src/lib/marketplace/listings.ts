@@ -1,15 +1,9 @@
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
+import { buildLabeledRequirements } from "./requirements";
 import type { MarketplaceListing, MarketplacePayment } from "./types";
 
 function buildRequirements(campaign: BrandCampaign): string[] {
-  const reqs: string[] = [];
-  if (campaign.requirements.niches.length) reqs.push(...campaign.requirements.niches);
-  if (campaign.requirements.minFollowersRange) {
-    reqs.push(`${campaign.requirements.minFollowersRange} followers`);
-  }
-  if (campaign.requirements.platforms.length) reqs.push(...campaign.requirements.platforms);
-  if (campaign.requirements.location) reqs.push(campaign.requirements.location);
-  return reqs.length ? reqs : ["See campaign brief"];
+  return buildLabeledRequirements(campaign.requirements);
 }
 
 function campaignPaymentToListingPayment(campaign: BrandCampaign): MarketplacePayment {

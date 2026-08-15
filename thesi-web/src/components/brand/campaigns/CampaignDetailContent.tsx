@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
+import { toDateInputValue } from "@/lib/brand-campaigns/date";
 import {
   downloadCampaignFile,
   getCampaignById,
@@ -21,6 +22,11 @@ import {
   type BrandCampaignStatus,
 } from "@/lib/brand-campaigns/types";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
+import {
+  DraftCampaignEditForm,
+  draftFormToInput,
+  useDraftForm,
+} from "./DraftCampaignEditForm";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 
 function toCampaignInput(campaign: BrandCampaign): CampaignInput {
@@ -29,8 +35,8 @@ function toCampaignInput(campaign: BrandCampaign): CampaignInput {
     campaignType: campaign.campaignType,
     type: campaign.type,
     status: campaign.status,
-    startDate: campaign.startDate,
-    endDate: campaign.endDate,
+    startDate: toDateInputValue(campaign.startDate),
+    endDate: toDateInputValue(campaign.endDate),
     brief: campaign.brief,
     deliverables: campaign.deliverables,
     exampleVideoLinks: campaign.exampleVideoLinks,
@@ -59,17 +65,38 @@ const PAYOUT_STATUS_LABELS: Record<CreatorPayout["status"], string> = {
 
 export function CampaignDetailContent() {
   const { id } = useParams<{ id: string }>();
-  const { session, authenticatedRequest, authenticatedBinaryRequest } = useAuth();
-  const { data, ready, error, updateCampaign } = useBrandCampaigns(authenticatedRequest);
-  const { data: inviteData, ready: invitesReady, reload: reloadInvites } =
-    useInvites(authenticatedRequest);
+  const { session, authenticatedRequest, authenticatedBinaryRequest } =
+    useAuth();
+  const {
+    data,
+    ready,
+    error,
+    updateCampaign,
+    uploadCampaignFile,
+  } = useBrandCampaigns(authenticatedRequest);
+  const {
+    data: inviteData,
+    ready: invitesReady,
+    reload: reloadInvites,
+  } = useInvites(authenticatedRequest);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [downloadError, setDownloadError] = useState("");
   const [lifecycleError, setLifecycleError] = useState("");
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [payouts, setPayouts] = useState<CreatorPayout[]>([]);
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
+
+  const campaign = useMemo(
+    () => (ready && id ? getCampaignById(data, id) : null),
+    [ready, id, data],
+  );
+  const { form, setForm } = useDraftForm(
+    campaign?.status === "draft" ? campaign : null,
+  );
 
   const loadPayouts = useCallback(async () => {
     if (!id) return;
@@ -98,7 +125,6 @@ export function CampaignDetailContent() {
 
   if (!ready || !invitesReady) return null;
 
-  const campaign = getCampaignById(data, id);
   if (!campaign) {
     return (
       <div className="app-content">
@@ -110,6 +136,7 @@ export function CampaignDetailContent() {
     );
   }
 
+  const isDraft = campaign.status === "draft";
   const brandName = session?.user.fullName ?? "Your Brand";
   const invites = getInvitesForCampaign(inviteData, campaign.id);
   const payoutByCreator = new Map(
@@ -146,11 +173,17 @@ export function CampaignDetailContent() {
   }) => {
     setLifecycleBusy(true);
     setLifecycleError("");
+    setSaveMessage("");
     try {
+      const base =
+        isDraft && form
+          ? draftFormToInput(form)
+          : toCampaignInput(campaign);
       await updateCampaign(campaign.id, {
-        ...toCampaignInput(campaign),
+        ...base,
         ...patch,
       });
+      setPendingFiles([]);
     } catch (requestError) {
       setLifecycleError(
         requestError instanceof Error
@@ -159,6 +192,30 @@ export function CampaignDetailContent() {
       );
     } finally {
       setLifecycleBusy(false);
+    }
+  };
+
+  const saveDraft = async () => {
+    if (!form) return;
+    setSavingDraft(true);
+    setLifecycleError("");
+    setSaveMessage("");
+    try {
+      const payload = draftFormToInput(form);
+      await updateCampaign(campaign.id, payload);
+      for (const file of pendingFiles) {
+        await uploadCampaignFile(campaign.id, file);
+      }
+      setPendingFiles([]);
+      setSaveMessage("Draft saved");
+    } catch (requestError) {
+      setLifecycleError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not save draft",
+      );
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -176,19 +233,45 @@ export function CampaignDetailContent() {
     <>
       <header className="app-topbar">
         <div>
-          <Link href="/app/campaigns" className="auth-link" style={{ fontSize: 13 }}>
+          <Link
+            href="/app/campaigns"
+            className="auth-link"
+            style={{ fontSize: 13 }}
+          >
             ← Campaigns
           </Link>
-          <h1 style={{ marginTop: 4 }}>{campaign.name}</h1>
+          <h1 style={{ marginTop: 4 }}>
+            {isDraft && form ? form.name || campaign.name : campaign.name}
+          </h1>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          {isDraft && (
+            <button
+              type="button"
+              className="crm-btn-primary"
+              disabled={savingDraft || lifecycleBusy || !form}
+              onClick={() => void saveDraft()}
+            >
+              {savingDraft ? "Saving…" : "Save draft"}
+            </button>
+          )}
           {canPublish && (
             <button
               type="button"
               className="crm-btn-primary"
-              disabled={lifecycleBusy}
+              disabled={lifecycleBusy || savingDraft}
               onClick={() =>
-                void applyLifecycle({ status: "active", postToMarketplace: true })
+                void applyLifecycle({
+                  status: "active",
+                  postToMarketplace: true,
+                })
               }
             >
               {campaign.status === "draft" ? "Publish" : "Post to marketplace"}
@@ -234,7 +317,11 @@ export function CampaignDetailContent() {
               Unpublish
             </button>
           )}
-          <button type="button" className="crm-btn-secondary" onClick={() => setInviteOpen(true)}>
+          <button
+            type="button"
+            className="crm-btn-secondary"
+            onClick={() => setInviteOpen(true)}
+          >
             Invite creators
           </button>
           <Link href="/app/campaigns/new" className="crm-btn-secondary">
@@ -243,211 +330,310 @@ export function CampaignDetailContent() {
         </div>
       </header>
       <div className="app-content">
-        {lifecycleError && (
-          <p className="workspace-hint" style={{ marginBottom: 16 }}>
-            {lifecycleError}
+        {(lifecycleError || error) && (
+          <p className="workspace-hint" style={{ marginBottom: 16 }} role="alert">
+            {lifecycleError || error}
           </p>
         )}
-        <div className="crm-detail-grid">
-          <div className="crm-detail-panel">
-            <h3>Campaign summary</h3>
-            <div className="crm-meta-row">
-              <span>Campaign type</span>
-              <span>
-                {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType] ??
-                  campaign.campaignType}
-              </span>
-            </div>
-            <div className="crm-meta-row">
-              <span>Content type</span>
-              <span>{BRAND_CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
-            </div>
-            <div className="crm-meta-row">
-              <span>Status</span>
-              <span>{BRAND_CAMPAIGN_STATUS_LABELS[campaign.status]}</span>
-            </div>
-            <div className="crm-meta-row">
-              <span>Timeline</span>
-              <span>
-                {campaign.startDate} → {campaign.endDate}
-              </span>
-            </div>
-            <div className="crm-meta-row">
-              <span>Marketplace</span>
-              <span>{campaign.postToMarketplace ? "Posted" : "Private invite only"}</span>
-            </div>
-            <h3 style={{ marginTop: 24 }}>Brief</h3>
-            <p>{campaign.brief}</p>
-            <h3 style={{ marginTop: 24 }}>Deliverables</h3>
-            <p>{campaign.deliverables}</p>
-            {(campaign.exampleVideoLinks?.length ?? 0) > 0 && (
-              <>
-                <h3 style={{ marginTop: 24 }}>Example videos</h3>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {campaign.exampleVideoLinks.map((link) => (
-                    <li key={link}>
-                      <a href={link} target="_blank" rel="noreferrer">
-                        {link}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+        {saveMessage && !lifecycleError && (
+          <p className="workspace-hint" style={{ marginBottom: 16 }} role="status">
+            {saveMessage}
+          </p>
+        )}
 
-          <div>
-            <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
-              <h3>Creator criteria</h3>
-              <div className="crm-meta-row">
-                <span>Niches</span>
-                <span>{campaign.requirements.niches.join(", ") || "—"}</span>
-              </div>
-              <div className="crm-meta-row">
-                <span>Min followers</span>
-                <span>{campaign.requirements.minFollowersRange || "—"}</span>
-              </div>
-              <div className="crm-meta-row">
-                <span>Location</span>
-                <span>{campaign.requirements.location || "—"}</span>
-              </div>
-              <div className="crm-meta-row">
-                <span>Platforms</span>
-                <span>{campaign.requirements.platforms.join(", ") || "—"}</span>
-              </div>
-            </div>
-
-            <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
-              <h3>Invites sent</h3>
-              {payoutError && (
-                <p className="workspace-hint" style={{ marginBottom: 10 }}>
-                  {payoutError}
-                </p>
-              )}
-              {invites.length === 0 ? (
-                <p className="workspace-hint">No invites sent yet. Use Invite creators to match and reach out.</p>
-              ) : (
-                invites.map((invite) => {
-                  const payout = invite.creatorId
-                    ? payoutByCreator.get(invite.creatorId)
-                    : undefined;
-                  const canPay =
-                    Boolean(invite.creatorId) &&
-                    !invite.external &&
-                    payout?.status !== "transferred";
-                  return (
-                    <div className="crm-meta-row" key={invite.id}>
-                      <span>
-                        {invite.creatorName}
-                        {invite.external && (
-                          <span className="crm-tag" style={{ marginLeft: 8 }}>
-                            External
-                          </span>
-                        )}
-                        {payout && (
-                          <span className="crm-tag" style={{ marginLeft: 8 }}>
-                            {PAYOUT_STATUS_LABELS[payout.status]}
-                            {payout.status === "transferred"
-                              ? ` · ${formatMoney(payout.amountCents)}`
-                              : ""}
-                          </span>
-                        )}
-                      </span>
-                      <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span>{invite.status}</span>
-                        {canPay && invite.creatorId && (
-                          <button
-                            type="button"
-                            className="inbox-btn-text"
-                            disabled={payingCreatorId === invite.creatorId}
-                            onClick={() => void payCreator(invite.creatorId!)}
-                          >
-                            {payingCreatorId === invite.creatorId
-                              ? "Paying…"
-                              : "Pay creator"}
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
-              <h3>Payment</h3>
-              <div className="crm-meta-row">
-                <span>Model</span>
-                <span>{BRAND_CAMPAIGN_PAYMENT_LABELS[campaign.payment.model]}</span>
-              </div>
-              <div className="crm-meta-row">
-                <span>Budget</span>
-                <span>{getCampaignBudgetLabel(campaign)}</span>
-              </div>
-              {campaign.payment.milestones?.map((milestone) => (
-                <div className="crm-meta-row" key={milestone.id}>
-                  <span>{milestone.label}</span>
-                  <span>{formatMoney(milestone.amountCents)}</span>
+        {isDraft && form ? (
+          <div className="crm-detail-grid">
+            <DraftCampaignEditForm
+              campaign={campaign}
+              form={form}
+              onChange={setForm}
+              pendingFiles={pendingFiles}
+              onPendingFiles={setPendingFiles}
+            />
+            <div>
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                <h3>Status</h3>
+                <div className="crm-meta-row">
+                  <span>Status</span>
+                  <span>{BRAND_CAMPAIGN_STATUS_LABELS[campaign.status]}</span>
                 </div>
-              ))}
-              {campaign.payment.notes && (
                 <p className="workspace-hint" style={{ marginTop: 10 }}>
-                  {campaign.payment.notes}
+                  Edit fields below, then Save draft. Publish when you&apos;re
+                  ready to activate (platform fee may apply).
                 </p>
+              </div>
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                <h3>Invites sent</h3>
+                {invites.length === 0 ? (
+                  <p className="workspace-hint">
+                    No invites sent yet. Use Invite creators to match and reach
+                    out.
+                  </p>
+                ) : (
+                  invites.map((invite) => (
+                    <div className="crm-meta-row" key={invite.id}>
+                      <span>{invite.creatorName}</span>
+                      <span>{invite.status}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="crm-detail-grid">
+            <div className="crm-detail-panel">
+              <h3>Campaign summary</h3>
+              <div className="crm-meta-row">
+                <span>Campaign type</span>
+                <span>
+                  {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType] ??
+                    campaign.campaignType}
+                </span>
+              </div>
+              <div className="crm-meta-row">
+                <span>Content type</span>
+                <span>{BRAND_CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
+              </div>
+              <div className="crm-meta-row">
+                <span>Status</span>
+                <span>{BRAND_CAMPAIGN_STATUS_LABELS[campaign.status]}</span>
+              </div>
+              <div className="crm-meta-row">
+                <span>Timeline</span>
+                <span>
+                  {toDateInputValue(campaign.startDate)} →{" "}
+                  {toDateInputValue(campaign.endDate)}
+                </span>
+              </div>
+              <div className="crm-meta-row">
+                <span>Marketplace</span>
+                <span>
+                  {campaign.status === "draft"
+                    ? campaign.postToMarketplace
+                      ? "Will post when published"
+                      : "Private invite only"
+                    : campaign.postToMarketplace
+                      ? "Posted"
+                      : "Private invite only"}
+                </span>
+              </div>
+              <h3 style={{ marginTop: 24 }}>Brief</h3>
+              <p>{campaign.brief}</p>
+              <h3 style={{ marginTop: 24 }}>Deliverables</h3>
+              <p>{campaign.deliverables}</p>
+              {(campaign.exampleVideoLinks?.length ?? 0) > 0 && (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Example videos</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {campaign.exampleVideoLinks.map((link) => (
+                      <li key={link}>
+                        <a href={link} target="_blank" rel="noreferrer">
+                          {link}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </div>
 
-            <div className="crm-detail-panel">
-              <h3>Files</h3>
-              {downloadError && <p className="workspace-hint">{downloadError}</p>}
-              {campaign.files.length === 0 ? (
-                <p className="workspace-hint">No files uploaded.</p>
-              ) : (
-                campaign.files.map((file) => (
-                  <div className="crm-meta-row" key={file.id}>
-                    <span>
-                      {file.name}
-                      <span className="workspace-hint" style={{ marginLeft: 8 }}>
-                        {file.sizeLabel}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      className="inbox-btn-text"
-                      onClick={async () => {
-                        setDownloadError("");
-                        try {
-                          await downloadCampaignFile(
-                            authenticatedBinaryRequest,
-                            campaign.id,
-                            file,
-                          );
-                        } catch (requestError) {
-                          setDownloadError(
-                            requestError instanceof Error
-                              ? requestError.message
-                              : "Could not download file",
-                          );
-                        }
-                      }}
-                    >
-                      Download
-                    </button>
+            <div>
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                <h3>Creator criteria</h3>
+                <div className="crm-meta-row">
+                  <span>Niches</span>
+                  <span>{campaign.requirements.niches.join(", ") || "—"}</span>
+                </div>
+                <div className="crm-meta-row">
+                  <span>Min followers</span>
+                  <span>
+                    {campaign.requirements.minFollowersRange || "—"}
+                  </span>
+                </div>
+                <div className="crm-meta-row">
+                  <span>Location</span>
+                  <span>{campaign.requirements.location || "—"}</span>
+                </div>
+                <div className="crm-meta-row">
+                  <span>Platforms</span>
+                  <span>
+                    {campaign.requirements.platforms.join(", ") || "—"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                <h3>Invites sent</h3>
+                {payoutError && (
+                  <p className="workspace-hint" style={{ marginBottom: 10 }}>
+                    {payoutError}
+                  </p>
+                )}
+                {invites.length === 0 ? (
+                  <p className="workspace-hint">
+                    No invites sent yet. Use Invite creators to match and reach
+                    out.
+                  </p>
+                ) : (
+                  invites.map((invite) => {
+                    const payout = invite.creatorId
+                      ? payoutByCreator.get(invite.creatorId)
+                      : undefined;
+                    const canPay =
+                      Boolean(invite.creatorId) &&
+                      !invite.external &&
+                      payout?.status !== "transferred";
+                    return (
+                      <div className="crm-meta-row" key={invite.id}>
+                        <span>
+                          {invite.creatorName}
+                          {invite.external && (
+                            <span
+                              className="crm-tag"
+                              style={{ marginLeft: 8 }}
+                            >
+                              External
+                            </span>
+                          )}
+                          {payout && (
+                            <span
+                              className="crm-tag"
+                              style={{ marginLeft: 8 }}
+                            >
+                              {PAYOUT_STATUS_LABELS[payout.status]}
+                              {payout.status === "transferred"
+                                ? ` · ${formatMoney(payout.amountCents)}`
+                                : ""}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                          }}
+                        >
+                          <span>{invite.status}</span>
+                          {canPay && invite.creatorId && (
+                            <button
+                              type="button"
+                              className="inbox-btn-text"
+                              disabled={payingCreatorId === invite.creatorId}
+                              onClick={() => void payCreator(invite.creatorId!)}
+                            >
+                              {payingCreatorId === invite.creatorId
+                                ? "Paying…"
+                                : "Pay creator"}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                <h3>Payment</h3>
+                <div className="crm-meta-row">
+                  <span>Model</span>
+                  <span>
+                    {BRAND_CAMPAIGN_PAYMENT_LABELS[campaign.payment.model]}
+                  </span>
+                </div>
+                <div className="crm-meta-row">
+                  <span>Budget</span>
+                  <span>{getCampaignBudgetLabel(campaign)}</span>
+                </div>
+                {campaign.payment.milestones?.map((milestone) => (
+                  <div className="crm-meta-row" key={milestone.id}>
+                    <span>{milestone.label}</span>
+                    <span>{formatMoney(milestone.amountCents)}</span>
                   </div>
-                ))
-              )}
+                ))}
+                {campaign.payment.notes && (
+                  <p className="workspace-hint" style={{ marginTop: 10 }}>
+                    {campaign.payment.notes}
+                  </p>
+                )}
+              </div>
+
+              <div className="crm-detail-panel">
+                <h3>Files</h3>
+                {downloadError && (
+                  <p className="workspace-hint">{downloadError}</p>
+                )}
+                {campaign.files.length === 0 ? (
+                  <p className="workspace-hint">No files uploaded.</p>
+                ) : (
+                  campaign.files.map((file) => (
+                    <div className="crm-meta-row" key={file.id}>
+                      <span>
+                        {file.name}
+                        <span
+                          className="workspace-hint"
+                          style={{ marginLeft: 8 }}
+                        >
+                          {file.sizeLabel}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="inbox-btn-text"
+                        onClick={async () => {
+                          setDownloadError("");
+                          try {
+                            await downloadCampaignFile(
+                              authenticatedBinaryRequest,
+                              campaign.id,
+                              file,
+                            );
+                          } catch (requestError) {
+                            setDownloadError(
+                              requestError instanceof Error
+                                ? requestError.message
+                                : "Could not download file",
+                            );
+                          }
+                        }}
+                      >
+                        Download
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       <InviteCreatorDrawer
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
         campaignId={campaign.id}
-        campaignName={campaign.name}
+        campaignName={
+          isDraft && form ? form.name || campaign.name : campaign.name
+        }
         brandName={brandName}
-        criteria={campaign.requirements}
+        criteria={
+          isDraft && form
+            ? {
+                niches: form.niches
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+                minFollowersRange: form.minFollowersRange,
+                location: form.location,
+                platforms: form.platforms
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean),
+              }
+            : campaign.requirements
+        }
         onInvited={refreshInvites}
       />
     </>
