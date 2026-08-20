@@ -1,4 +1,57 @@
+# Local full stack: Postgres + Flyway + API + web.
+#
+#   ./scripts/docker-up.sh
+#   # or: docker compose up --build
+#
+# Web  http://localhost:3010
+# API  http://localhost:5010/v1
+# DB   localhost:5436  (database `thesi`; 5434 is often used by vendor-postgres)
+#
+# Flyway SQL is read from sibling ../clothme-db/databases/thesi/sql.
+
 services:
+  postgres:
+    image: postgres:16
+    container_name: thesi-postgres
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - thesi_postgres_data:/var/lib/postgresql/data
+      - ./scripts/docker-init-thesi.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - thesi_network
+    restart: unless-stopped
+
+  migrate:
+    image: flyway/flyway:10-alpine
+    container_name: thesi-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ${THESI_MIGRATIONS_DIR:-../clothme-db/databases/thesi/sql}:/flyway/sql:ro
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/thesi
+      FLYWAY_USER: postgres
+      FLYWAY_PASSWORD: postgres
+      FLYWAY_SCHEMAS: applications,thesi,public
+      FLYWAY_DEFAULT_SCHEMA: public
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+      FLYWAY_BASELINE_ON_MIGRATE: "true"
+      FLYWAY_VALIDATE_MIGRATION_NAMING: "true"
+    command: migrate
+    networks:
+      - thesi_network
+    restart: "no"
+
   thesi-api:
     container_name: thesi-api-local
     build:
@@ -10,21 +63,36 @@ services:
     env_file:
       - ./thesi-api/.env
     environment:
-      POSTGRES_HOST: host.docker.internal
-      POSTGRES_PORT: 5434
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: thesi
       POSTGRES_SSL_ENABLED: "false"
-      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:5434/thesi
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/thesi
       PORT: 5000
       NODE_ENV: development
       JWT_SECRET: thesi-local-jwt-secret-change-before-production
       JWT_REFRESH_SECRET: thesi-local-refresh-secret-change-before-production
       ADMIN_API_KEY: thesi-local-admin-key-change-before-production
       THESI_WEB_URL: http://localhost:3010
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5000/v1/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     volumes:
       - ./thesi-api:/usr/src/app
       - /usr/src/app/node_modules
@@ -45,12 +113,13 @@ services:
       THESI_API_URL: http://thesi-api:5000
       NEXT_PUBLIC_AUTH_DEV_MODE: "false"
       NODE_ENV: development
+    depends_on:
+      thesi-api:
+        condition: service_healthy
     volumes:
       - ./thesi-web:/usr/src/app
       - /usr/src/app/node_modules
       - /usr/src/app/.next
-    depends_on:
-      - thesi-api
     networks:
       - thesi_network
     restart: unless-stopped
@@ -58,3 +127,6 @@ services:
 networks:
   thesi_network:
     driver: bridge
+
+volumes:
+  thesi_postgres_data:

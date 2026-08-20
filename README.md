@@ -7,22 +7,29 @@ UGC business platform for the ClothME Creator Community.
 
 ## Quick start (Docker)
 
-**Requires clothme-db Postgres running first:**
+One command starts **Postgres, Flyway migrations, API, and web**. Migrations are read from sibling `../clothme-db/databases/thesi/sql`.
 
 ```bash
-cd ../clothme-db
-docker compose up -d postgres
-./scripts/migrate.sh thesi
+cd thesi
+chmod +x scripts/docker-up.sh
+./scripts/docker-up.sh
+```
 
-cd ../thesi
+Or:
+
+```bash
 cp thesi-api/.env.example thesi-api/.env
 cp thesi-web/.env.example thesi-web/.env.local
 docker compose up --build
 ```
 
+Stop with `docker compose down`. After new SQL migrations, recreate Flyway: `docker compose up --build --force-recreate migrate`.
+
+This stack publishes Postgres on **5436** so it does not collide with `vendor-postgres` / clothme-db on **5434**. API and web talk to Postgres on the Docker network (`postgres:5432`). Data lives in the `thesi_postgres_data` volume.
+
 ### Production images (local smoke test)
 
-Same DB prerequisite, then:
+Uses host Postgres (unified stack on `:5436`, or clothme-db / vendor on `:5434`). Then:
 
 ```bash
 cd thesi
@@ -35,7 +42,7 @@ docker compose -f docker-compose.prod.yml up --build
 | API        | http://localhost:5010/v1   |
 | Health     | http://localhost:5010/v1/health |
 | Swagger    | http://localhost:5010/v1/api |
-| Postgres   | localhost:5434 (clothme-db, DB `thesi`) |
+| Postgres   | localhost:5436 (Docker stack, DB `thesi`) |
 
 ## Local development (without Docker)
 
