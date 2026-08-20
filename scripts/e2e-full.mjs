@@ -396,6 +396,18 @@ async function main() {
     else fail('Campaign invite (Novu+inbox)', JSON.stringify(json));
   }
 
+  // Creator accepts campaign invite before payout
+  {
+    const { res, json } = await api('/invites/campaign/respond', {
+      method: 'POST',
+      token: creatorToken,
+      body: { campaignId, decision: 'accepted' },
+    });
+    if (res.ok && json?.data?.status === 'accepted')
+      ok('Creator accepts campaign invite');
+    else fail('Creator accepts campaign invite', JSON.stringify(json));
+  }
+
   // Creator inbox has invite
   {
     const { res, json } = await api('/inbox', { token: creatorToken });

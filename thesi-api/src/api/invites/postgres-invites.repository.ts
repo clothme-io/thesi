@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
@@ -101,6 +101,27 @@ export class PostgresInvitesRepository implements InvitesRepository {
     return row ? this.toCampaignInvite(row) : null;
   }
 
+  async findCampaignInviteForCreator(
+    campaignId: string,
+    creatorUserId: string,
+    creatorEmail: string,
+  ) {
+    const [row] = await this.db
+      .select()
+      .from(schema.campaignInvite)
+      .where(
+        and(
+          eq(schema.campaignInvite.campaignId, campaignId),
+          or(
+            eq(schema.campaignInvite.creatorUserId, creatorUserId),
+            sql`lower(${schema.campaignInvite.creatorEmail}) = ${creatorEmail.toLowerCase()}`,
+          ),
+        ),
+      )
+      .limit(1);
+    return row ? this.toCampaignInvite(row) : null;
+  }
+
   async createCampaignInvite(input: CreateCampaignInviteInput) {
     const [row] = await this.db
       .insert(schema.campaignInvite)
@@ -117,6 +138,23 @@ export class PostgresInvitesRepository implements InvitesRepository {
       })
       .returning();
     return this.toCampaignInvite(row);
+  }
+
+  async updateCampaignInviteStatus(
+    inviteId: string,
+    status: Exclude<InviteStatus, 'sent'>,
+  ) {
+    const [row] = await this.db
+      .update(schema.campaignInvite)
+      .set({ status })
+      .where(
+        and(
+          eq(schema.campaignInvite.id, inviteId),
+          eq(schema.campaignInvite.status, 'sent'),
+        ),
+      )
+      .returning();
+    return row ? this.toCampaignInvite(row) : null;
   }
 
   async setCampaignInviteNovuTransactionId(
@@ -187,6 +225,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
     return {
       id: row.id,
       campaignId: row.campaignId,
+      brandUserId: row.brandUserId,
       campaignName: row.campaignName,
       brandName: row.brandName,
       ...(row.creatorUserId ? { creatorId: row.creatorUserId } : {}),

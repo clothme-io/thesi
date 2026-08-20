@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -12,6 +13,7 @@ import { NovuService } from 'src/shared/novu/novu.service';
 import {
   INVITES_REPOSITORY,
   type CampaignInviteRecord,
+  type InviteStatus,
   type InvitesRepository,
   type PlatformBrandInviteRecord,
 } from './invites.repository';
@@ -38,6 +40,73 @@ export class InvitesService {
     }
     const invites = await this.invites.listCampaignInvites(userId, campaignId);
     return { invites };
+  }
+
+  async getReceivedCampaignInvite(
+    userId: string,
+    campaignId: string,
+  ): Promise<{ invite: CampaignInviteRecord | null }> {
+    const user = await this.requireUser(userId);
+    if (user.role !== 'creator') {
+      throw new ForbiddenException('Creator account required');
+    }
+    const invite = await this.invites.findCampaignInviteForCreator(
+      campaignId.trim(),
+      userId,
+      user.email,
+    );
+    return { invite };
+  }
+
+  async respondToCampaignInvite(
+    userId: string,
+    input: {
+      campaignId: string;
+      decision: Exclude<InviteStatus, 'sent'>;
+    },
+  ): Promise<CampaignInviteRecord> {
+    const user = await this.requireUser(userId);
+    if (user.role !== 'creator') {
+      throw new ForbiddenException('Creator account required');
+    }
+
+    const campaignId = input.campaignId.trim();
+    if (!campaignId) {
+      throw new BadRequestException('campaignId is required');
+    }
+    if (input.decision !== 'accepted' && input.decision !== 'declined') {
+      throw new BadRequestException('decision must be accepted or declined');
+    }
+
+    const invite = await this.invites.findCampaignInviteForCreator(
+      campaignId,
+      userId,
+      user.email,
+    );
+    if (!invite) {
+      throw new NotFoundException('Campaign invite not found');
+    }
+    if (invite.status !== 'sent') {
+      throw new ConflictException(`Invite already ${invite.status}`);
+    }
+
+    const updated = await this.invites.updateCampaignInviteStatus(
+      invite.id,
+      input.decision,
+    );
+    if (!updated) {
+      throw new ConflictException('Invite already responded to');
+    }
+
+    await this.inbox.notifyCampaignInviteResponse(userId, {
+      brandUserId: updated.brandUserId,
+      campaignId: updated.campaignId,
+      campaignName: updated.campaignName,
+      creatorName: updated.creatorName || user.fullName,
+      decision: input.decision,
+    });
+
+    return updated;
   }
 
   async createCampaignInvite(

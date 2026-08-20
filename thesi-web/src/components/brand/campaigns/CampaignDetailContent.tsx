@@ -22,6 +22,7 @@ import {
   type BrandCampaignStatus,
 } from "@/lib/brand-campaigns/types";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
+import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
 import {
   DraftCampaignEditForm,
   draftFormToInput,
@@ -373,7 +374,9 @@ export function CampaignDetailContent() {
                   invites.map((invite) => (
                     <div className="crm-meta-row" key={invite.id}>
                       <span>{invite.creatorName}</span>
-                      <span>{invite.status}</span>
+                      <span className="crm-tag">
+                        {INVITE_STATUS_LABELS[invite.status]}
+                      </span>
                     </div>
                   ))
                 )}
@@ -483,6 +486,7 @@ export function CampaignDetailContent() {
                     const canPay =
                       Boolean(invite.creatorId) &&
                       !invite.external &&
+                      invite.status === "accepted" &&
                       payout?.status !== "transferred";
                     return (
                       <div className="crm-meta-row" key={invite.id}>
@@ -515,7 +519,9 @@ export function CampaignDetailContent() {
                             alignItems: "center",
                           }}
                         >
-                          <span>{invite.status}</span>
+                          <span className="crm-tag">
+                            {INVITE_STATUS_LABELS[invite.status]}
+                          </span>
                           {canPay && invite.creatorId && (
                             <button
                               type="button"

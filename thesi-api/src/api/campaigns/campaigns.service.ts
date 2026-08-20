@@ -25,6 +25,10 @@ import {
   MARKETPLACE_CAMPAIGN_SYNC,
   type MarketplaceCampaignSync,
 } from '../marketplace/marketplace.repository';
+import {
+  INVITES_REPOSITORY,
+  type InvitesRepository,
+} from '../invites/invites.repository';
 import { toFileMeta } from './campaign-file.mapper';
 import type {
   CampaignPaymentDto,
@@ -61,6 +65,8 @@ export class CampaignsService {
     private readonly billing: BillingService,
     private readonly stripe: StripeService,
     private readonly connect: ConnectService,
+    @Inject(INVITES_REPOSITORY)
+    private readonly invites: InvitesRepository,
     @Optional()
     @Inject(MARKETPLACE_CAMPAIGN_SYNC)
     private readonly marketplaceSync?: MarketplaceCampaignSync,
@@ -199,6 +205,21 @@ export class CampaignsService {
       return existing;
     }
 
+    const invites = await this.invites.listCampaignInvites(userId, campaignId);
+    const invite = invites.find(
+      (item) => item.creatorId === creatorUserId && !item.external,
+    );
+    if (!invite) {
+      throw new BadRequestException(
+        'Invite this creator to the campaign before paying them',
+      );
+    }
+    if (invite.status !== 'accepted') {
+      throw new BadRequestException(
+        'Creator must accept the campaign invite before they can be paid',
+      );
+    }
+
     const readiness =
       await this.connect.getCreatorPayoutReadiness(creatorUserId);
     if (!readiness.ready || !readiness.accountId) {
@@ -255,12 +276,6 @@ export class CampaignsService {
           stripeDestinationAccountId: readiness.accountId,
           idempotencyKey,
           failureReason: null,
-        });
-        await this.billing.recordPlatformFeeInvoice({
-          brandUserId: userId,
-          campaignName: `${campaign.name} (creator payout)`,
-          feeCents: amountCents,
-          stripePaymentIntentId: paymentIntentId,
         });
       }
 

@@ -7,6 +7,7 @@ import type { InboxService } from 'src/api/inbox/inbox.service';
 import type { NovuService } from 'src/shared/novu/novu.service';
 import type {
   CampaignInviteRecord,
+  InviteStatus,
   InviteUser,
   InvitesRepository,
   PlatformBrandInviteRecord,
@@ -40,8 +41,8 @@ class FakeInvitesRepository implements InvitesRepository {
   async listCampaignInvites(brandUserId: string, campaignId?: string) {
     return this.campaignInvites.filter(
       (invite) =>
-        (!campaignId || invite.campaignId === campaignId) &&
-        this.campaignInvites.includes(invite),
+        invite.brandUserId === brandUserId &&
+        (!campaignId || invite.campaignId === campaignId),
     );
   }
 
@@ -51,6 +52,21 @@ class FakeInvitesRepository implements InvitesRepository {
         (invite) =>
           invite.campaignId === campaignId &&
           invite.creatorEmail.toLowerCase() === creatorEmail.toLowerCase(),
+      ) ?? null
+    );
+  }
+
+  async findCampaignInviteForCreator(
+    campaignId: string,
+    creatorUserId: string,
+    creatorEmail: string,
+  ) {
+    return (
+      this.campaignInvites.find(
+        (invite) =>
+          invite.campaignId === campaignId &&
+          (invite.creatorId === creatorUserId ||
+            invite.creatorEmail.toLowerCase() === creatorEmail.toLowerCase()),
       ) ?? null
     );
   }
@@ -68,6 +84,7 @@ class FakeInvitesRepository implements InvitesRepository {
     const invite: CampaignInviteRecord = {
       id: `invite-${this.campaignInvites.length + 1}`,
       campaignId: input.campaignId,
+      brandUserId: input.brandUserId,
       campaignName: input.campaignName,
       brandName: input.brandName,
       ...(input.creatorUserId ? { creatorId: input.creatorUserId } : {}),
@@ -78,6 +95,16 @@ class FakeInvitesRepository implements InvitesRepository {
       sentAt: new Date().toISOString(),
     };
     this.campaignInvites.push(invite);
+    return invite;
+  }
+
+  async updateCampaignInviteStatus(
+    inviteId: string,
+    status: Exclude<InviteStatus, 'sent'>,
+  ) {
+    const invite = this.campaignInvites.find((row) => row.id === inviteId);
+    if (!invite || invite.status !== 'sent') return null;
+    invite.status = status;
     return invite;
   }
 
@@ -132,6 +159,7 @@ describe('InvitesService', () => {
   let inbox: {
     deliverCampaignInvite: jest.Mock;
     notifySelf: jest.Mock;
+    notifyCampaignInviteResponse: jest.Mock;
   };
   let novu: { trigger: jest.Mock };
   let service: InvitesService;
@@ -158,6 +186,7 @@ describe('InvitesService', () => {
     inbox = {
       deliverCampaignInvite: jest.fn().mockResolvedValue({ delivered: true }),
       notifySelf: jest.fn().mockResolvedValue({}),
+      notifyCampaignInviteResponse: jest.fn().mockResolvedValue(undefined),
     };
     novu = {
       trigger: jest.fn().mockResolvedValue('txn-1'),
@@ -284,5 +313,84 @@ describe('InvitesService', () => {
         external: false,
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('accepts a campaign invite and notifies the brand', async () => {
+    await service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1',
+      campaignName: 'Summer Drop',
+      brandName: 'Acme',
+      creatorId: 'creator-1',
+      creatorEmail: 'creator@example.com',
+      creatorName: 'Alex Creator',
+      external: false,
+    });
+
+    const updated = await service.respondToCampaignInvite('creator-1', {
+      campaignId: 'camp-1',
+      decision: 'accepted',
+    });
+
+    expect(updated.status).toBe('accepted');
+    expect(inbox.notifyCampaignInviteResponse).toHaveBeenCalledWith(
+      'creator-1',
+      expect.objectContaining({
+        brandUserId: 'brand-1',
+        decision: 'accepted',
+        campaignId: 'camp-1',
+      }),
+    );
+  });
+
+  it('declines a campaign invite', async () => {
+    await service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1',
+      campaignName: 'Summer Drop',
+      brandName: 'Acme',
+      creatorId: 'creator-1',
+      creatorEmail: 'creator@example.com',
+      creatorName: 'Alex Creator',
+      external: false,
+    });
+
+    const updated = await service.respondToCampaignInvite('creator-1', {
+      campaignId: 'camp-1',
+      decision: 'declined',
+    });
+
+    expect(updated.status).toBe('declined');
+  });
+
+  it('rejects duplicate responses', async () => {
+    await service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1',
+      campaignName: 'Summer Drop',
+      brandName: 'Acme',
+      creatorId: 'creator-1',
+      creatorEmail: 'creator@example.com',
+      creatorName: 'Alex Creator',
+      external: false,
+    });
+
+    await service.respondToCampaignInvite('creator-1', {
+      campaignId: 'camp-1',
+      decision: 'accepted',
+    });
+
+    await expect(
+      service.respondToCampaignInvite('creator-1', {
+        campaignId: 'camp-1',
+        decision: 'declined',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('forbids brands from responding to campaign invites', async () => {
+    await expect(
+      service.respondToCampaignInvite('brand-1', {
+        campaignId: 'camp-1',
+        decision: 'accepted',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

@@ -86,16 +86,27 @@ vi.mock("@/lib/brand-campaigns/storage", async () => {
 
 vi.mock("@/lib/invites/storage", () => ({
   useInvites: () => ({
-    data: { invites: [] },
+    data: { invites: campaignInvites },
     ready: true,
     reload: vi.fn(),
   }),
-  getInvitesForCampaign: () => [],
+  getInvitesForCampaign: () => campaignInvites,
 }));
 
 vi.mock("./InviteCreatorDrawer", () => ({
   InviteCreatorDrawer: () => null,
 }));
+
+type TestInvite = {
+  id: string;
+  campaignId: string;
+  creatorId?: string;
+  creatorName: string;
+  external: boolean;
+  status: "sent" | "accepted" | "declined";
+};
+
+let campaignInvites: TestInvite[] = [];
 
 describe("CampaignDetailContent lifecycle buttons", () => {
   afterEach(() => {
@@ -105,8 +116,10 @@ describe("CampaignDetailContent lifecycle buttons", () => {
   beforeEach(() => {
     updateCampaign.mockReset();
     updateCampaign.mockResolvedValue(undefined);
+    authenticatedRequest.mockReset();
     authenticatedRequest.mockResolvedValue({ payouts: [] });
     activeCampaign = buildCampaign();
+    campaignInvites = [];
   });
 
   it("pauses an active marketplace campaign", async () => {
@@ -221,5 +234,69 @@ describe("CampaignDetailContent lifecycle buttons", () => {
       );
     });
     expect(await screen.findByText("Draft saved")).toBeInTheDocument();
+  });
+
+  it("pays an accepted creator invite", async () => {
+    campaignInvites = [
+      {
+        id: "invite-1",
+        campaignId: "campaign-1",
+        creatorId: "creator-1",
+        creatorName: "Alex Creator",
+        external: false,
+        status: "accepted",
+      },
+    ];
+    authenticatedRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (path.includes("/payouts") && options?.method !== "POST") {
+        return { payouts: [] };
+      }
+      if (path.includes("/pay-creator")) {
+        return {
+          id: "payout-1",
+          creatorUserId: "creator-1",
+          amountCents: 50000,
+          status: "transferred",
+        };
+      }
+      return { payouts: [] };
+    });
+
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    const user = userEvent.setup();
+    render(<CampaignDetailContent />);
+
+    expect(await screen.findByText("Alex Creator")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Pay creator" }));
+
+    await waitFor(() => {
+      expect(authenticatedRequest).toHaveBeenCalledWith(
+        "/api/campaigns/campaign-1/pay-creator",
+        expect.objectContaining({
+          method: "POST",
+          body: { creatorUserId: "creator-1" },
+        }),
+      );
+    });
+  });
+
+  it("hides pay creator until the invite is accepted", async () => {
+    campaignInvites = [
+      {
+        id: "invite-1",
+        campaignId: "campaign-1",
+        creatorId: "creator-1",
+        creatorName: "Alex Creator",
+        external: false,
+        status: "sent",
+      },
+    ];
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    render(<CampaignDetailContent />);
+
+    expect(await screen.findByText("Alex Creator")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pay creator" }),
+    ).not.toBeInTheDocument();
   });
 });

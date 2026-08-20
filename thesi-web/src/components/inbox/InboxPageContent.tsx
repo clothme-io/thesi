@@ -12,6 +12,12 @@ import {
   formatMessageDateTime,
 } from "@/lib/inbox/storage";
 import type { InboxMessage } from "@/lib/inbox/types";
+import {
+  getReceivedCampaignInvite,
+  respondToCampaignInvite,
+} from "@/lib/invites/respond-campaign-invite";
+import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
+import type { InviteStatus } from "@/lib/invites/types";
 
 type InboxTab = "messages" | "notifications";
 
@@ -43,6 +49,7 @@ export function InboxPageContent() {
     removeMessage,
     markNotificationRead,
     markAllNotificationsRead,
+    reload,
   } = useInbox(authenticatedRequest);
   const [tab, setTab] = useState<InboxTab>("messages");
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
@@ -51,6 +58,12 @@ export function InboxPageContent() {
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState("");
   const [sending, setSending] = useState(false);
+  const [inviteStatuses, setInviteStatuses] = useState<
+    Record<string, InviteStatus>
+  >({});
+  const [respondingCampaignId, setRespondingCampaignId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const brandId = searchParams.get("brand");
@@ -67,6 +80,43 @@ export function InboxPageContent() {
       setTab("notifications");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!ready || role !== "creator") return;
+    const campaignIds = [
+      ...new Set(
+        data.messages
+          .filter((message) => message.kind === "invite" && message.campaignId)
+          .map((message) => message.campaignId as string),
+      ),
+    ];
+    if (campaignIds.length === 0) return;
+
+    let active = true;
+    void (async () => {
+      const next: Record<string, InviteStatus> = {};
+      await Promise.all(
+        campaignIds.map(async (campaignId) => {
+          try {
+            const invite = await getReceivedCampaignInvite(
+              authenticatedRequest,
+              campaignId,
+            );
+            if (invite) next[campaignId] = invite.status;
+          } catch {
+            // Ignore individual status failures; buttons stay available.
+          }
+        }),
+      );
+      if (active) {
+        setInviteStatuses((prev) => ({ ...prev, ...next }));
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest, data.messages, ready, role]);
 
   const filteredContacts = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -103,6 +153,31 @@ export function InboxPageContent() {
   const handleReplyTo = (message: InboxMessage) => {
     setReplySubjectValue(replySubject(message.subject));
     setReplyContent("");
+  };
+
+  const handleInviteDecision = async (
+    campaignId: string,
+    decision: Exclude<InviteStatus, "sent">,
+  ) => {
+    setRespondingCampaignId(campaignId);
+    setActionError("");
+    try {
+      const invite = await respondToCampaignInvite(
+        authenticatedRequest,
+        campaignId,
+        decision,
+      );
+      setInviteStatuses((prev) => ({ ...prev, [campaignId]: invite.status }));
+      await reload();
+    } catch (requestError) {
+      setActionError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not update invite",
+      );
+    } finally {
+      setRespondingCampaignId(null);
+    }
   };
 
   const handleSendReply = async (e: React.FormEvent) => {
@@ -309,6 +384,62 @@ export function InboxPageContent() {
                             <h3 className="inbox-message-subject">{message.subject}</h3>
                             <p className="inbox-message-content">{message.content}</p>
                             <div className="inbox-message-actions">
+                              {role === "creator" &&
+                                message.kind === "invite" &&
+                                message.campaignId &&
+                                !message.isFromMe && (
+                                  <>
+                                    {inviteStatuses[message.campaignId] &&
+                                    inviteStatuses[message.campaignId] !==
+                                      "sent" ? (
+                                      <span className="crm-tag">
+                                        {
+                                          INVITE_STATUS_LABELS[
+                                            inviteStatuses[message.campaignId]
+                                          ]
+                                        }
+                                      </span>
+                                    ) : (
+                                      <>
+                                        <button
+                                          type="button"
+                                          className="inbox-btn-text"
+                                          disabled={
+                                            respondingCampaignId ===
+                                            message.campaignId
+                                          }
+                                          onClick={() =>
+                                            void handleInviteDecision(
+                                              message.campaignId!,
+                                              "accepted",
+                                            )
+                                          }
+                                        >
+                                          {respondingCampaignId ===
+                                          message.campaignId
+                                            ? "Working…"
+                                            : "Accept"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="inbox-btn-text inbox-btn-text--danger"
+                                          disabled={
+                                            respondingCampaignId ===
+                                            message.campaignId
+                                          }
+                                          onClick={() =>
+                                            void handleInviteDecision(
+                                              message.campaignId!,
+                                              "declined",
+                                            )
+                                          }
+                                        >
+                                          Decline
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                )}
                               <button
                                 type="button"
                                 className="inbox-btn-text"
