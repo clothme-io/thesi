@@ -4,6 +4,7 @@ export type AppEnv = Record<string, unknown> & {
   JWT_REFRESH_SECRET: string;
   ADMIN_API_KEY: string;
   THESI_WEB_URL: string;
+  AUTH_FORCE_PASSWORD_CHANGE: boolean;
 };
 
 const REQUIRED_KEYS = [
@@ -13,6 +14,15 @@ const REQUIRED_KEYS = [
   'ADMIN_API_KEY',
   'THESI_WEB_URL',
 ] as const;
+
+function parseBool(value: unknown, fallback: boolean): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+}
 
 export function validateEnv(config: Record<string, unknown>): AppEnv {
   const validated = { ...config } as AppEnv;
@@ -24,6 +34,11 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     }
     validated[key] = value.trim();
   }
+
+  validated.AUTH_FORCE_PASSWORD_CHANGE = parseBool(
+    config.AUTH_FORCE_PASSWORD_CHANGE,
+    true,
+  );
 
   return validated;
 }

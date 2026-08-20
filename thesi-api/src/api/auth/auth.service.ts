@@ -258,6 +258,7 @@ export class AuthService {
     }
 
     const passwordHash = await this.passwordService.hash(input.tempPassword);
+    const forcePasswordChange = this.isForcePasswordChangeEnabled();
     const [user] = await db
       .insert(schema.thesiUser)
       .values({
@@ -266,9 +267,9 @@ export class AuthService {
         passwordHash,
         fullName: input.fullName.trim(),
         role: 'creator',
-        mustChangePassword: true,
-        onboardingCompleted: false,
-        onboardingStep: 'change-password',
+        mustChangePassword: forcePasswordChange,
+        onboardingCompleted: !forcePasswordChange,
+        onboardingStep: forcePasswordChange ? 'change-password' : 'complete',
         creatorApplicationId: input.creatorApplicationId,
       })
       .returning();
@@ -281,13 +282,14 @@ export class AuthService {
     tempPassword: string,
   ): Promise<UserRow> {
     const passwordHash = await this.passwordService.hash(tempPassword);
+    const forcePasswordChange = this.isForcePasswordChangeEnabled();
     const [user] = await this.db
       .update(schema.thesiUser)
       .set({
         passwordHash,
-        mustChangePassword: true,
-        onboardingCompleted: false,
-        onboardingStep: 'change-password',
+        mustChangePassword: forcePasswordChange,
+        onboardingCompleted: !forcePasswordChange,
+        onboardingStep: forcePasswordChange ? 'change-password' : 'complete',
         updatedAt: new Date(),
       })
       .where(eq(schema.thesiUser.creatorApplicationId, creatorApplicationId))
@@ -329,6 +331,20 @@ export class AuthService {
   }
 
   private mapUser(user: UserRow): AuthUserDto {
+    const forcePasswordChange = this.isForcePasswordChangeEnabled();
+    if (!forcePasswordChange) {
+      return {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        companyName: user.companyName ?? undefined,
+        role: user.role,
+        mustChangePassword: false,
+        onboardingCompleted: true,
+        onboardingStep: 'complete',
+      };
+    }
+
     return {
       id: user.id,
       email: user.email,
@@ -339,6 +355,19 @@ export class AuthService {
       onboardingCompleted: user.onboardingCompleted,
       onboardingStep: this.resolveOnboardingStep(user),
     };
+  }
+
+  private isForcePasswordChangeEnabled(): boolean {
+    const value = this.configService.get<boolean | string>(
+      'AUTH_FORCE_PASSWORD_CHANGE',
+    );
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+      if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+    }
+    return true;
   }
 
   private resolveOnboardingStep(user: UserRow): OnboardingStep {
