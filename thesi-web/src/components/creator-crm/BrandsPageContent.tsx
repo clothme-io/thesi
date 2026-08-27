@@ -24,7 +24,7 @@ const STAGES: Array<RelationshipStage | ""> = [
 
 export function BrandsPageContent() {
   const { session, authenticatedRequest } = useAuth();
-  const { data, ready, importCsv } = useCreatorCrm(authenticatedRequest);
+  const { data, ready, importCsv, reload } = useCreatorCrm(authenticatedRequest);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [stage, setStage] = useState("");
@@ -195,6 +195,9 @@ export function BrandsPageContent() {
         onClose={() => setInviteOpen(false)}
         invitedBy={session?.user.fullName ?? "Creator"}
         invitedByEmail={session?.user.email ?? ""}
+        onInvited={() => {
+          void reload();
+        }}
       />
       <CsvImportDrawer
         open={importOpen}

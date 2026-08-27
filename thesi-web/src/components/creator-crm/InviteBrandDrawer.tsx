@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
+import { parseBrandLines } from "@/lib/invites/parse-brand-lines";
 import { usePlatformInvites } from "@/lib/invites/platform-storage";
 import { sendPlatformBrandInvite } from "@/lib/invites/send-platform-brand-invite";
 
@@ -11,24 +12,6 @@ export interface InviteBrandDrawerProps {
   invitedBy: string;
   invitedByEmail: string;
   onInvited?: () => void;
-}
-
-function parseBrandLines(raw: string): { name: string; email: string }[] {
-  return raw
-    .split(/[\n,;]+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const emailMatch = line.match(/[\w.+-]+@[\w.-]+\.\w+/);
-      const email = emailMatch?.[0] ?? "";
-      const name =
-        line
-          .replace(email, "")
-          .replace(/[<>",]/g, "")
-          .trim() || email.split("@")[0];
-      return { name, email };
-    })
-    .filter((entry) => entry.email);
 }
 
 export function InviteBrandDrawer({
