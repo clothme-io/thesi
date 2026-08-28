@@ -60,8 +60,8 @@ export function useCreatorProfile(
         if (active) {
           setProfile({
             ...DEFAULT_CREATOR_PROFILE,
-            displayName: fallbackName,
             ...data,
+            displayName: data.displayName?.trim() || fallbackName,
             ugcPosts: Array.isArray(data.ugcPosts) ? data.ugcPosts : [],
           });
         }
