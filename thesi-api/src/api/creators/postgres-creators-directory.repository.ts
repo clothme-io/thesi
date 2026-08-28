@@ -1,8 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
+import {
+  averageUgcViews,
+  nativeStatsFromInvites,
+} from 'src/api/profiles/follower-range.util';
 import type {
   CreatorDirectoryProfile,
   CreatorPlatformStats,
@@ -192,13 +196,43 @@ export class PostgresCreatorsDirectoryRepository
       platform: post.platform,
       ...(post.campaignName ? { campaignName: post.campaignName } : {}),
       ...(post.brandName ? { brandName: post.brandName } : {}),
-      postedAt: post.postedAt,
+      ...(post.url ? { url: post.url } : {}),
+      ...(post.source ? { source: post.source } : {}),
+      postedAt: postedAtToString(post.postedAt),
       views: post.views,
       likes: post.likes,
       comments: post.comments,
       shares: post.shares,
       saves: post.saves,
     }));
+
+    const connectionRows = await this.db
+      .select({
+        lastSyncAt: schema.creatorSocialConnection.lastSyncAt,
+      })
+      .from(schema.creatorSocialConnection)
+      .where(eq(schema.creatorSocialConnection.creatorUserId, row.userId));
+    const syncTimes = connectionRows
+      .map((connection) => connection.lastSyncAt)
+      .filter((value): value is Date => value instanceof Date);
+    const statsSyncedAt =
+      syncTimes.length > 0
+        ? new Date(
+            Math.max(...syncTimes.map((value) => value.getTime())),
+          ).toISOString()
+        : null;
+
+    const inviteRows = await this.db
+      .select({ status: schema.campaignInvite.status })
+      .from(schema.campaignInvite)
+      .where(
+        or(
+          eq(schema.campaignInvite.creatorUserId, row.userId),
+          sql`lower(${schema.campaignInvite.creatorEmail}) = ${row.email.toLowerCase()}`,
+        ),
+      );
+    const native = nativeStatsFromInvites(inviteRows.map((invite) => invite.status));
+    const storedAvgViews = statsRow?.avgViews ?? 0;
 
     return {
       id: row.userId,
@@ -209,17 +243,23 @@ export class PostgresCreatorsDirectoryRepository
       platforms,
       followerRange: row.followerRange || '',
       bio: row.bio || '',
+      statsSyncedAt,
       stats: {
         totalFollowers: statsRow?.totalFollowers ?? 0,
-        avgViews: statsRow?.avgViews ?? 0,
+        avgViews: storedAvgViews || averageUgcViews(ugcPosts),
         avgEngagementRate: Number(statsRow?.avgEngagementRate ?? 0),
-        completedCampaigns: statsRow?.completedCampaigns ?? 0,
-        responseRate: statsRow?.responseRate ?? 0,
+        completedCampaigns: native.completedCampaigns,
+        responseRate: native.responseRate,
         platforms: platformStats,
       },
       ugcPosts,
     };
   }
+}
+
+function postedAtToString(value: string | Date): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
 }
 
 function derivePlatformsFromSocials(row: {

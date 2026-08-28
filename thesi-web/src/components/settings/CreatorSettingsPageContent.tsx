@@ -116,6 +116,15 @@ export function CreatorSettingsPageContent() {
             </div>
             <div className="settings-security" style={{ marginTop: 12 }}>
               <div>
+                <strong>Connected accounts</strong>
+                <p>Sync YouTube, TikTok, and Instagram stats for brands to see.</p>
+              </div>
+              <Link href="/app/settings/social" className="crm-btn-secondary">
+                Manage accounts
+              </Link>
+            </div>
+            <div className="settings-security" style={{ marginTop: 12 }}>
+              <div>
                 <strong>Integrations</strong>
                 <p>Connect Gmail / Outlook and calendars into the CRM timeline.</p>
               </div>
@@ -135,9 +144,9 @@ export function CreatorSettingsPageContent() {
                 <strong>Password</strong>
                 <p>Update your password to keep your account secure.</p>
               </div>
-              <Link href="/onboarding/change-password" className="crm-btn-secondary">
+              <a href="/onboarding/change-password" className="crm-btn-secondary">
                 Change password
-              </Link>
+              </a>
             </div>
           </section>
 

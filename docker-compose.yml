@@ -77,6 +77,9 @@ services:
       ADMIN_API_KEY: thesi-local-admin-key-change-before-production
       THESI_WEB_URL: http://localhost:3010
       AUTH_FORCE_PASSWORD_CHANGE: "true"
+      SOCIAL_TOKEN_ENCRYPTION_KEY: thesi-local-social-token-key
+      TIKTOK_REDIRECT_URI: http://localhost:5010/v1/social/tiktok/callback
+      INSTAGRAM_REDIRECT_URI: http://localhost:5010/v1/social/instagram/callback
     depends_on:
       postgres:
         condition: service_healthy

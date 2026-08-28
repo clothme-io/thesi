@@ -503,6 +503,43 @@
   grid-column: 1 / -1;
 }
 
+.milestone-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.milestone-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 140px auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.milestone-row-remove {
+  margin-bottom: 10px;
+  white-space: nowrap;
+}
+
+.portfolio-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.portfolio-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.portfolio-row-remove {
+  align-self: end;
+  margin-bottom: 10px;
+}
+
 .workspace-field span,
 .workspace-field-label {
   font-size: 13px;
@@ -672,6 +709,22 @@
 
   .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .milestone-row {
+    grid-template-columns: 1fr;
+  }
+
+  .milestone-row-remove {
+    margin-bottom: 0;
+  }
+
+  .portfolio-row {
+    grid-template-columns: 1fr;
+  }
+
+  .portfolio-row-remove {
+    margin-bottom: 0;
   }
 
   .settings-security {

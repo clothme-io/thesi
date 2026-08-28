@@ -181,7 +181,7 @@ export function getBrandDashboardMetrics(data: BrandCampaignData) {
   // Drafts can have postToMarketplace=true as intent ("when published") but are
   // not listed on the marketplace until status is active (or later lifecycle).
   const posted = data.campaigns.filter(
-    (c) => c.postToMarketplace && c.status !== "draft",
+    (c) => c.postToMarketplace && c.status === "active",
   );
   return {
     total: data.campaigns.length,
@@ -195,5 +195,6 @@ export function getBrandDashboardMetrics(data: BrandCampaignData) {
 export function campaignMarketplaceLabel(campaign: BrandCampaign): string {
   if (!campaign.postToMarketplace) return "Private";
   if (campaign.status === "draft") return "When published";
-  return "Posted";
+  if (campaign.status === "active") return "Posted";
+  return "Closed";
 }

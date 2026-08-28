@@ -56,6 +56,9 @@ describe('ProfilesService', () => {
       displayName: 'Avery Creator',
       headline: 'UGC Creator',
       niches: [],
+      followerRange: '',
+      tiktokFollowers: 0,
+      ugcPosts: [],
     });
   });
 
@@ -112,7 +115,58 @@ describe('ProfilesService', () => {
         rateRange: '',
         turnaround: '',
         portfolioUrl: '',
+        followerRange: '',
+        tiktokFollowers: 0,
+        instagramFollowers: 0,
+        youtubeFollowers: 0,
+        avgViews: 0,
+        avgEngagementRate: 0,
+        ugcPosts: [],
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('persists follower range and self-reported stats on the creator profile', async () => {
+    repository.user = {
+      id: 'creator-1',
+      role: 'creator',
+      fullName: 'Avery Creator',
+      companyName: null,
+    };
+    const profile = {
+      displayName: 'Avery Creator',
+      headline: 'UGC Creator',
+      bio: '',
+      location: 'US',
+      website: '',
+      instagram: '@avery',
+      tiktok: '',
+      youtube: '',
+      niches: ['Fashion'],
+      rateRange: '',
+      turnaround: '3–5 business days',
+      portfolioUrl: '',
+      followerRange: '5k+',
+      tiktokFollowers: 0,
+      instagramFollowers: 6200,
+      youtubeFollowers: 0,
+      avgViews: 1400,
+      avgEngagementRate: 4.1,
+      ugcPosts: [
+        {
+          title: 'Fall lookbook',
+          platform: 'Instagram',
+          url: 'https://instagram.com/p/example',
+          postedAt: '2026-08-01',
+          views: 2200,
+          likes: 180,
+        },
+      ],
+    };
+
+    await expect(service.updateCreator('creator-1', profile)).resolves.toEqual(
+      profile,
+    );
+    expect(repository.creator).toEqual(profile);
   });
 });

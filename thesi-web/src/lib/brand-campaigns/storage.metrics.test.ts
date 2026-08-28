@@ -61,5 +61,31 @@ describe("brand dashboard marketplace metrics", () => {
         campaign({ status: "active", postToMarketplace: true }),
       ),
     ).toBe("Posted");
+    expect(
+      campaignMarketplaceLabel(
+        campaign({ status: "paused", postToMarketplace: true }),
+      ),
+    ).toBe("Closed");
+    expect(
+      campaignMarketplaceLabel(
+        campaign({ status: "completed", postToMarketplace: true }),
+      ),
+    ).toBe("Closed");
+  });
+
+  it("does not count paused or completed campaigns as posted", () => {
+    const metrics = getBrandDashboardMetrics({
+      campaigns: [
+        campaign({ id: "paused", status: "paused", postToMarketplace: true }),
+        campaign({
+          id: "completed",
+          status: "completed",
+          postToMarketplace: true,
+        }),
+        campaign({ id: "active", status: "active", postToMarketplace: true }),
+      ],
+    });
+
+    expect(metrics.posted).toBe(1);
   });
 });

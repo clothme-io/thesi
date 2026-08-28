@@ -89,6 +89,8 @@ export interface MarketplaceRepository {
   ): Promise<
     | (MarketplaceApplicationRecord & {
         creatorUserId: string;
+        creatorEmail: string;
+        creatorName: string;
       })
     | null
   >;

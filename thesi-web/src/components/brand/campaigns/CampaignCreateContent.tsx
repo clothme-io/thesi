@@ -1,21 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
-import { useBrandCampaigns } from "@/lib/brand-campaigns/storage";
+import { getCampaignById, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
+import {
+  buildCampaignPayment,
+  formPayoutCents,
+  milestonesToFormRows,
+  newMilestoneId,
+  seedMilestonesIfNeeded,
+  paymentFormError,
+  type MilestoneFormRow,
+} from "@/lib/brand-campaigns/payment-form";
 import type {
   BrandCampaignGoalType,
   BrandCampaignPaymentModel,
   BrandCampaignStatus,
   BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
+import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
+import { MilestoneBuilder } from "./MilestoneBuilder";
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
 } from "@/lib/brand-campaigns/types";
-import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { publishCampaignToMarketplace } from "@/lib/marketplace/publish-from-campaign";
 import {
   calculatePlatformFeeCents,
@@ -56,12 +66,6 @@ function parseList(raw: string): string[] {
     .filter(Boolean);
 }
 
-function parseMoneyToCents(raw: string): number {
-  const num = Number(raw.replace(/[^0-9.]/g, ""));
-  if (Number.isNaN(num)) return 0;
-  return Math.round(num * 100);
-}
-
 const defaultDates = () => {
   const start = new Date();
   const end = new Date();
@@ -74,10 +78,13 @@ const defaultDates = () => {
 
 export function CampaignCreateContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const duplicateFromId = searchParams.get("from");
   const { session, authenticatedRequest } = useAuth();
-  const { ready, createCampaign, updateCampaign, uploadCampaignFile, error: loadError } =
+  const { data, ready, createCampaign, updateCampaign, uploadCampaignFile, error: loadError } =
     useBrandCampaigns(authenticatedRequest);
   const dates = defaultDates();
+  const hydratedRef = useRef(false);
 
   const [name, setName] = useState("");
   const [campaignType, setCampaignType] =
@@ -94,6 +101,7 @@ export function CampaignCreateContent() {
   const [platforms, setPlatforms] = useState("TikTok, Instagram");
   const [paymentModel, setPaymentModel] = useState<BrandCampaignPaymentModel>("flat_rate");
   const [flatAmount, setFlatAmount] = useState("");
+  const [milestones, setMilestones] = useState<MilestoneFormRow[]>([]);
   const [paymentNotes, setPaymentNotes] = useState("");
   const [postToMarketplace, setPostToMarketplace] = useState(true);
   const [inviteContext, setInviteContext] = useState<{ id: string; name: string } | null>(null);
@@ -107,10 +115,49 @@ export function CampaignCreateContent() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const draftRef = useRef<{ id: string; name: string } | null>(null);
 
+  useEffect(() => {
+    if (!ready || !duplicateFromId || hydratedRef.current) return;
+    const source = getCampaignById(data, duplicateFromId);
+    if (!source) {
+      setError("Could not find campaign to duplicate.");
+      hydratedRef.current = true;
+      return;
+    }
+    hydratedRef.current = true;
+    setName(`${source.name} (copy)`);
+    setCampaignType(source.campaignType);
+    setType(source.type);
+    setStartDate(source.startDate.slice(0, 10));
+    setEndDate(source.endDate.slice(0, 10));
+    setBrief(source.brief);
+    setDeliverables(source.deliverables);
+    setExampleVideoLinks(
+      source.exampleVideoLinks.length > 0 ? source.exampleVideoLinks : [""],
+    );
+    setNiches(source.requirements.niches.join(", "));
+    setMinFollowersRange(source.requirements.minFollowersRange);
+    setLocation(source.requirements.location);
+    setPlatforms(source.requirements.platforms.join(", "));
+    setPaymentModel(source.payment.model);
+    setFlatAmount(
+      source.payment.flatRateCents
+        ? String(source.payment.flatRateCents / 100)
+        : "",
+    );
+    setMilestones(
+      milestonesToFormRows(source.payment.milestones).map((row) => ({
+        ...row,
+        id: newMilestoneId(),
+      })),
+    );
+    setPaymentNotes(source.payment.notes ?? "");
+    setPostToMarketplace(source.postToMarketplace);
+  }, [ready, duplicateFromId, data]);
+
   if (!ready) return null;
 
   const brandName = session?.user.fullName ?? "Your Brand";
-  const payoutCents = parseMoneyToCents(flatAmount);
+  const payoutCents = formPayoutCents(paymentModel, flatAmount, milestones);
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
 
@@ -131,13 +178,17 @@ export function CampaignCreateContent() {
       platforms: parseList(platforms),
     },
     files: [],
-    payment: {
+    payment: buildCampaignPayment({
       model: paymentModel,
-      flatRateCents: parseMoneyToCents(flatAmount),
-      notes: paymentNotes || undefined,
-    },
+      flatAmount,
+      notes: paymentNotes,
+      milestones,
+    }),
     postToMarketplace,
   });
+
+  const requireMilestonePayment = (): string | null =>
+    paymentFormError(paymentModel, milestones);
 
   const flushPendingUploads = async (campaignId: string) => {
     if (pendingFiles.length === 0) return [] as Array<{ id: string; name: string; sizeLabel: string }>;
@@ -151,6 +202,10 @@ export function CampaignCreateContent() {
   };
 
   const saveDraft = async (): Promise<{ id: string; name: string }> => {
+    const milestoneError = requireMilestonePayment();
+    if (milestoneError) {
+      throw new Error(milestoneError);
+    }
     const payload = buildCampaignPayload("draft");
     const campaign = draftRef.current
       ? await updateCampaign(draftRef.current.id, payload)
@@ -184,6 +239,12 @@ export function CampaignCreateContent() {
     setSaving(true);
     setError("");
     setSaveMessage("");
+    const milestoneError = requireMilestonePayment();
+    if (milestoneError) {
+      setError(milestoneError);
+      setSaving(false);
+      return;
+    }
     const payload = buildCampaignPayload("active");
     const userId = session?.user.id ?? "dev-user-1";
 
@@ -243,7 +304,9 @@ export function CampaignCreateContent() {
           <Link href="/app/campaigns" className="auth-link" style={{ fontSize: 13 }}>
             ← Campaigns
           </Link>
-          <h1 style={{ marginTop: 4 }}>New campaign</h1>
+          <h1 style={{ marginTop: 4 }}>
+            {duplicateFromId ? "Duplicate campaign" : "New campaign"}
+          </h1>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
@@ -425,7 +488,11 @@ export function CampaignCreateContent() {
                 <span>Payment type</span>
                 <select
                   value={paymentModel}
-                  onChange={(e) => setPaymentModel(e.target.value as BrandCampaignPaymentModel)}
+                  onChange={(e) => {
+                    const next = e.target.value as BrandCampaignPaymentModel;
+                    setPaymentModel(next);
+                    setMilestones((prev) => seedMilestonesIfNeeded(next, prev));
+                  }}
                 >
                   {PAYMENT_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -434,20 +501,24 @@ export function CampaignCreateContent() {
                   ))}
                 </select>
               </label>
-              <label className="workspace-field">
-                <span>Base/flat amount</span>
-                <input
-                  type="text"
-                  placeholder="$0.00"
-                  value={flatAmount}
-                  onChange={(e) => setFlatAmount(e.target.value)}
-                />
-              </label>
+              {paymentModel === "milestone" ? (
+                <MilestoneBuilder rows={milestones} onChange={setMilestones} />
+              ) : (
+                <label className="workspace-field">
+                  <span>Base/flat amount</span>
+                  <input
+                    type="text"
+                    placeholder="$0.00"
+                    value={flatAmount}
+                    onChange={(e) => setFlatAmount(e.target.value)}
+                  />
+                </label>
+              )}
               <label className="workspace-field workspace-field--full">
                 <span>Payment notes</span>
                 <textarea
                   rows={2}
-                  placeholder="Milestone notes, royalty terms, payout timeline..."
+                  placeholder="Royalty terms, payout timeline..."
                   value={paymentNotes}
                   onChange={(e) => setPaymentNotes(e.target.value)}
                 />

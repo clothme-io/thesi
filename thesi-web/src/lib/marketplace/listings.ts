@@ -43,7 +43,7 @@ export function campaignToListing(
   brandName: string,
   ownerUserId: string,
 ): MarketplaceListing {
-  const deadline = campaign.startDate;
+  const deadline = campaign.endDate;
   const remoteOk =
     !campaign.requirements.location ||
     campaign.requirements.location.toLowerCase() === "remote" ||

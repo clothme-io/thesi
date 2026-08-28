@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from 'src/api/auth/auth.module';
 import { CreatorCrmModule } from 'src/api/creator-crm/creator-crm.module';
 import { InboxModule } from 'src/api/inbox/inbox.module';
+import { InvitesModule } from 'src/api/invites/invites.module';
 import {
   MARKETPLACE_CAMPAIGN_SYNC,
   MARKETPLACE_REPOSITORY,
@@ -11,7 +12,12 @@ import { MarketplaceService } from './marketplace.service';
 import { PostgresMarketplaceRepository } from './postgres-marketplace.repository';
 
 @Module({
-  imports: [AuthModule, forwardRef(() => CreatorCrmModule), InboxModule],
+  imports: [
+    AuthModule,
+    forwardRef(() => CreatorCrmModule),
+    InboxModule,
+    InvitesModule,
+  ],
   controllers: [MarketplaceController],
   providers: [
     MarketplaceService,

@@ -141,16 +141,19 @@ export class InvitesService {
     const brandName = input.brandName.trim() || user.fullName;
 
     let creatorUserId = input.creatorId?.trim() || null;
-    if (!input.external) {
-      const creator =
-        (creatorUserId ? await this.invites.getUser(creatorUserId) : null) ??
-        (await this.invites.findUserByEmail(creatorEmail));
-      if (!creator || creator.role !== 'creator') {
-        throw new NotFoundException(
-          'Creator account not found for invite delivery',
-        );
-      }
+    let external = input.external;
+    const creator =
+      (creatorUserId ? await this.invites.getUser(creatorUserId) : null) ??
+      (await this.invites.findUserByEmail(creatorEmail));
+    if (creator && creator.role === 'creator') {
       creatorUserId = creator.id;
+      external = false;
+    } else if (!external) {
+      throw new NotFoundException(
+        'Creator account not found for invite delivery',
+      );
+    } else {
+      creatorUserId = null;
     }
 
     const invite = await this.invites.createCampaignInvite({
@@ -161,7 +164,7 @@ export class InvitesService {
       creatorUserId,
       creatorEmail,
       creatorName: input.creatorName.trim(),
-      external: input.external,
+      external,
     });
 
     if (!invite.external) {
@@ -203,6 +206,27 @@ export class InvitesService {
     }
 
     return invite;
+  }
+
+  async acceptMarketplaceApplicant(input: {
+    brandUserId: string;
+    campaignId: string;
+    campaignName: string;
+    brandName: string;
+    creatorUserId: string;
+    creatorEmail: string;
+    creatorName: string;
+  }): Promise<CampaignInviteRecord> {
+    return this.invites.upsertAcceptedCampaignInvite({
+      campaignId: input.campaignId,
+      brandUserId: input.brandUserId,
+      campaignName: input.campaignName,
+      brandName: input.brandName,
+      creatorUserId: input.creatorUserId,
+      creatorEmail: input.creatorEmail.trim().toLowerCase(),
+      creatorName: input.creatorName.trim(),
+      external: false,
+    });
   }
 
   async listPlatformBrandInvites(

@@ -4,22 +4,25 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { v4 as uuidv4 } from 'uuid';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { PasswordService } from 'src/shared/auth/password.service';
 import { generateRefreshToken, hashToken } from 'src/shared/auth/token.util';
+import { EmailService } from 'src/shared/email/email.service';
 import {
   AuthSessionDto,
   AuthUserDto,
   ChangePasswordDto,
   RefreshTokenDto,
+  ResetPasswordDto,
   SignInDto,
   SignUpDto,
 } from './dto/auth.dto';
@@ -36,12 +39,15 @@ export type OnboardingStep =
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(DrizzleAsyncProvider)
     private readonly db: NodePgDatabase<typeof schema>,
     private readonly passwordService: PasswordService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async signUp(dto: SignUpDto): Promise<AuthSessionDto> {
@@ -164,6 +170,103 @@ export class AuthService {
       .returning();
 
     return this.createSession(updated);
+  }
+
+  async requestPasswordReset(emailRaw: string): Promise<void> {
+    const email = emailRaw.trim().toLowerCase();
+    const user = await this.findUserByEmail(email);
+    if (!user) {
+      return;
+    }
+
+    const rawToken = generateRefreshToken();
+    const expiresAt = this.addDuration(new Date(), '1h');
+
+    await this.db
+      .update(schema.thesiPasswordResetToken)
+      .set({ usedAt: new Date() })
+      .where(
+        and(
+          eq(schema.thesiPasswordResetToken.userId, user.id),
+          isNull(schema.thesiPasswordResetToken.usedAt),
+        ),
+      );
+
+    await this.db.insert(schema.thesiPasswordResetToken).values({
+      id: uuidv4(),
+      userId: user.id,
+      tokenHash: hashToken(rawToken),
+      expiresAt,
+    });
+
+    const webUrl = this.configService
+      .getOrThrow<string>('THESI_WEB_URL')
+      .replace(/\/+$/, '');
+    const resetUrl = `${webUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+    if (this.configService.get<string>('NODE_ENV') !== 'production') {
+      this.logger.log(`Password reset URL (dev): ${resetUrl}`);
+    }
+
+    await this.emailService
+      .sendPasswordReset(user.email, user.fullName, resetUrl)
+      .catch((err: { message?: string }) =>
+        this.logger.warn(
+          `Failed to send password reset email: ${err?.message}`,
+        ),
+      );
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Passwords do not match');
+    }
+
+    const tokenHash = hashToken(dto.token.trim());
+    const [stored] = await this.db
+      .select()
+      .from(schema.thesiPasswordResetToken)
+      .where(
+        and(
+          eq(schema.thesiPasswordResetToken.tokenHash, tokenHash),
+          isNull(schema.thesiPasswordResetToken.usedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!stored || !stored.expiresAt || stored.expiresAt < new Date()) {
+      throw new BadRequestException(
+        'This reset link is invalid or has expired',
+      );
+    }
+
+    const passwordHash = await this.passwordService.hash(dto.newPassword);
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.thesiUser)
+        .set({
+          passwordHash,
+          mustChangePassword: false,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.thesiUser.id, stored.userId));
+
+      await tx
+        .update(schema.thesiPasswordResetToken)
+        .set({ usedAt: new Date() })
+        .where(eq(schema.thesiPasswordResetToken.id, stored.id));
+
+      await tx
+        .update(schema.thesiRefreshToken)
+        .set({ revokedAt: new Date() })
+        .where(
+          and(
+            eq(schema.thesiRefreshToken.userId, stored.userId),
+            isNull(schema.thesiRefreshToken.revokedAt),
+          ),
+        );
+    });
   }
 
   async completeWelcome(userId: string): Promise<AuthSessionDto> {

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { CreatorCrmService } from 'src/api/creator-crm/creator-crm.service';
 import { InboxService } from 'src/api/inbox/inbox.service';
+import { InvitesService } from 'src/api/invites/invites.service';
 import type { CampaignRecord } from '../campaigns/campaign.repository';
 import {
   MARKETPLACE_REPOSITORY,
@@ -26,6 +27,7 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     private readonly marketplace: MarketplaceRepository,
     private readonly creatorCrm: CreatorCrmService,
     private readonly inbox: InboxService,
+    private readonly invites: InvitesService,
   ) {}
 
   async syncFromCampaign(
@@ -44,6 +46,10 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     }
     // Active / paused / completed: upsert so applicants are preserved when
     // paused or completed (listing status resolves to closed).
+    const existing = (await this.marketplace.listByOwner(ownerUserId)).find(
+      (listing) => listing.campaignId === campaign.id,
+    );
+    const wasBrowsable = Boolean(existing && existing.status !== 'closed');
     const brandName =
       (await this.marketplace.getBrandDisplayName(ownerUserId)) || 'Your Brand';
     await this.marketplace.upsertListingFromCampaign({
@@ -51,6 +57,19 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       brandName,
       campaign,
     });
+
+    const nowBrowsable =
+      campaign.postToMarketplace && campaign.status === 'active';
+    if (nowBrowsable && !wasBrowsable) {
+      await this.inbox.notifySelf(ownerUserId, {
+        type: 'campaign_update',
+        title: 'Campaign published to marketplace',
+        body: `"${campaign.name}" is now live on the marketplace for creators to browse and apply.`,
+        href: '/app/marketplace',
+        campaignId: campaign.id,
+        audience: 'brand',
+      });
+    }
   }
 
   async getMarketplace(userId: string): Promise<{
@@ -72,7 +91,11 @@ export class MarketplaceService implements MarketplaceCampaignSync {
         this.marketplace.listApplicationsForCreator(userId),
         this.marketplace.listCrmLinkedListingIds(userId),
       ]);
-      return { listings, applications, crmLinkedListingIds };
+      return {
+        listings: listings.filter((listing) => listing.status !== 'closed'),
+        applications,
+        crmLinkedListingIds,
+      };
     }
     throw new ForbiddenException('Marketplace access required');
   }
@@ -207,6 +230,18 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       campaignId: listing.campaignId,
       audience: 'creator',
     });
+
+    if (decision === 'accepted') {
+      await this.invites.acceptMarketplaceApplicant({
+        brandUserId: userId,
+        campaignId: listing.campaignId,
+        campaignName: listing.name,
+        brandName: listing.brandName,
+        creatorUserId: existing.creatorUserId,
+        creatorEmail: existing.creatorEmail,
+        creatorName: existing.creatorName,
+      });
+    }
 
     return { application };
   }

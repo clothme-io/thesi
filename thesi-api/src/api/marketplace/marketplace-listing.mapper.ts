@@ -19,7 +19,7 @@ export function buildListingPayload(
     status: resolveListingStatus(campaign),
     startDate: campaign.startDate,
     endDate: campaign.endDate,
-    applicationDeadline: campaign.startDate,
+    applicationDeadline: campaign.endDate,
     brief: campaign.brief,
     deliverables: campaign.deliverables,
     exampleVideoLinks: campaign.exampleVideoLinks ?? [],

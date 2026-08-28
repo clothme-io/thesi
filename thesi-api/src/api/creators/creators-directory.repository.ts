@@ -12,6 +12,7 @@ export type CreatorPlatformStats = {
   followers: number;
   avgViews: number;
   engagementRate: number;
+  source?: 'self_reported' | 'youtube' | 'tiktok' | 'instagram';
 };
 
 export type CreatorUgcPost = {
@@ -22,6 +23,8 @@ export type CreatorUgcPost = {
   campaignName?: string;
   brandName?: string;
   postedAt: string;
+  url?: string;
+  source?: string;
   views: number;
   likes: number;
   comments: number;
@@ -38,6 +41,7 @@ export type CreatorDirectoryProfile = {
   platforms: string[];
   followerRange: string;
   bio: string;
+  statsSyncedAt: string | null;
   stats: {
     totalFollowers: number;
     avgViews: number;
