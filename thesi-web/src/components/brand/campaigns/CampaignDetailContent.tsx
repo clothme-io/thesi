@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { toDateInputValue } from "@/lib/brand-campaigns/date";
+import { paymentFormError } from "@/lib/brand-campaigns/payment-form";
 import {
   downloadCampaignFile,
   getCampaignById,
+  campaignMarketplaceLabel,
   useBrandCampaigns,
   type CampaignInput,
 } from "@/lib/brand-campaigns/storage";
@@ -138,6 +140,7 @@ export function CampaignDetailContent() {
   }
 
   const isDraft = campaign.status === "draft";
+  const marketplaceLabel = campaignMarketplaceLabel(campaign);
   const brandName = session?.user.fullName ?? "Your Brand";
   const invites = getInvitesForCampaign(inviteData, campaign.id);
   const payoutByCreator = new Map(
@@ -180,6 +183,16 @@ export function CampaignDetailContent() {
         isDraft && form
           ? draftFormToInput(form)
           : toCampaignInput(campaign);
+      if (isDraft && form) {
+        const milestoneError = paymentFormError(
+          form.paymentModel,
+          form.milestones,
+        );
+        if (milestoneError) {
+          setLifecycleError(milestoneError);
+          return;
+        }
+      }
       await updateCampaign(campaign.id, {
         ...base,
         ...patch,
@@ -202,6 +215,14 @@ export function CampaignDetailContent() {
     setLifecycleError("");
     setSaveMessage("");
     try {
+      const milestoneError = paymentFormError(
+        form.paymentModel,
+        form.milestones,
+      );
+      if (milestoneError) {
+        setLifecycleError(milestoneError);
+        return;
+      }
       const payload = draftFormToInput(form);
       await updateCampaign(campaign.id, payload);
       for (const file of pendingFiles) {
@@ -325,7 +346,10 @@ export function CampaignDetailContent() {
           >
             Invite creators
           </button>
-          <Link href="/app/campaigns/new" className="crm-btn-secondary">
+          <Link
+            href={`/app/campaigns/new?from=${campaign.id}`}
+            className="crm-btn-secondary"
+          >
             Duplicate as new
           </Link>
         </div>
@@ -412,13 +436,11 @@ export function CampaignDetailContent() {
               <div className="crm-meta-row">
                 <span>Marketplace</span>
                 <span>
-                  {campaign.status === "draft"
-                    ? campaign.postToMarketplace
+                  {marketplaceLabel === "Private"
+                    ? "Private invite only"
+                    : marketplaceLabel === "When published"
                       ? "Will post when published"
-                      : "Private invite only"
-                    : campaign.postToMarketplace
-                      ? "Posted"
-                      : "Private invite only"}
+                      : marketplaceLabel}
                 </span>
               </div>
               <h3 style={{ marginTop: 24 }}>Brief</h3>
@@ -556,7 +578,10 @@ export function CampaignDetailContent() {
                 {campaign.payment.milestones?.map((milestone) => (
                   <div className="crm-meta-row" key={milestone.id}>
                     <span>{milestone.label}</span>
-                    <span>{formatMoney(milestone.amountCents)}</span>
+                    <span>
+                      {formatMoney(milestone.amountCents)}
+                      {milestone.trigger ? ` · ${milestone.trigger}` : ""}
+                    </span>
                   </div>
                 ))}
                 {campaign.payment.notes && (

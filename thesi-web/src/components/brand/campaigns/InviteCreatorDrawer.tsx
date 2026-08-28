@@ -9,6 +9,7 @@ import {
   useCreatorsDirectory,
 } from "@/lib/brand-creators/storage";
 import { matchCreatorsToCampaign } from "@/lib/invites/matching";
+import { parseBrandLines } from "@/lib/invites/parse-brand-lines";
 import { sendCampaignInvite } from "@/lib/invites/send-campaign-invite";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
 import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
@@ -24,24 +25,6 @@ export interface InviteCreatorDrawerProps {
   brandName: string;
   criteria: CampaignInviteCriteria;
   onInvited?: () => void;
-}
-
-function parseExternalLines(raw: string): { name: string; email: string }[] {
-  return raw
-    .split(/[\n,;]+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const emailMatch = line.match(/[\w.+-]+@[\w.-]+\.\w+/);
-      const email = emailMatch?.[0] ?? "";
-      const name =
-        line
-          .replace(email, "")
-          .replace(/[<>",]/g, "")
-          .trim() || email.split("@")[0];
-      return { name, email };
-    })
-    .filter((entry) => entry.email);
 }
 
 export function InviteCreatorDrawer({
@@ -149,7 +132,7 @@ export function InviteCreatorDrawer({
           sent += 1;
         }
       } else {
-        const externals = parseExternalLines(externalRaw);
+        const externals = parseBrandLines(externalRaw);
         for (const entry of externals) {
           if (alreadyInvitedEmails.has(entry.email.toLowerCase())) continue;
           await sendCampaignInvite(
@@ -183,7 +166,7 @@ export function InviteCreatorDrawer({
   };
 
   const canSend =
-    tab === "matched" ? selectedIds.size > 0 : parseExternalLines(externalRaw).length > 0;
+    tab === "matched" ? selectedIds.size > 0 : parseBrandLines(externalRaw).length > 0;
 
   return (
     <>

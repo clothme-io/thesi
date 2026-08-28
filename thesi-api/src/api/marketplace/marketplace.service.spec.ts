@@ -56,7 +56,7 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
       status,
       startDate: input.campaign.startDate,
       endDate: input.campaign.endDate,
-      applicationDeadline: input.campaign.startDate,
+      applicationDeadline: input.campaign.endDate,
       brief: input.campaign.brief,
       deliverables: input.campaign.deliverables,
       exampleVideoLinks: input.campaign.exampleVideoLinks ?? [],
@@ -175,6 +175,8 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
       addedToCrm: application.addedToCrm,
       status: application.status ?? 'pending',
       creatorUserId: application.creatorUserId,
+      creatorEmail: application.creatorEmail || 'creator@example.com',
+      creatorName: application.creatorName || 'Creator',
     };
   }
 
@@ -205,12 +207,16 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
 describe('MarketplaceService', () => {
   let repository: FakeMarketplaceRepository;
   let inbox: { notifySelf: jest.Mock };
+  let invites: { acceptMarketplaceApplicant: jest.Mock };
   let service: MarketplaceService;
 
   beforeEach(() => {
     repository = new FakeMarketplaceRepository();
     inbox = {
       notifySelf: jest.fn().mockResolvedValue({}),
+    };
+    invites = {
+      acceptMarketplaceApplicant: jest.fn().mockResolvedValue({}),
     };
     const creatorCrm = {
       addListingToPipeline: jest.fn().mockResolvedValue(undefined),
@@ -219,6 +225,7 @@ describe('MarketplaceService', () => {
       repository,
       creatorCrm as never,
       inbox as never,
+      invites as never,
     );
   });
 
@@ -236,6 +243,7 @@ describe('MarketplaceService', () => {
 
     await service.syncFromCampaign('brand-1', campaign);
     expect(repository.listings).toHaveLength(1);
+    expect(repository.listings[0]?.applicationDeadline).toBe(campaign.endDate);
 
     await service.syncFromCampaign('brand-1', {
       ...campaign,
@@ -271,6 +279,96 @@ describe('MarketplaceService', () => {
     });
     expect(repository.listings).toHaveLength(1);
     expect(repository.listings[0]?.status).toBe('closed');
+  });
+
+  it('notifies the brand inbox when a campaign first goes live', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand',
+      companyName: 'Acme',
+    };
+    const campaign = sampleCampaign({
+      postToMarketplace: true,
+      status: 'active',
+    });
+
+    await service.syncFromCampaign('brand-1', campaign);
+    expect(inbox.notifySelf).toHaveBeenCalledWith(
+      'brand-1',
+      expect.objectContaining({
+        type: 'campaign_update',
+        title: 'Campaign published to marketplace',
+        href: '/app/marketplace',
+        campaignId: campaign.id,
+      }),
+    );
+
+    inbox.notifySelf.mockClear();
+    await service.syncFromCampaign('brand-1', campaign);
+    expect(inbox.notifySelf).not.toHaveBeenCalled();
+  });
+
+  it('hides closed listings from creator marketplace browse', async () => {
+    repository.user = {
+      id: 'creator-1',
+      role: 'creator',
+      fullName: 'Creator',
+      companyName: null,
+    };
+    repository.listings = [
+      {
+        id: 'open-1',
+        name: 'Open campaign',
+        brandName: 'Acme',
+        ownerUserId: 'brand-1',
+        campaignId: 'campaign-open',
+        campaignType: 'experience',
+        type: 'tiktok',
+        status: 'open',
+        startDate: '2026-07-01',
+        endDate: '2026-09-01',
+        applicationDeadline: '2026-09-01',
+        brief: 'Brief',
+        deliverables: '1 video',
+        exampleVideoLinks: [],
+        requirements: [],
+        files: [],
+        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        location: 'Remote',
+        remoteOk: true,
+        slots: 5,
+        applicantsCount: 0,
+        postedAt: new Date().toISOString(),
+      },
+      {
+        id: 'closed-1',
+        name: 'Paused campaign',
+        brandName: 'Acme',
+        ownerUserId: 'brand-1',
+        campaignId: 'campaign-closed',
+        campaignType: 'community',
+        type: 'mixed_bundle',
+        status: 'closed',
+        startDate: '2026-07-01',
+        endDate: '2026-09-01',
+        applicationDeadline: '2026-09-01',
+        brief: 'Brief',
+        deliverables: '1 video',
+        exampleVideoLinks: [],
+        requirements: [],
+        files: [],
+        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        location: 'Remote',
+        remoteOk: true,
+        slots: 5,
+        applicantsCount: 0,
+        postedAt: new Date().toISOString(),
+      },
+    ];
+
+    const result = await service.getMarketplace('creator-1');
+    expect(result.listings.map((listing) => listing.id)).toEqual(['open-1']);
   });
 
   it('lets creators apply once and notifies the brand', async () => {
@@ -452,6 +550,15 @@ describe('MarketplaceService', () => {
         href: '/app/marketplace/listing-1',
       }),
     );
+    expect(invites.acceptMarketplaceApplicant).toHaveBeenCalledWith({
+      brandUserId: 'brand-1',
+      campaignId: 'campaign-1',
+      campaignName: 'Summer',
+      brandName: 'Acme',
+      creatorUserId: 'creator-1',
+      creatorEmail: 'alex@example.com',
+      creatorName: 'Alex',
+    });
 
     await expect(
       service.respondToApplication('brand-1', 'listing-1', 'app-1', 'rejected'),

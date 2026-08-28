@@ -140,6 +140,50 @@ export class PostgresInvitesRepository implements InvitesRepository {
     return this.toCampaignInvite(row);
   }
 
+  async upsertAcceptedCampaignInvite(input: CreateCampaignInviteInput) {
+    const existing = await this.findCampaignInviteByEmail(
+      input.campaignId,
+      input.creatorEmail,
+    );
+    if (existing) {
+      const [row] = await this.db
+        .update(schema.campaignInvite)
+        .set({
+          status: 'accepted',
+          creatorUserId: input.creatorUserId ?? null,
+          creatorName: input.creatorName.trim() || existing.creatorName,
+          campaignName: input.campaignName,
+          brandName: input.brandName,
+          external: false,
+        })
+        .where(eq(schema.campaignInvite.id, existing.id))
+        .returning();
+      if (!row) {
+        throw new Error('Failed to update accepted campaign invite');
+      }
+      return this.toCampaignInvite(row);
+    }
+
+    const [row] = await this.db
+      .insert(schema.campaignInvite)
+      .values({
+        campaignId: input.campaignId,
+        brandUserId: input.brandUserId,
+        campaignName: input.campaignName,
+        brandName: input.brandName,
+        creatorUserId: input.creatorUserId ?? null,
+        creatorEmail: input.creatorEmail.trim().toLowerCase(),
+        creatorName: input.creatorName.trim(),
+        external: false,
+        status: 'accepted',
+      })
+      .returning();
+    if (!row) {
+      throw new Error('Failed to create accepted campaign invite');
+    }
+    return this.toCampaignInvite(row);
+  }
+
   async updateCampaignInviteStatus(
     inviteId: string,
     status: Exclude<InviteStatus, 'sent'>,

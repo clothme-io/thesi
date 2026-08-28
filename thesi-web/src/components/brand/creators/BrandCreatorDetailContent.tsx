@@ -10,7 +10,16 @@ import {
   useCreatorDirectoryProfile,
 } from "@/lib/brand-creators/storage";
 import { BRAND_CREATORS_ROUTES } from "@/lib/brand-creators/routes";
-import { formatCount, formatPercent } from "@/lib/creators/types";
+import {
+  formatCount,
+  formatFollowers,
+  formatPercent,
+  formatStatCount,
+  formatStatPercent,
+  formatSyncedAgo,
+  hasConnectedStats,
+  isConnectedPlatformSource,
+} from "@/lib/creators/types";
 
 export function BrandCreatorDetailContent() {
   const { id } = useParams<{ id: string }>();
@@ -38,6 +47,8 @@ export function BrandCreatorDetailContent() {
   }
 
   const fav = isFavorite(favData, creator.id);
+  const connected = hasConnectedStats(creator.stats);
+  const syncedAgo = formatSyncedAgo(creator.statsSyncedAt);
 
   return (
     <>
@@ -46,7 +57,17 @@ export function BrandCreatorDetailContent() {
           <Link href={BRAND_CREATORS_ROUTES.list} className="auth-link" style={{ fontSize: 13 }}>
             ← Creators
           </Link>
-          <h1 style={{ marginTop: 4 }}>{creator.name}</h1>
+          <h1 style={{ marginTop: 4 }}>
+            {creator.name}
+            {connected && (
+              <span
+                className="marketplace-badge marketplace-badge--applied"
+                style={{ marginLeft: 10, verticalAlign: "middle" }}
+              >
+                Connected
+              </span>
+            )}
+          </h1>
           <span className="workspace-subtitle">
             {creator.platforms.join(" · ") || "No platforms"} · {creator.location || "—"}
           </span>
@@ -101,7 +122,9 @@ export function BrandCreatorDetailContent() {
                 Analyze views, comments, and engagement on past brand content.
               </p>
               {creator.ugcPosts.length === 0 ? (
-                <p className="workspace-hint">No UGC posts on file yet.</p>
+                <p className="workspace-hint">
+                  This creator has not added work yet.
+                </p>
               ) : (
                 <div className="brand-ugc-table-wrap">
                   <table className="brand-table brand-ugc-table">
@@ -122,14 +145,30 @@ export function BrandCreatorDetailContent() {
                       {creator.ugcPosts.map((post) => (
                         <tr key={post.id}>
                           <td>
-                            <strong>{post.title}</strong>
+                            {post.url ? (
+                              <a href={post.url} target="_blank" rel="noreferrer">
+                                <strong>{post.title}</strong>
+                              </a>
+                            ) : (
+                              <strong>{post.title}</strong>
+                            )}
                             {post.brandName && (
                               <span className="brand-ugc-brand" style={{ display: "block" }}>
                                 {post.brandName}
                               </span>
                             )}
                           </td>
-                          <td>{post.platform}</td>
+                          <td>
+                            {post.platform}
+                            {isConnectedPlatformSource(post.source) ? (
+                              <span
+                                className="workspace-hint"
+                                style={{ display: "block", margin: 0 }}
+                              >
+                                Synced
+                              </span>
+                            ) : null}
+                          </td>
                           <td>{post.campaignName ?? "—"}</td>
                           <td>{formatCount(post.views)}</td>
                           <td>{formatCount(post.likes)}</td>
@@ -149,17 +188,30 @@ export function BrandCreatorDetailContent() {
           <aside>
             <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
               <h3>Performance stats</h3>
+              <p className="workspace-hint" style={{ marginTop: 0 }}>
+                {connected
+                  ? "Followers and views include connected social accounts. Campaigns done and response rate come from Thesi invites."
+                  : "Followers and views are self-reported until social accounts are connected. Campaigns done and response rate come from Thesi invites."}
+                {syncedAgo ? ` ${syncedAgo}.` : ""}
+              </p>
               <div className="brand-creator-stats-grid">
                 <div className="brand-creator-stat">
-                  <strong>{formatCount(creator.stats.totalFollowers)}</strong>
+                  <strong>
+                    {formatFollowers(
+                      creator.stats.totalFollowers,
+                      creator.followerRange,
+                    )}
+                  </strong>
                   <span>Total followers</span>
                 </div>
                 <div className="brand-creator-stat">
-                  <strong>{formatCount(creator.stats.avgViews)}</strong>
+                  <strong>{formatStatCount(creator.stats.avgViews)}</strong>
                   <span>Avg views</span>
                 </div>
                 <div className="brand-creator-stat">
-                  <strong>{formatPercent(creator.stats.avgEngagementRate)}</strong>
+                  <strong>
+                    {formatStatPercent(creator.stats.avgEngagementRate)}
+                  </strong>
                   <span>Avg engagement</span>
                 </div>
                 <div className="brand-creator-stat">
@@ -175,24 +227,45 @@ export function BrandCreatorDetailContent() {
 
             <div className="crm-detail-panel">
               <h3>By platform</h3>
-              {creator.stats.platforms.length === 0 ? (
-                <p className="workspace-hint">No platform stats yet.</p>
+              {creator.stats.platforms.filter((platform) => platform.followers > 0)
+                .length === 0 ? (
+                <p className="workspace-hint">
+                  {creator.followerRange
+                    ? `No per-platform counts yet. Range: ${creator.followerRange}.`
+                    : "No platform stats yet."}
+                </p>
               ) : (
-                creator.stats.platforms.map((platform) => (
+                creator.stats.platforms
+                  .filter((platform) => platform.followers > 0)
+                  .map((platform) => (
                   <div key={platform.platform} style={{ marginBottom: 16 }}>
-                    <strong>{platform.platform}</strong>
+                    <strong>
+                      {platform.platform}
+                      {isConnectedPlatformSource(platform.source) && (
+                        <span
+                          className="marketplace-badge marketplace-badge--applied"
+                          style={{ marginLeft: 8 }}
+                        >
+                          Connected
+                        </span>
+                      )}
+                    </strong>
                     <div className="crm-meta-row">
                       <span>Followers</span>
                       <span>{formatCount(platform.followers)}</span>
                     </div>
-                    <div className="crm-meta-row">
-                      <span>Avg views</span>
-                      <span>{formatCount(platform.avgViews)}</span>
-                    </div>
-                    <div className="crm-meta-row">
-                      <span>Engagement</span>
-                      <span>{formatPercent(platform.engagementRate)}</span>
-                    </div>
+                    {platform.avgViews > 0 && (
+                      <div className="crm-meta-row">
+                        <span>Avg views</span>
+                        <span>{formatCount(platform.avgViews)}</span>
+                      </div>
+                    )}
+                    {platform.engagementRate > 0 && (
+                      <div className="crm-meta-row">
+                        <span>Engagement</span>
+                        <span>{formatPercent(platform.engagementRate)}</span>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

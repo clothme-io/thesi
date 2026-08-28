@@ -35,7 +35,7 @@ export default function SignInPage() {
     <GuestGuard>
       <AuthLayout
         title="Sign in"
-        subtitle="Welcome back. Enter the email and password sent with your invitation."
+        subtitle="Welcome back. Enter the email and password for your Thesi account."
       >
         <form onSubmit={handleSubmit}>
           {error && (

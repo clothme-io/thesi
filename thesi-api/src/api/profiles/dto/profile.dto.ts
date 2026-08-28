@@ -1,11 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
   IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
   IsString,
+  Matches,
+  Max,
   MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+import { CREATOR_FOLLOWER_RANGES } from '../follower-range.util';
 
 const CREATOR_NICHES = [
   'Fashion',
@@ -24,6 +33,86 @@ const BRAND_PLATFORMS = [
   'Pinterest',
   'Snapchat',
 ];
+
+const UGC_PLATFORMS = ['TikTok', 'Instagram', 'YouTube'] as const;
+
+export class CreatorUgcPostInputDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  id?: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(200)
+  title: string;
+
+  @ApiProperty({ enum: UGC_PLATFORMS })
+  @IsIn(UGC_PLATFORMS)
+  platform: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  url?: string;
+
+  @ApiProperty({ example: '2026-08-01' })
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  postedAt: string;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  views: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  likes: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  comments?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  shares?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  saves?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  campaignName?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  brandName?: string;
+}
 
 export class UpdateCreatorProfileDto {
   @ApiProperty()
@@ -87,6 +176,52 @@ export class UpdateCreatorProfileDto {
   @IsString()
   @MaxLength(500)
   portfolioUrl: string;
+
+  @ApiProperty({ enum: ['', ...CREATOR_FOLLOWER_RANGES] })
+  @IsIn(['', ...CREATOR_FOLLOWER_RANGES])
+  followerRange: string;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  tiktokFollowers: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  instagramFollowers: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  youtubeFollowers: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000_000)
+  avgViews: number;
+
+  @ApiProperty()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  avgEngagementRate: number;
+
+  @ApiProperty({ type: [CreatorUgcPostInputDto] })
+  @IsArray()
+  @ArrayMaxSize(12)
+  @ValidateNested({ each: true })
+  @Type(() => CreatorUgcPostInputDto)
+  ugcPosts: CreatorUgcPostInputDto[];
 }
 
 export class UpdateBrandProfileDto {

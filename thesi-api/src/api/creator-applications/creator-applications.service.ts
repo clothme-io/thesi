@@ -15,6 +15,7 @@ import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { EmailService } from 'src/shared/email/email.service';
 import { generateTempPassword } from 'src/shared/auth/token.util';
+import { creatorProfileSeedFromApplication } from 'src/api/profiles/follower-range.util';
 import {
   CreateCreatorApplicationDto,
   CreatorApplicationData,
@@ -98,7 +99,7 @@ export class CreatorApplicationsService {
           return { application: current, alreadyApproved: true };
         }
 
-        await this.authService.createUserFromApplication(
+        const user = await this.authService.createUserFromApplication(
           {
             email: current.email,
             fullName: current.fullName,
@@ -107,6 +108,21 @@ export class CreatorApplicationsService {
           },
           tx,
         );
+        const seed = creatorProfileSeedFromApplication(current);
+        await tx
+          .insert(schema.creatorProfile)
+          .values({
+            userId: user.id,
+            displayName: seed.displayName,
+            location: seed.location,
+            instagram: seed.instagram,
+            tiktok: seed.tiktok,
+            youtube: seed.youtube,
+            followerRange: seed.followerRange,
+            portfolioUrl: seed.portfolioUrl,
+            platforms: seed.platforms,
+          })
+          .onConflictDoNothing();
 
         const [updated] = await tx
           .update(schema.thesiCreatorApplication)

@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import { toDateInputValue } from "@/lib/brand-campaigns/date";
 import type { CampaignInput } from "@/lib/brand-campaigns/storage";
 import {
+  buildCampaignPayment,
+  centsToInput,
+  formPayoutCents,
+  milestonesToFormRows,
+  seedMilestonesIfNeeded,
+  type MilestoneFormRow,
+} from "@/lib/brand-campaigns/payment-form";
+import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
   formatMoney,
@@ -12,6 +20,7 @@ import {
   type BrandCampaignPaymentModel,
   type BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
+import { MilestoneBuilder } from "./MilestoneBuilder";
 import {
   calculatePlatformFeeCents,
   formatCents,
@@ -51,17 +60,6 @@ function parseList(raw: string): string[] {
     .filter(Boolean);
 }
 
-function parseMoneyToCents(raw: string): number {
-  const num = Number(raw.replace(/[^0-9.]/g, ""));
-  if (Number.isNaN(num)) return 0;
-  return Math.round(num * 100);
-}
-
-function centsToInput(cents?: number): string {
-  if (!cents) return "";
-  return (cents / 100).toFixed(2);
-}
-
 export type DraftCampaignFormState = {
   name: string;
   campaignType: BrandCampaignGoalType;
@@ -77,6 +75,7 @@ export type DraftCampaignFormState = {
   platforms: string;
   paymentModel: BrandCampaignPaymentModel;
   flatAmount: string;
+  milestones: MilestoneFormRow[];
   paymentNotes: string;
   postToMarketplace: boolean;
 };
@@ -102,6 +101,7 @@ export function draftFormFromCampaign(
     platforms: campaign.requirements.platforms.join(", "),
     paymentModel: campaign.payment.model,
     flatAmount: centsToInput(campaign.payment.flatRateCents),
+    milestones: milestonesToFormRows(campaign.payment.milestones),
     paymentNotes: campaign.payment.notes ?? "",
     postToMarketplace: campaign.postToMarketplace,
   };
@@ -127,11 +127,12 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       platforms: parseList(form.platforms),
     },
     files: [],
-    payment: {
+    payment: buildCampaignPayment({
       model: form.paymentModel,
-      flatRateCents: parseMoneyToCents(form.flatAmount),
-      notes: form.paymentNotes || undefined,
-    },
+      flatAmount: form.flatAmount,
+      notes: form.paymentNotes,
+      milestones: form.milestones,
+    }),
     postToMarketplace: form.postToMarketplace,
   };
 }
@@ -151,7 +152,11 @@ export function DraftCampaignEditForm({
   pendingFiles,
   onPendingFiles,
 }: Props) {
-  const payoutCents = parseMoneyToCents(form.flatAmount);
+  const payoutCents = formPayoutCents(
+    form.paymentModel,
+    form.flatAmount,
+    form.milestones,
+  );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
 
@@ -329,9 +334,14 @@ export function DraftCampaignEditForm({
             <span>Payment type</span>
             <select
               value={form.paymentModel}
-              onChange={(e) =>
-                set("paymentModel", e.target.value as BrandCampaignPaymentModel)
-              }
+              onChange={(e) => {
+                const next = e.target.value as BrandCampaignPaymentModel;
+                onChange({
+                  ...form,
+                  paymentModel: next,
+                  milestones: seedMilestonesIfNeeded(next, form.milestones),
+                });
+              }}
             >
               {PAYMENT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -340,15 +350,22 @@ export function DraftCampaignEditForm({
               ))}
             </select>
           </label>
-          <label className="workspace-field">
-            <span>Base/flat amount</span>
-            <input
-              type="text"
-              placeholder="$0.00"
-              value={form.flatAmount}
-              onChange={(e) => set("flatAmount", e.target.value)}
+          {form.paymentModel === "milestone" ? (
+            <MilestoneBuilder
+              rows={form.milestones}
+              onChange={(milestones) => onChange({ ...form, milestones })}
             />
-          </label>
+          ) : (
+            <label className="workspace-field">
+              <span>Base/flat amount</span>
+              <input
+                type="text"
+                placeholder="$0.00"
+                value={form.flatAmount}
+                onChange={(e) => set("flatAmount", e.target.value)}
+              />
+            </label>
+          )}
           <label className="workspace-field workspace-field--full">
             <span>Payment notes</span>
             <textarea

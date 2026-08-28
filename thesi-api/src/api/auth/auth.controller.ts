@@ -16,10 +16,12 @@ import { CurrentUser } from 'src/shared/auth/current-user.decorator';
 import { JwtAuthGuard } from 'src/shared/auth/jwt-auth.guard';
 import type { AuthJwtPayload } from 'src/shared/auth/jwt-auth.guard';
 import { AuthService } from './auth.service';
-import { AuthResponse } from './dto/auth-response.dto';
+import { AuthResponse, PasswordResetAckResponse } from './dto/auth-response.dto';
 import {
   ChangePasswordDto,
+  ForgotPasswordDto,
   RefreshTokenDto,
+  ResetPasswordDto,
   SignInDto,
   SignUpDto,
 } from './dto/auth.dto';
@@ -67,5 +69,29 @@ export class AuthController {
   ): Promise<AuthResponse> {
     const data = await this.authService.changePassword(user.sub, dto);
     return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Request a password reset email (always returns success)',
+  })
+  @ApiResponse({ status: 200, type: PasswordResetAckResponse })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+  ): Promise<PasswordResetAckResponse> {
+    await this.authService.requestPasswordReset(dto.email);
+    return { status: HttpStatus.OK, error: null, data: { ok: true } };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a new password using a reset token' })
+  @ApiResponse({ status: 200, type: PasswordResetAckResponse })
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+  ): Promise<PasswordResetAckResponse> {
+    await this.authService.resetPassword(dto);
+    return { status: HttpStatus.OK, error: null, data: { ok: true } };
   }
 }

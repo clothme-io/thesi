@@ -227,12 +227,33 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
   ): Promise<
     | (MarketplaceApplicationRecord & {
         creatorUserId: string;
+        creatorEmail: string;
+        creatorName: string;
       })
     | null
   > {
     const [row] = await this.db
-      .select()
+      .select({
+        id: schema.marketplaceApplication.id,
+        listingId: schema.marketplaceApplication.listingId,
+        pitch: schema.marketplaceApplication.pitch,
+        appliedAt: schema.marketplaceApplication.appliedAt,
+        addedToCrm: schema.marketplaceApplication.addedToCrm,
+        status: schema.marketplaceApplication.status,
+        creatorUserId: schema.marketplaceApplication.creatorUserId,
+        creatorEmail: schema.thesiUser.email,
+        creatorName: schema.thesiUser.fullName,
+        displayName: schema.creatorProfile.displayName,
+      })
       .from(schema.marketplaceApplication)
+      .innerJoin(
+        schema.thesiUser,
+        eq(schema.thesiUser.id, schema.marketplaceApplication.creatorUserId),
+      )
+      .leftJoin(
+        schema.creatorProfile,
+        eq(schema.creatorProfile.userId, schema.marketplaceApplication.creatorUserId),
+      )
       .where(eq(schema.marketplaceApplication.id, applicationId))
       .limit(1);
     if (!row) return null;
@@ -244,6 +265,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       addedToCrm: row.addedToCrm,
       status: row.status as MarketplaceApplicationRecord['status'],
       creatorUserId: row.creatorUserId,
+      creatorEmail: row.creatorEmail,
+      creatorName: row.displayName?.trim() || row.creatorName,
     };
   }
 

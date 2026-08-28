@@ -99,6 +99,7 @@ function sampleCreator(id: string, name: string): CreatorDirectoryProfile {
     platforms: ['TikTok'],
     followerRange: '10k+',
     bio: 'Bio',
+    statsSyncedAt: null,
     stats: {
       totalFollowers: 1000,
       avgViews: 2000,

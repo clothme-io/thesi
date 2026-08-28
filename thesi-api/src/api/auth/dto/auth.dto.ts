@@ -59,6 +59,34 @@ export class ChangePasswordDto {
   confirmPassword: string;
 }
 
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'you@example.com' })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  confirmPassword: string;
+}
+
+export class PasswordResetAckDto {
+  @ApiProperty() ok: boolean;
+}
+
 export class AuthUserDto {
   @ApiProperty() id: string;
   @ApiProperty() email: string;

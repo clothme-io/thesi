@@ -1,5 +1,4 @@
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
-import { addInboxNotification } from "@/lib/inbox/storage";
 
 type AuthenticatedRequest = <T>(
   path: string,
@@ -10,29 +9,16 @@ type AuthenticatedRequest = <T>(
 ) => Promise<T>;
 
 /**
- * Marketplace listings are synced by thesi-api when campaigns are created/updated.
- * This helper keeps the brand inbox notification when a campaign goes live.
+ * Marketplace listings and brand inbox notifications are owned by thesi-api
+ * when campaigns are created or updated.
  */
 export async function publishCampaignToMarketplace(
-  campaign: BrandCampaign,
+  _campaign: BrandCampaign,
   _ownerUserId: string,
   _brandName?: string,
-  authenticatedRequest?: AuthenticatedRequest,
+  _authenticatedRequest?: AuthenticatedRequest,
 ): Promise<void> {
-  if (!campaign.postToMarketplace || campaign.status !== "active") {
-    return;
-  }
-
-  if (authenticatedRequest) {
-    await addInboxNotification(authenticatedRequest, {
-      type: "campaign_update",
-      title: "Campaign published to marketplace",
-      body: `"${campaign.name}" is now live on the marketplace for creators to browse and apply.`,
-      href: "/app/marketplace",
-      campaignId: campaign.id,
-      audience: "brand",
-    });
-  }
+  return;
 }
 
 export function unpublishCampaignFromMarketplace(_campaignId: string): void {

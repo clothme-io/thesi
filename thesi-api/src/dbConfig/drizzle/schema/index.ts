@@ -10,6 +10,7 @@ export * from './inboxSchema';
 export * from './invitesSchema';
 export * from './marketplaceSchema';
 export * from './onboardingAnswersSchema';
+export * from './passwordResetTokenSchema';
 export * from './profileSchema';
 export * from './refreshTokenSchema';
 export * from './settingsSchema';

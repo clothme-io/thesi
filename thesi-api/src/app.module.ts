@@ -13,6 +13,7 @@ import { InboxModule } from './api/inbox/inbox.module';
 import { InvitesModule } from './api/invites/invites.module';
 import { BillingModule } from './api/billing/billing.module';
 import { ConnectModule } from './api/connect/connect.module';
+import { SocialModule } from './api/social/social.module';
 import { StripeWebhooksModule } from './api/stripe-webhooks/stripe-webhooks.module';
 import {
   HealthController,
@@ -42,6 +43,7 @@ import { StripeModule } from './shared/stripe/stripe.module';
     InvitesModule,
     BillingModule,
     ConnectModule,
+    SocialModule,
     StripeWebhooksModule,
   ],
   controllers: [HealthController, ReadinessController],

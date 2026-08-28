@@ -1,9 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth } from "@/context/AuthProvider";
 import { useCreatorProfile } from "@/lib/profile/creator-storage";
-import { CREATOR_NICHE_OPTIONS } from "@/lib/profile/creator-types";
+import {
+  CREATOR_FOLLOWER_RANGE_OPTIONS,
+  CREATOR_NICHE_OPTIONS,
+} from "@/lib/profile/creator-types";
 import { getInitials } from "@/lib/profile/shared";
+import { CreatorPortfolioBuilder } from "./CreatorPortfolioBuilder";
 
 export function CreatorProfilePageContent() {
   const { session, authenticatedRequest } = useAuth();
@@ -125,12 +130,48 @@ export function CreatorProfilePageContent() {
                 />
               </label>
               <label className="workspace-field">
+                <span>Instagram followers</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={
+                    profile.instagramFollowers
+                      ? String(profile.instagramFollowers)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    updateProfile({
+                      instagramFollowers:
+                        Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
+                    })
+                  }
+                />
+              </label>
+              <label className="workspace-field">
                 <span>TikTok</span>
                 <input
                   type="text"
                   value={profile.tiktok}
                   onChange={(e) => updateProfile({ tiktok: e.target.value })}
                   placeholder="@handle"
+                />
+              </label>
+              <label className="workspace-field">
+                <span>TikTok followers</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={
+                    profile.tiktokFollowers ? String(profile.tiktokFollowers) : ""
+                  }
+                  onChange={(e) =>
+                    updateProfile({
+                      tiktokFollowers:
+                        Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
+                    })
+                  }
                 />
               </label>
               <label className="workspace-field">
@@ -143,7 +184,26 @@ export function CreatorProfilePageContent() {
                 />
               </label>
               <label className="workspace-field">
-                <span>Portfolio</span>
+                <span>YouTube subscribers</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={
+                    profile.youtubeFollowers
+                      ? String(profile.youtubeFollowers)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    updateProfile({
+                      youtubeFollowers:
+                        Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
+                    })
+                  }
+                />
+              </label>
+              <label className="workspace-field workspace-field--full">
+                <span>Portfolio site</span>
                 <input
                   type="url"
                   value={profile.portfolioUrl}
@@ -151,6 +211,69 @@ export function CreatorProfilePageContent() {
                   placeholder="https://"
                 />
               </label>
+            </div>
+          </section>
+
+          <section className="workspace-section">
+            <h3>Audience</h3>
+            <p className="workspace-hint" style={{ marginTop: 0 }}>
+              Brands see these numbers until you{" "}
+              <Link href="/app/settings/social" className="auth-link">
+                connect social accounts
+              </Link>
+              . Range is enough if you do not have exact counts yet.
+            </p>
+            <div className="workspace-grid">
+              <label className="workspace-field">
+                <span>Follower range</span>
+                <select
+                  value={profile.followerRange}
+                  onChange={(e) => updateProfile({ followerRange: e.target.value })}
+                >
+                  {CREATOR_FOLLOWER_RANGE_OPTIONS.map((option) => (
+                    <option key={option.value || "none"} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="workspace-field">
+                <span>Typical views</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={profile.avgViews ? String(profile.avgViews) : ""}
+                  onChange={(e) =>
+                    updateProfile({
+                      avgViews: Number(e.target.value.replace(/[^0-9]/g, "")) || 0,
+                    })
+                  }
+                />
+              </label>
+              <label className="workspace-field">
+                <span>Engagement %</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
+                  value={
+                    profile.avgEngagementRate
+                      ? String(profile.avgEngagementRate)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    updateProfile({
+                      avgEngagementRate:
+                        Number(e.target.value.replace(/[^0-9.]/g, "")) || 0,
+                    })
+                  }
+                />
+              </label>
+              <CreatorPortfolioBuilder
+                posts={profile.ugcPosts}
+                onChange={(ugcPosts) => updateProfile({ ugcPosts })}
+              />
             </div>
           </section>
 

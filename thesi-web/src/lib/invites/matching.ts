@@ -1,10 +1,18 @@
 import type { CreatorDirectoryEntry } from "@/lib/creators/types";
 import type { CampaignInviteCriteria } from "./types";
 
-function parseFollowerMin(range: string): number {
-  const match = range.match(/(\d+)\s*k/i);
+function parseBound(part: string): number {
+  const match = part.match(/(\d+(?:\.\d+)?)/);
   if (!match) return 0;
-  return Number(match[1]) * 1000;
+  const value = Number(match[1]);
+  return /k/i.test(part) ? value * 1000 : value;
+}
+
+export function parseFollowerMin(range: string): number {
+  const normalized = range.trim().toLowerCase().replace(/–/g, "-");
+  if (!normalized) return 0;
+  if (normalized.includes("+")) return parseBound(normalized);
+  return parseBound(normalized.split("-")[0] ?? "");
 }
 
 function locationMatches(campaignLocation: string, creatorLocation: string): boolean {

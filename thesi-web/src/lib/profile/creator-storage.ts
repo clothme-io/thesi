@@ -57,7 +57,14 @@ export function useCreatorProfile(
     setError("");
     authenticatedRequest<CreatorProfile>("/api/profile")
       .then((data) => {
-        if (active) setProfile(data);
+        if (active) {
+          setProfile({
+            ...DEFAULT_CREATOR_PROFILE,
+            displayName: fallbackName,
+            ...data,
+            ugcPosts: Array.isArray(data.ugcPosts) ? data.ugcPosts : [],
+          });
+        }
       })
       .catch((requestError) => {
         if (active) {
@@ -88,9 +95,31 @@ export function useCreatorProfile(
       try {
         const savedProfile = await authenticatedRequest<CreatorProfile>(
           "/api/profile/creator",
-          { method: "PUT", body: next },
+          {
+            method: "PUT",
+            body: {
+              ...next,
+              tiktokFollowers: Number(next.tiktokFollowers) || 0,
+              instagramFollowers: Number(next.instagramFollowers) || 0,
+              youtubeFollowers: Number(next.youtubeFollowers) || 0,
+              avgViews: Number(next.avgViews) || 0,
+              avgEngagementRate: Math.min(
+                100,
+                Math.round((Number(next.avgEngagementRate) || 0) * 100) / 100,
+              ),
+              ugcPosts: next.ugcPosts.filter(
+                (post) => post.title.trim() && post.platform.trim(),
+              ),
+            },
+          },
         );
-        setProfile(savedProfile);
+        setProfile({
+          ...DEFAULT_CREATOR_PROFILE,
+          ...savedProfile,
+          ugcPosts: Array.isArray(savedProfile.ugcPosts)
+            ? savedProfile.ugcPosts
+            : [],
+        });
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       } catch (requestError) {

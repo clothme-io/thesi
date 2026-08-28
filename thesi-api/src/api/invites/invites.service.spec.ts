@@ -98,6 +98,47 @@ class FakeInvitesRepository implements InvitesRepository {
     return invite;
   }
 
+  async upsertAcceptedCampaignInvite(input: {
+    campaignId: string;
+    brandUserId: string;
+    campaignName: string;
+    brandName: string;
+    creatorUserId?: string | null;
+    creatorEmail: string;
+    creatorName: string;
+    external: boolean;
+  }) {
+    const existing = this.campaignInvites.find(
+      (invite) =>
+        invite.campaignId === input.campaignId &&
+        invite.creatorEmail.toLowerCase() === input.creatorEmail.toLowerCase(),
+    );
+    if (existing) {
+      existing.status = 'accepted';
+      existing.external = false;
+      if (input.creatorUserId) existing.creatorId = input.creatorUserId;
+      existing.creatorName = input.creatorName || existing.creatorName;
+      existing.campaignName = input.campaignName;
+      existing.brandName = input.brandName;
+      return existing;
+    }
+    const invite: CampaignInviteRecord = {
+      id: `invite-${this.campaignInvites.length + 1}`,
+      campaignId: input.campaignId,
+      brandUserId: input.brandUserId,
+      campaignName: input.campaignName,
+      brandName: input.brandName,
+      ...(input.creatorUserId ? { creatorId: input.creatorUserId } : {}),
+      creatorEmail: input.creatorEmail,
+      creatorName: input.creatorName,
+      external: false,
+      status: 'accepted',
+      sentAt: new Date().toISOString(),
+    };
+    this.campaignInvites.push(invite);
+    return invite;
+  }
+
   async updateCampaignInviteStatus(
     inviteId: string,
     status: Exclude<InviteStatus, 'sent'>,
@@ -236,6 +277,39 @@ describe('InvitesService', () => {
 
     expect(inbox.deliverCampaignInvite).not.toHaveBeenCalled();
     expect(novu.trigger).toHaveBeenCalled();
+  });
+
+  it('resolves pasted emails to on-platform creators', async () => {
+    const invite = await service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1',
+      campaignName: 'Summer Drop',
+      brandName: 'Acme',
+      creatorEmail: 'creator@example.com',
+      creatorName: 'Alex Creator',
+      external: true,
+    });
+
+    expect(invite.external).toBe(false);
+    expect(invite.creatorId).toBe('creator-1');
+    expect(inbox.deliverCampaignInvite).toHaveBeenCalled();
+  });
+
+  it('links an accepted marketplace applicant without Novu or extra inbox', async () => {
+    const invite = await service.acceptMarketplaceApplicant({
+      brandUserId: 'brand-1',
+      campaignId: 'camp-1',
+      campaignName: 'Summer Drop',
+      brandName: 'Acme',
+      creatorUserId: 'creator-1',
+      creatorEmail: 'creator@example.com',
+      creatorName: 'Alex Creator',
+    });
+
+    expect(invite.status).toBe('accepted');
+    expect(invite.external).toBe(false);
+    expect(invite.creatorId).toBe('creator-1');
+    expect(novu.trigger).not.toHaveBeenCalled();
+    expect(inbox.deliverCampaignInvite).not.toHaveBeenCalled();
   });
 
   it('rejects duplicate campaign invites', async () => {

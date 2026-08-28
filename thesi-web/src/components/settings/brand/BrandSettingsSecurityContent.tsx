@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 
 export function BrandSettingsSecurityContent() {
@@ -12,9 +11,9 @@ export function BrandSettingsSecurityContent() {
             <strong>Password</strong>
             <p>Update your password to keep your account secure.</p>
           </div>
-          <Link href="/onboarding/change-password" className="crm-btn-secondary">
+          <a href="/onboarding/change-password" className="crm-btn-secondary">
             Change password
-          </Link>
+          </a>
         </div>
       </section>
     </BrandSettingsSection>

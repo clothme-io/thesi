@@ -81,6 +81,9 @@ export interface InvitesRepository {
   createCampaignInvite(
     input: CreateCampaignInviteInput,
   ): Promise<CampaignInviteRecord>;
+  upsertAcceptedCampaignInvite(
+    input: CreateCampaignInviteInput,
+  ): Promise<CampaignInviteRecord>;
   updateCampaignInviteStatus(
     inviteId: string,
     status: Exclude<InviteStatus, 'sent'>,

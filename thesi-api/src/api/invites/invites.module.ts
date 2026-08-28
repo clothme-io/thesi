@@ -17,6 +17,6 @@ import { PostgresInvitesRepository } from './postgres-invites.repository';
       useClass: PostgresInvitesRepository,
     },
   ],
-  exports: [INVITES_REPOSITORY],
+  exports: [INVITES_REPOSITORY, InvitesService],
 })
 export class InvitesModule {}

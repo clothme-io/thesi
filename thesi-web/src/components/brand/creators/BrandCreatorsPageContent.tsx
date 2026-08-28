@@ -10,7 +10,12 @@ import {
   useCreatorsDirectory,
 } from "@/lib/brand-creators/storage";
 import { BRAND_CREATORS_ROUTES } from "@/lib/brand-creators/routes";
-import { formatCount, formatPercent } from "@/lib/creators/types";
+import {
+  formatFollowers,
+  formatStatCount,
+  formatStatPercent,
+  hasConnectedStats,
+} from "@/lib/creators/types";
 
 export function BrandCreatorsPageContent() {
   const { authenticatedRequest } = useAuth();
@@ -136,7 +141,17 @@ export function BrandCreatorsPageContent() {
                     </button>
                   </div>
                   <Link href={BRAND_CREATORS_ROUTES.creator(creator.id)} className="brand-creator-card-link">
-                    <h2>{creator.name}</h2>
+                    <h2>
+                      {creator.name}
+                      {hasConnectedStats(creator.stats) && (
+                        <span
+                          className="marketplace-badge marketplace-badge--applied"
+                          style={{ marginLeft: 8, fontSize: 10 }}
+                        >
+                          Connected
+                        </span>
+                      )}
+                    </h2>
                     <p className="brand-creator-card-bio">{creator.bio}</p>
                     <div className="crm-tags">
                       {creator.niches.map((tag) => (
@@ -147,15 +162,22 @@ export function BrandCreatorsPageContent() {
                     </div>
                     <div className="brand-creator-stats-row">
                       <div>
-                        <strong>{formatCount(creator.stats.totalFollowers)}</strong>
+                        <strong>
+                          {formatFollowers(
+                            creator.stats.totalFollowers,
+                            creator.followerRange,
+                          )}
+                        </strong>
                         <span>Followers</span>
                       </div>
                       <div>
-                        <strong>{formatCount(creator.stats.avgViews)}</strong>
+                        <strong>{formatStatCount(creator.stats.avgViews)}</strong>
                         <span>Avg views</span>
                       </div>
                       <div>
-                        <strong>{formatPercent(creator.stats.avgEngagementRate)}</strong>
+                        <strong>
+                          {formatStatPercent(creator.stats.avgEngagementRate)}
+                        </strong>
                         <span>Engagement</span>
                       </div>
                     </div>

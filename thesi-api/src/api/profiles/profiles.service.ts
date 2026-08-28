@@ -91,6 +91,13 @@ function defaultCreatorProfile(user: ProfileUser): CreatorProfileData {
     rateRange: '',
     turnaround: '3–5 business days',
     portfolioUrl: '',
+    followerRange: '',
+    tiktokFollowers: 0,
+    instagramFollowers: 0,
+    youtubeFollowers: 0,
+    avgViews: 0,
+    avgEngagementRate: 0,
+    ugcPosts: [],
   };
 }
 

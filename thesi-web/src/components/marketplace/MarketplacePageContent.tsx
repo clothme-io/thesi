@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthProvider";
 import { useMarketplace } from "@/lib/marketplace/storage";
-import { getListingsForBrand } from "@/lib/marketplace/listings";
+import { getBrowseListingsForCreator, getListingsForBrand } from "@/lib/marketplace/listings";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { BRAND_CAMPAIGN_GOAL_TYPE_LABELS } from "@/lib/brand-campaigns/types";
 import {
@@ -52,7 +52,7 @@ export function MarketplacePageContent() {
     if (isBrand) {
       return getListingsForBrand(data.listings, userId);
     }
-    return data.listings;
+    return getBrowseListingsForCreator(data.listings);
   }, [data.listings, isBrand, userId]);
 
   const filtered = useMemo(() => {

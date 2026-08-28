@@ -124,4 +124,23 @@ export class EmailService {
       text: `Hi ${fullName}, your Thesi creator account is ready. Sign in at ${this.signInUrl} with ${to} and temporary password: ${tempPassword}. You must set a new password on first sign-in.`,
     });
   }
+
+  async sendPasswordReset(
+    to: string,
+    fullName: string,
+    resetUrl: string,
+  ): Promise<void> {
+    await this.send({
+      to,
+      subject: 'Reset your Thesi password',
+      html: `
+        <p>Hi ${fullName || 'there'},</p>
+        <p>We received a request to reset your Thesi password.</p>
+        <p><a href="${resetUrl}">Choose a new password</a></p>
+        <p>This link expires in one hour. If you did not request a reset, you can ignore this email.</p>
+        <p>— The Thesi Team</p>
+      `,
+      text: `Hi ${fullName || 'there'}, reset your Thesi password: ${resetUrl}. This link expires in one hour. If you did not request a reset, ignore this email.`,
+    });
+  }
 }
