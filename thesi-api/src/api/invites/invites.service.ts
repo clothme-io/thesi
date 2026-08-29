@@ -106,6 +106,28 @@ export class InvitesService {
       decision: input.decision,
     });
 
+    const brandUser = await this.invites.getUser(updated.brandUserId);
+    if (brandUser) {
+      await this.novu
+        .trigger({
+          type: 'campaign_invite_response',
+          toEmail: brandUser.email,
+          subscriberId: brandUser.id,
+          brandUserName: this.firstName(brandUser.fullName),
+          creatorName: updated.creatorName || user.fullName,
+          campaignTitle: updated.campaignName,
+          response: input.decision,
+          campaignId: updated.campaignId,
+        })
+        .catch((error) =>
+          this.logger.error(
+            `Novu campaign invite response failed for ${updated.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        );
+    }
+
     return updated;
   }
 
@@ -332,5 +354,9 @@ export class InvitesService {
       throw new NotFoundException('User account not found');
     }
     return user;
+  }
+
+  private firstName(fullName: string): string {
+    return fullName.trim().split(/\s+/)[0] || 'there';
   }
 }

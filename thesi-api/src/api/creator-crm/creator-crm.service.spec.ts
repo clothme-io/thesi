@@ -70,8 +70,9 @@ class FakeCreatorCrmRepository implements CreatorCrmRepository {
 
   async findBrandByEmail(_creatorUserId: string, email: string) {
     return (
-      this.brands.find((brand) => brand.email.toLowerCase() === email.toLowerCase()) ??
-      null
+      this.brands.find(
+        (brand) => brand.email.toLowerCase() === email.toLowerCase(),
+      ) ?? null
     );
   }
 
@@ -351,9 +352,11 @@ class FakeCreatorCrmRepository implements CreatorCrmRepository {
     const payment = this.payments.find((item) => item.id === paymentId);
     if (!payment) return null;
     if (patch.status !== undefined) payment.status = patch.status;
-    if (patch.amountCents !== undefined) payment.amountCents = patch.amountCents;
+    if (patch.amountCents !== undefined)
+      payment.amountCents = patch.amountCents;
     if (patch.dueDate !== undefined) payment.dueDate = patch.dueDate;
-    if (patch.description !== undefined) payment.description = patch.description;
+    if (patch.description !== undefined)
+      payment.description = patch.description;
     if (patch.sentAt !== undefined) {
       if (patch.sentAt) payment.sentAt = patch.sentAt;
       else delete payment.sentAt;
@@ -494,7 +497,9 @@ class FakeCreatorCrmRepository implements CreatorCrmRepository {
 
   async deleteCustomObject(_creatorUserId: string, objectId: string) {
     const before = this.customObjects.length;
-    this.customObjects = this.customObjects.filter((item) => item.id !== objectId);
+    this.customObjects = this.customObjects.filter(
+      (item) => item.id !== objectId,
+    );
     this.customFields = this.customFields.filter(
       (field) => field.targetObjectId !== objectId,
     );
@@ -627,7 +632,9 @@ class FakeCreatorCrmRepository implements CreatorCrmRepository {
 
   async deleteCustomRecord(_creatorUserId: string, recordId: string) {
     const before = this.customRecords.length;
-    this.customRecords = this.customRecords.filter((item) => item.id !== recordId);
+    this.customRecords = this.customRecords.filter(
+      (item) => item.id !== recordId,
+    );
     return this.customRecords.length < before;
   }
 
@@ -690,9 +697,11 @@ class FakeCreatorCrmRepository implements CreatorCrmRepository {
     const workflow = this.workflows.find((item) => item.id === workflowId);
     if (!workflow) return null;
     if (patch.name !== undefined) workflow.name = patch.name;
-    if (patch.description !== undefined) workflow.description = patch.description;
+    if (patch.description !== undefined)
+      workflow.description = patch.description;
     if (patch.enabled !== undefined) workflow.enabled = patch.enabled;
-    if (patch.triggerType !== undefined) workflow.triggerType = patch.triggerType;
+    if (patch.triggerType !== undefined)
+      workflow.triggerType = patch.triggerType;
     if (patch.triggerConfig !== undefined) {
       workflow.triggerConfig = patch.triggerConfig;
     }
@@ -728,7 +737,12 @@ class FakeCreatorCrmRepository implements CreatorCrmRepository {
 
 class FakeFileStorage {
   async upload(
-    _file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    _file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+      size: number;
+    },
     key: string,
   ) {
     return { provider: 'local' as const, key };
@@ -741,10 +755,14 @@ class FakeFileStorage {
 
 describe('CreatorCrmService', () => {
   let repository: FakeCreatorCrmRepository;
+  let novu: { trigger: jest.Mock };
   let service: CreatorCrmService;
 
   beforeEach(() => {
     repository = new FakeCreatorCrmRepository();
+    novu = {
+      trigger: jest.fn().mockResolvedValue('txn-1'),
+    };
     repository.deals.push({
       id: 'deal-1',
       brandId: 'brand-1',
@@ -790,6 +808,7 @@ describe('CreatorCrmService', () => {
     service = new CreatorCrmService(
       repository,
       new FakeFileStorage() as never,
+      novu as never,
     );
   });
 
@@ -876,6 +895,34 @@ describe('CreatorCrmService', () => {
     expect(data.activities.some((a) => a.type === 'payment_marked_paid')).toBe(
       true,
     );
+    expect(novu.trigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'creator_payment_marked_paid',
+        toEmail: 'creator@example.com',
+      }),
+    );
+  });
+
+  it('sends a brand invoice email when an invoice is marked sent', async () => {
+    await service.createPayment('creator-1', {
+      brandId: 'brand-1',
+      amountCents: 10000,
+      dueDate: '2026-08-01',
+      description: 'TikTok package',
+    });
+    const paymentId = repository.payments[0].id;
+
+    await service.updatePayment('creator-1', paymentId, {
+      status: 'invoice_sent',
+    });
+
+    expect(novu.trigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'creator_invoice_sent',
+        toEmail: 'a@acme.com',
+        amount: '100.00',
+      }),
+    );
   });
 
   it('runs a workflow that creates a task on deal stage change', async () => {
@@ -893,9 +940,9 @@ describe('CreatorCrmService', () => {
     const before = repository.tasks.length;
     const data = await service.moveDealStage('creator-1', 'deal-1', 'pitched');
     expect(repository.tasks.length).toBe(before + 1);
-    expect(
-      data.tasks.some((task) => task.title === 'Send pitch deck'),
-    ).toBe(true);
+    expect(data.tasks.some((task) => task.title === 'Send pitch deck')).toBe(
+      true,
+    );
     expect(data.activities.some((a) => a.type === 'workflow_ran')).toBe(true);
   });
 });

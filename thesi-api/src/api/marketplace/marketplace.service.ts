@@ -4,11 +4,13 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { CreatorCrmService } from 'src/api/creator-crm/creator-crm.service';
 import { InboxService } from 'src/api/inbox/inbox.service';
 import { InvitesService } from 'src/api/invites/invites.service';
+import { NovuService } from 'src/shared/novu/novu.service';
 import type { CampaignRecord } from '../campaigns/campaign.repository';
 import {
   MARKETPLACE_REPOSITORY,
@@ -22,12 +24,15 @@ import {
 
 @Injectable()
 export class MarketplaceService implements MarketplaceCampaignSync {
+  private readonly logger = new Logger(MarketplaceService.name);
+
   constructor(
     @Inject(MARKETPLACE_REPOSITORY)
     private readonly marketplace: MarketplaceRepository,
     private readonly creatorCrm: CreatorCrmService,
     private readonly inbox: InboxService,
     private readonly invites: InvitesService,
+    private readonly novu: NovuService,
   ) {}
 
   async syncFromCampaign(
@@ -125,7 +130,9 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       throw new NotFoundException('Listing not found');
     }
     if (listing.ownerUserId !== userId) {
-      throw new ForbiddenException('You can only view applicants for your listings');
+      throw new ForbiddenException(
+        'You can only view applicants for your listings',
+      );
     }
     const applications =
       await this.marketplace.listApplicationsForListing(listingId);
@@ -175,8 +182,30 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       audience: 'brand',
     });
 
-    const crmLinkedListingIds =
-      await this.marketplace.listCrmLinkedListingIds(user.id);
+    if (user.email) {
+      await this.novu
+        .trigger({
+          type: 'marketplace_application_received',
+          toEmail: user.email,
+          subscriberId: user.id,
+          creatorName: user.fullName,
+          brandName: listing.brandName,
+          campaignTitle: listing.name,
+          listingId: listing.id,
+          applicationId: application.id,
+        })
+        .catch((error) =>
+          this.logger.warn(
+            `Novu marketplace application confirmation failed for ${application.id}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          ),
+        );
+    }
+
+    const crmLinkedListingIds = await this.marketplace.listCrmLinkedListingIds(
+      user.id,
+    );
     return { application, crmLinkedListingIds };
   }
 
@@ -204,8 +233,7 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       );
     }
 
-    const existing =
-      await this.marketplace.getApplicationById(applicationId);
+    const existing = await this.marketplace.getApplicationById(applicationId);
     if (!existing || existing.listingId !== listingId) {
       throw new NotFoundException('Application not found');
     }
@@ -230,6 +258,29 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       campaignId: listing.campaignId,
       audience: 'creator',
     });
+
+    await this.novu
+      .trigger({
+        type: 'marketplace_application_status',
+        toEmail: existing.creatorEmail,
+        subscriberId: existing.creatorUserId,
+        creatorName: existing.creatorName,
+        campaignTitle: listing.name,
+        status: decision,
+        message:
+          decision === 'accepted'
+            ? `${listing.brandName} accepted your application.`
+            : `${listing.brandName} declined your application.`,
+        listingId: listing.id,
+        applicationId: application.id,
+      })
+      .catch((error) =>
+        this.logger.warn(
+          `Novu marketplace application status failed for ${application.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
 
     if (decision === 'accepted') {
       await this.invites.acceptMarketplaceApplicant({

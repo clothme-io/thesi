@@ -13,8 +13,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from 'src/api/auth/auth.service';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
-import { EmailService } from 'src/shared/email/email.service';
 import { generateTempPassword } from 'src/shared/auth/token.util';
+import { NovuService } from 'src/shared/novu/novu.service';
 import { creatorProfileSeedFromApplication } from 'src/api/profiles/follower-range.util';
 import {
   CreateCreatorApplicationDto,
@@ -28,7 +28,7 @@ export class CreatorApplicationsService {
   constructor(
     @Inject(DrizzleAsyncProvider)
     private readonly db: NodePgDatabase<typeof schema>,
-    private readonly emailService: EmailService,
+    private readonly novu: NovuService,
     private readonly authService: AuthService,
   ) {}
 
@@ -61,8 +61,12 @@ export class CreatorApplicationsService {
       })
       .returning();
 
-    this.emailService
-      .sendCreatorApplicationConfirmation(dto.email, dto.fullName)
+    this.novu
+      .trigger({
+        type: 'creator_application_received',
+        toEmail: dto.email,
+        firstName: this.firstName(dto.fullName),
+      })
       .catch((err) =>
         this.logger.warn(`Failed to send confirmation email: ${err?.message}`),
       );
@@ -173,11 +177,12 @@ export class CreatorApplicationsService {
     tempPassword: string,
   ): Promise<void> {
     try {
-      await this.emailService.sendCreatorAccountReady(
-        application.email,
-        application.fullName,
-        tempPassword,
-      );
+      await this.novu.trigger({
+        type: 'creator_account_approved',
+        toEmail: application.email,
+        firstName: this.firstName(application.fullName),
+        temporaryPassword: tempPassword,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
@@ -187,5 +192,9 @@ export class CreatorApplicationsService {
         `Creator account was created, but invitation delivery failed. Retry PATCH /v1/creator-applications/${application.id}/resend-invite.`,
       );
     }
+  }
+
+  private firstName(fullName: string): string {
+    return fullName.trim().split(/\s+/)[0] || 'there';
   }
 }

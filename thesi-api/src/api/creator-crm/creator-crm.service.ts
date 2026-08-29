@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -12,6 +13,7 @@ import {
   type FileStoragePort,
   type UploadableFile,
 } from 'src/shared/storage/file-storage.port';
+import { NovuService } from 'src/shared/novu/novu.service';
 import {
   CREATOR_CRM_REPOSITORY,
   type CreatorCrmAggregate,
@@ -78,7 +80,9 @@ function listingValueCents(payment: {
     case 'flat_rate':
       return payment.flatAmountCents ?? 0;
     case 'milestone':
-      return payment.milestones?.reduce((sum, m) => sum + m.amountCents, 0) ?? 0;
+      return (
+        payment.milestones?.reduce((sum, m) => sum + m.amountCents, 0) ?? 0
+      );
     case 'royalty':
       return payment.royaltyMinimumCents ?? 0;
     case 'hybrid':
@@ -90,11 +94,14 @@ function listingValueCents(payment: {
 
 @Injectable()
 export class CreatorCrmService {
+  private readonly logger = new Logger(CreatorCrmService.name);
+
   constructor(
     @Inject(CREATOR_CRM_REPOSITORY)
     private readonly crm: CreatorCrmRepository,
     @Inject(FILE_STORAGE)
     private readonly storage: FileStoragePort,
+    private readonly novu: NovuService,
   ) {}
 
   async getCrm(userId: string): Promise<CreatorCrmAggregate> {
@@ -593,9 +600,7 @@ export class CreatorCrmService {
       creatorUserId: userId,
       brandId: brand.id,
       type: 'note_added',
-      message: notes.trim()
-        ? 'Brand notes updated'
-        : 'Brand notes cleared',
+      message: notes.trim() ? 'Brand notes updated' : 'Brand notes cleared',
     });
     return this.crm.getAggregate(userId);
   }
@@ -775,9 +780,7 @@ export class CreatorCrmService {
       email,
       relationshipStage: 'prospect',
       tags: input.tags ?? ['Invited via Thesi'],
-      notes:
-        input.notes ??
-        'Invited to join Thesi as a brand partner.',
+      notes: input.notes ?? 'Invited to join Thesi as a brand partner.',
     });
   }
 
@@ -880,6 +883,7 @@ export class CreatorCrmService {
       throw new NotFoundException('Invoice not found');
     }
 
+    const previousStatus = existing.status;
     const nextStatus = patch.status ?? existing.status;
     const updates: {
       status?: CrmPaymentRecord['status'];
@@ -890,7 +894,8 @@ export class CreatorCrmService {
       paidAt?: string | null;
     } = {};
 
-    if (patch.amountCents !== undefined) updates.amountCents = patch.amountCents;
+    if (patch.amountCents !== undefined)
+      updates.amountCents = patch.amountCents;
     if (patch.dueDate !== undefined) updates.dueDate = patch.dueDate;
     if (patch.description !== undefined) {
       updates.description = patch.description.trim();
@@ -933,7 +938,14 @@ export class CreatorCrmService {
       });
     }
 
-    if (patch.status && patch.status !== existing.status) {
+    if (patch.status === 'invoice_sent' && patch.status !== previousStatus) {
+      await this.sendInvoiceSentEmail(userId, payment);
+    }
+    if (patch.status === 'paid' && patch.status !== previousStatus) {
+      await this.sendPaymentMarkedPaidEmail(userId, payment);
+    }
+
+    if (patch.status && patch.status !== previousStatus) {
       await this.runWorkflows(userId, 'payment_status_changed', {
         brandId: payment.brandId,
         jobId: payment.jobId,
@@ -942,6 +954,83 @@ export class CreatorCrmService {
     }
 
     return this.crm.getAggregate(userId);
+  }
+
+  private async sendInvoiceSentEmail(
+    userId: string,
+    payment: CrmPaymentRecord,
+  ): Promise<void> {
+    const [user, brand, job] = await Promise.all([
+      this.crm.getUser(userId),
+      this.crm.getBrand(userId, payment.brandId),
+      this.crm.getJob(userId, payment.jobId),
+    ]);
+    if (!brand?.email) return;
+    await this.novu
+      .trigger({
+        type: 'creator_invoice_sent',
+        toEmail: brand.email,
+        subscriberId: `email:${brand.email}`,
+        brandContactName: brand.contactName || brand.name,
+        creatorName: user?.fullName || 'Creator',
+        dealName:
+          job?.title ||
+          payment.description ||
+          payment.invoiceNumber ||
+          payment.id,
+        amount: this.formatMoney(payment.amountCents),
+        currency: 'USD',
+        invoiceUrl: `${this.invoiceBaseUrl()}/${payment.id}`,
+      })
+      .catch((error) =>
+        this.logger.warn(
+          `Novu creator invoice email failed for ${payment.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
+  }
+
+  private async sendPaymentMarkedPaidEmail(
+    userId: string,
+    payment: CrmPaymentRecord,
+  ): Promise<void> {
+    const [user, job] = await Promise.all([
+      this.crm.getUser(userId),
+      this.crm.getJob(userId, payment.jobId),
+    ]);
+    if (!user?.email) return;
+    await this.novu
+      .trigger({
+        type: 'creator_payment_marked_paid',
+        toEmail: user.email,
+        subscriberId: user.id,
+        creatorName: user.fullName || 'there',
+        dealName:
+          job?.title ||
+          payment.description ||
+          payment.invoiceNumber ||
+          payment.id,
+        amount: this.formatMoney(payment.amountCents),
+        currency: 'USD',
+      })
+      .catch((error) =>
+        this.logger.warn(
+          `Novu creator payment paid email failed for ${payment.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
+  }
+
+  private formatMoney(amountCents: number): string {
+    return (amountCents / 100).toFixed(2);
+  }
+
+  private invoiceBaseUrl(): string {
+    return process.env.THESI_WEB_URL
+      ? `${process.env.THESI_WEB_URL.replace(/\/+$/, '')}/app/crm/invoices`
+      : '/app/crm/invoices';
   }
 
   async getPaymentPdf(
@@ -961,9 +1050,7 @@ export class CreatorCrmService {
       payment.invoiceNumber || `INV-${payment.id.slice(0, 8)}`;
     const buffer = buildInvoicePdf({
       invoiceNumber,
-      description:
-        payment.description ||
-        `Creator invoice for ${brand.name}`,
+      description: payment.description || `Creator invoice for ${brand.name}`,
       amountCents: payment.amountCents,
       status: payment.status,
       invoiceDate: payment.createdAt.slice(0, 10),
@@ -976,10 +1063,7 @@ export class CreatorCrmService {
     return { fileName: `${invoiceNumber}.pdf`, buffer };
   }
 
-  async addListingToPipeline(
-    userId: string,
-    listingId: string,
-  ): Promise<void> {
+  async addListingToPipeline(userId: string, listingId: string): Promise<void> {
     await this.requireCreator(userId);
     const existingDeal = await this.crm.findDealByListing(userId, listingId);
     if (existingDeal) return;
@@ -1106,7 +1190,10 @@ export class CreatorCrmService {
       if (!input.targetObjectId) {
         throw new BadRequestException('targetObjectId is required');
       }
-      const object = await this.crm.getCustomObject(userId, input.targetObjectId);
+      const object = await this.crm.getCustomObject(
+        userId,
+        input.targetObjectId,
+      );
       if (!object) throw new NotFoundException('Custom object not found');
     } else if (input.targetObjectId) {
       throw new BadRequestException(
@@ -1352,7 +1439,12 @@ export class CreatorCrmService {
         continue;
       }
       for (const action of workflow.actions) {
-        await this.runWorkflowAction(userId, action.actionType, action.actionConfig, context);
+        await this.runWorkflowAction(
+          userId,
+          action.actionType,
+          action.actionConfig,
+          context,
+        );
       }
       await this.crm.createActivity({
         creatorUserId: userId,

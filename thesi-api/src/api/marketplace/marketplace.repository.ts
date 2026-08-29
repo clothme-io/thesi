@@ -7,6 +7,7 @@ export const MARKETPLACE_CAMPAIGN_SYNC = Symbol('MARKETPLACE_CAMPAIGN_SYNC');
 export type MarketplaceUser = {
   id: string;
   role: string;
+  email?: string;
   fullName: string;
   companyName: string | null;
 };
@@ -84,9 +85,7 @@ export interface MarketplaceRepository {
     pitch: string;
     addedToCrm: boolean;
   }): Promise<MarketplaceApplicationRecord>;
-  getApplicationById(
-    applicationId: string,
-  ): Promise<
+  getApplicationById(applicationId: string): Promise<
     | (MarketplaceApplicationRecord & {
         creatorUserId: string;
         creatorEmail: string;
