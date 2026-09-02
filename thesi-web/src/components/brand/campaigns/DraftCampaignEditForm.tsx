@@ -173,6 +173,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Name</span>
             <input
+              id="campaign-name"
+              name="campaignName"
+              data-testid="campaign-name-input"
               type="text"
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
@@ -181,6 +184,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Campaign type</span>
             <select
+              id="campaign-goal-type"
+              name="campaignGoalType"
+              data-testid="campaign-goal-type-select"
               value={form.campaignType}
               onChange={(e) =>
                 set("campaignType", e.target.value as BrandCampaignGoalType)
@@ -199,6 +205,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Content type</span>
             <select
+              id="campaign-content-type"
+              name="campaignContentType"
+              data-testid="campaign-content-type-select"
               value={form.type}
               onChange={(e) => set("type", e.target.value as BrandCampaignType)}
             >
@@ -212,6 +221,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Start date</span>
             <input
+              id="campaign-start-date"
+              name="campaignStartDate"
+              data-testid="campaign-start-date-input"
               type="date"
               value={form.startDate}
               onChange={(e) => set("startDate", e.target.value)}
@@ -220,6 +232,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>End date</span>
             <input
+              id="campaign-end-date"
+              name="campaignEndDate"
+              data-testid="campaign-end-date-input"
               type="date"
               value={form.endDate}
               onChange={(e) => set("endDate", e.target.value)}
@@ -228,6 +243,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field workspace-field--full">
             <span>Brief</span>
             <textarea
+              id="campaign-brief"
+              name="campaignBrief"
+              data-testid="campaign-brief-textarea"
               rows={4}
               value={form.brief}
               onChange={(e) => set("brief", e.target.value)}
@@ -236,6 +254,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field workspace-field--full">
             <span>Deliverables</span>
             <textarea
+              id="campaign-deliverables"
+              name="campaignDeliverables"
+              data-testid="campaign-deliverables-textarea"
               rows={3}
               value={form.deliverables}
               onChange={(e) => set("deliverables", e.target.value)}
@@ -249,6 +270,9 @@ export function DraftCampaignEditForm({
                 style={{ display: "flex", gap: 8, marginTop: 8 }}
               >
                 <input
+                  id={`campaign-example-link-${index}`}
+                  name={`campaignExampleLink${index + 1}`}
+                  data-testid={`campaign-example-link-${index}`}
                   type="url"
                   placeholder="https://"
                   value={link}
@@ -295,6 +319,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field workspace-field--full">
             <span>Niches (comma-separated)</span>
             <input
+              id="campaign-niches"
+              name="campaignNiches"
+              data-testid="campaign-niches-input"
               type="text"
               value={form.niches}
               onChange={(e) => set("niches", e.target.value)}
@@ -303,6 +330,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Min followers</span>
             <input
+              id="campaign-min-followers"
+              name="campaignMinFollowers"
+              data-testid="campaign-min-followers-input"
               type="text"
               value={form.minFollowersRange}
               onChange={(e) => set("minFollowersRange", e.target.value)}
@@ -311,6 +341,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Location</span>
             <input
+              id="campaign-location"
+              name="campaignLocation"
+              data-testid="campaign-location-input"
               type="text"
               value={form.location}
               onChange={(e) => set("location", e.target.value)}
@@ -319,6 +352,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field workspace-field--full">
             <span>Platforms (comma-separated)</span>
             <input
+              id="campaign-platforms"
+              name="campaignPlatforms"
+              data-testid="campaign-platforms-input"
               type="text"
               value={form.platforms}
               onChange={(e) => set("platforms", e.target.value)}
@@ -333,6 +369,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Payment type</span>
             <select
+              id="campaign-payment-model"
+              name="campaignPaymentModel"
+              data-testid="campaign-payment-model-select"
               value={form.paymentModel}
               onChange={(e) => {
                 const next = e.target.value as BrandCampaignPaymentModel;
@@ -359,6 +398,9 @@ export function DraftCampaignEditForm({
             <label className="workspace-field">
               <span>Base/flat amount</span>
               <input
+                id="campaign-flat-amount"
+                name="campaignFlatAmount"
+                data-testid="campaign-flat-amount-input"
                 type="text"
                 placeholder="$0.00"
                 value={form.flatAmount}
@@ -369,6 +411,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field workspace-field--full">
             <span>Payment notes</span>
             <textarea
+              id="campaign-payment-notes"
+              name="campaignPaymentNotes"
+              data-testid="campaign-payment-notes-textarea"
               rows={2}
               value={form.paymentNotes}
               onChange={(e) => set("paymentNotes", e.target.value)}
@@ -390,6 +435,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Post to marketplace</span>
             <select
+              id="campaign-post-to-marketplace"
+              name="campaignPostToMarketplace"
+              data-testid="campaign-post-to-marketplace-select"
               value={form.postToMarketplace ? "yes" : "no"}
               onChange={(e) =>
                 set("postToMarketplace", e.target.value === "yes")
@@ -402,6 +450,9 @@ export function DraftCampaignEditForm({
           <label className="workspace-field">
             <span>Upload files</span>
             <input
+              id="campaign-files"
+              name="campaignFiles"
+              data-testid="campaign-files-input"
               type="file"
               multiple
               onChange={(e) => {

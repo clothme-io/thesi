@@ -7,6 +7,8 @@ import { getStripePublishableKey } from "@/lib/stripe/publishable-key";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 import { AddPaymentMethodModal } from "./AddPaymentMethodModal";
 
+const PAYMENTS_COMING_SOON = true;
+
 export function BrandSettingsPaymentMethodsContent() {
   const { authenticatedRequest } = useAuth();
   const {
@@ -27,6 +29,10 @@ export function BrandSettingsPaymentMethodsContent() {
 
   const handleAdd = async () => {
     setActionError("");
+    if (PAYMENTS_COMING_SOON) {
+      setActionError("Payment methods are coming soon.");
+      return;
+    }
     if (!publishableKey) {
       setActionError(
         "Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in thesi-web to add cards.",
@@ -66,6 +72,16 @@ export function BrandSettingsPaymentMethodsContent() {
             {actionError || error}
           </p>
         )}
+        <div className="brand-billing-plan" style={{ marginBottom: 16 }}>
+          <div>
+            <strong>Coming soon</strong>
+            <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
+              Card capture and automated billing are not live yet. Campaign
+              publishing and creator applications do not charge a card.
+            </p>
+          </div>
+          <span className="crm-tag">Coming soon</span>
+        </div>
         {data.paymentMethods.length === 0 ? (
           <p className="workspace-hint">No payment methods on file yet.</p>
         ) : (
@@ -114,14 +130,17 @@ export function BrandSettingsPaymentMethodsContent() {
           className="crm-btn-secondary"
           style={{ marginTop: 16 }}
           onClick={handleAdd}
-          disabled={opening}
+          disabled={opening || PAYMENTS_COMING_SOON}
         >
-          {opening ? "Preparing…" : "+ Add payment method"}
+          {PAYMENTS_COMING_SOON
+            ? "Payment methods coming soon"
+            : opening
+              ? "Preparing…"
+              : "+ Add payment method"}
         </button>
         <p className="workspace-hint" style={{ marginTop: 8 }}>
-          Cards are captured with Stripe Elements (SetupIntent). Requires
-          STRIPE_SECRET_KEY on the API and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY on
-          the web app.
+          Stripe card setup will be enabled when payments are ready for live
+          billing.
         </p>
       </section>
 

@@ -112,6 +112,8 @@ export function TasksPageContent() {
           return (
             <label key={task.id} className="crm-task-item">
               <input
+                aria-label={`Mark ${task.title} complete`}
+                data-testid={`task-toggle-${task.id}`}
                 type="checkbox"
                 checked={false}
                 onChange={() => toggleTask(task.id, task.status)}
@@ -138,6 +140,8 @@ export function TasksPageContent() {
             {done.map((task) => (
               <label key={task.id} className="crm-task-item">
                 <input
+                  aria-label={`Mark ${task.title} pending`}
+                  data-testid={`task-toggle-${task.id}`}
                   type="checkbox"
                   checked
                   onChange={() => toggleTask(task.id, task.status)}

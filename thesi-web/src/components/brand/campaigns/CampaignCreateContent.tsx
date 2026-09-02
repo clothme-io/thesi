@@ -344,11 +344,22 @@ export function CampaignCreateContent() {
             <div className="workspace-grid">
               <label className="workspace-field">
                 <span>Name</span>
-                <input type="text" placeholder="Campaign name" value={name} onChange={(e) => setName(e.target.value)} />
+                <input
+                  id="campaign-name"
+                  name="campaignName"
+                  data-testid="campaign-name-input"
+                  type="text"
+                  placeholder="Campaign name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </label>
               <label className="workspace-field">
                 <span>Campaign type</span>
                 <select
+                  id="campaign-goal-type"
+                  name="campaignGoalType"
+                  data-testid="campaign-goal-type-select"
                   value={campaignType}
                   onChange={(e) =>
                     setCampaignType(e.target.value as BrandCampaignGoalType)
@@ -366,7 +377,13 @@ export function CampaignCreateContent() {
               </label>
               <label className="workspace-field">
                 <span>Content type</span>
-                <select value={type} onChange={(e) => setType(e.target.value as BrandCampaignType)}>
+                <select
+                  id="campaign-content-type"
+                  name="campaignContentType"
+                  data-testid="campaign-content-type-select"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as BrandCampaignType)}
+                >
                   {CONTENT_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -379,15 +396,32 @@ export function CampaignCreateContent() {
               </label>
               <label className="workspace-field">
                 <span>Start date</span>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                <input
+                  id="campaign-start-date"
+                  name="campaignStartDate"
+                  data-testid="campaign-start-date-input"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
               </label>
               <label className="workspace-field">
                 <span>End date</span>
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                <input
+                  id="campaign-end-date"
+                  name="campaignEndDate"
+                  data-testid="campaign-end-date-input"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
               </label>
               <label className="workspace-field workspace-field--full">
                 <span>Brief</span>
                 <textarea
+                  id="campaign-brief"
+                  name="campaignBrief"
+                  data-testid="campaign-brief-textarea"
                   rows={4}
                   placeholder="Describe campaign goals, concept, and success criteria."
                   value={brief}
@@ -397,6 +431,9 @@ export function CampaignCreateContent() {
               <label className="workspace-field workspace-field--full">
                 <span>Deliverables</span>
                 <textarea
+                  id="campaign-deliverables"
+                  name="campaignDeliverables"
+                  data-testid="campaign-deliverables-textarea"
                   rows={3}
                   placeholder="List deliverables expected from creators."
                   value={deliverables}
@@ -414,6 +451,9 @@ export function CampaignCreateContent() {
                     style={{ display: "flex", gap: 8, marginTop: 8 }}
                   >
                     <input
+                      id={`campaign-example-link-${index}`}
+                      name={`campaignExampleLink${index + 1}`}
+                      data-testid={`campaign-example-link-${index}`}
                       type="url"
                       placeholder="https://"
                       value={link}
@@ -459,11 +499,21 @@ export function CampaignCreateContent() {
             <div className="workspace-grid">
               <label className="workspace-field workspace-field--full">
                 <span>Niches (comma-separated)</span>
-                <input type="text" value={niches} onChange={(e) => setNiches(e.target.value)} />
+                <input
+                  id="campaign-niches"
+                  name="campaignNiches"
+                  data-testid="campaign-niches-input"
+                  type="text"
+                  value={niches}
+                  onChange={(e) => setNiches(e.target.value)}
+                />
               </label>
               <label className="workspace-field">
                 <span>Min followers</span>
                 <input
+                  id="campaign-min-followers"
+                  name="campaignMinFollowers"
+                  data-testid="campaign-min-followers-input"
                   type="text"
                   placeholder="e.g. 10k+"
                   value={minFollowersRange}
@@ -472,11 +522,25 @@ export function CampaignCreateContent() {
               </label>
               <label className="workspace-field">
                 <span>Location</span>
-                <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} />
+                <input
+                  id="campaign-location"
+                  name="campaignLocation"
+                  data-testid="campaign-location-input"
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                />
               </label>
               <label className="workspace-field workspace-field--full">
                 <span>Platforms (comma-separated)</span>
-                <input type="text" value={platforms} onChange={(e) => setPlatforms(e.target.value)} />
+                <input
+                  id="campaign-platforms"
+                  name="campaignPlatforms"
+                  data-testid="campaign-platforms-input"
+                  type="text"
+                  value={platforms}
+                  onChange={(e) => setPlatforms(e.target.value)}
+                />
               </label>
             </div>
           </section>
@@ -487,6 +551,9 @@ export function CampaignCreateContent() {
               <label className="workspace-field">
                 <span>Payment type</span>
                 <select
+                  id="campaign-payment-model"
+                  name="campaignPaymentModel"
+                  data-testid="campaign-payment-model-select"
                   value={paymentModel}
                   onChange={(e) => {
                     const next = e.target.value as BrandCampaignPaymentModel;
@@ -507,6 +574,9 @@ export function CampaignCreateContent() {
                 <label className="workspace-field">
                   <span>Base/flat amount</span>
                   <input
+                    id="campaign-flat-amount"
+                    name="campaignFlatAmount"
+                    data-testid="campaign-flat-amount-input"
                     type="text"
                     placeholder="$0.00"
                     value={flatAmount}
@@ -517,6 +587,9 @@ export function CampaignCreateContent() {
               <label className="workspace-field workspace-field--full">
                 <span>Payment notes</span>
                 <textarea
+                  id="campaign-payment-notes"
+                  name="campaignPaymentNotes"
+                  data-testid="campaign-payment-notes-textarea"
                   rows={2}
                   placeholder="Royalty terms, payout timeline..."
                   value={paymentNotes}
@@ -555,6 +628,9 @@ export function CampaignCreateContent() {
               <label className="workspace-field">
                 <span>Post to marketplace</span>
                 <select
+                  id="campaign-post-to-marketplace"
+                  name="campaignPostToMarketplace"
+                  data-testid="campaign-post-to-marketplace-select"
                   value={postToMarketplace ? "yes" : "no"}
                   onChange={(e) => setPostToMarketplace(e.target.value === "yes")}
                 >
@@ -565,6 +641,9 @@ export function CampaignCreateContent() {
               <label className="workspace-field">
                 <span>Upload files</span>
                 <input
+                  id="campaign-files"
+                  name="campaignFiles"
+                  data-testid="campaign-files-input"
                   type="file"
                   multiple
                   onChange={(e) => {
