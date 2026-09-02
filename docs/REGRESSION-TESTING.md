@@ -18,6 +18,12 @@ settings.
 
 ## Local Safety Checks
 
+Run the full automated gate from the repository root:
+
+```bash
+./scripts/qa-regression.sh
+```
+
 From `thesi-web`:
 
 ```bash
@@ -30,6 +36,24 @@ From `thesi-api`:
 
 ```bash
 npm test
+```
+
+To test the production web build locally in Docker before deploying:
+
+```bash
+./scripts/qa-web-docker-preview.sh
+```
+
+Defaults:
+
+- URL: `http://localhost:3002`
+- API URL used at build time: `http://host.docker.internal:5010`
+- Local auth dev mode: enabled
+
+Override the preview port or API URL when needed:
+
+```bash
+PORT=3003 NEXT_PUBLIC_API_URL=http://host.docker.internal:5010 ./scripts/qa-web-docker-preview.sh
 ```
 
 Run focused tests while fixing a regression:
@@ -84,6 +108,8 @@ For live browser RC checks, cover both behavior and layout:
   overflow, no incoherent overlapping controls, and no console errors.
 - On long authenticated app pages, scroll the main content area and confirm the
   sidebar remains pinned in the viewport while `window.scrollY` stays `0`.
+- On brand campaign forms, confirm footer action buttons have visible spacing
+  between `Invite creators`, `Save draft`, and `Publish`.
 
 ## Creator Release Candidate Flow
 

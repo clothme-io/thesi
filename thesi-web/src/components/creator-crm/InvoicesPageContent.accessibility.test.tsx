@@ -46,9 +46,35 @@ describe("InvoicesPageContent field handles", () => {
     const user = userEvent.setup();
     createInvoice.mockResolvedValue(undefined);
 
-    render(<InvoicesPageContent />);
+    const { container } = render(<InvoicesPageContent />);
 
     await user.click(screen.getByRole("button", { name: "+ New invoice" }));
+
+    expect(container.querySelector('label[for="invoice-brand"]')).toHaveTextContent(
+      "Brand",
+    );
+    expect(container.querySelector('label[for="invoice-amount"]')).toHaveTextContent(
+      "Amount (USD)",
+    );
+    expect(container.querySelector('label[for="invoice-due-date"]')).toHaveTextContent(
+      "Due date",
+    );
+    expect(screen.getByLabelText("Brand")).toHaveAttribute(
+      "id",
+      "invoice-brand",
+    );
+    expect(screen.getByLabelText("Amount (USD)")).toHaveAttribute(
+      "id",
+      "invoice-amount",
+    );
+    expect(screen.getByLabelText("Due date")).toHaveAttribute(
+      "id",
+      "invoice-due-date",
+    );
+
+    expect(screen.getByTestId("invoice-create-button")).toHaveAccessibleName(
+      "Create invoice",
+    );
 
     const dueDate = screen.getByLabelText("Due date");
     expect(dueDate).toHaveAttribute("name", "invoiceDueDate");
