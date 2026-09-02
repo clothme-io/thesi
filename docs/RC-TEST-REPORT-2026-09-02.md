@@ -114,6 +114,9 @@ Creator test account: `pikhane@gmail.com`
 - [PASS] Responsive layout smoke passed for brand campaign detail at desktop
   `1440x900` and mobile `390x844`: nonblank, no horizontal overflow, no
   console errors.
+- [PASS] Local sidebar scroll regression verified after shell fix: on long
+  campaign forms, `.app-content` scrolls while `.app-sidebar` stays pinned at
+  viewport top and `window.scrollY` remains `0`.
 
 ## Failed Checks
 
@@ -148,6 +151,9 @@ Creator test account: `pikhane@gmail.com`
   forms; added an accessible task checkbox label.
 - [FIXED LOCALLY] Payment setup surfaces now clearly show `Coming soon` and
   disable card/payout setup actions while payment rails are offline.
+- [FIXED LOCALLY] Sidebar scrolled away on long app pages. App shell now owns
+  viewport height, hides document overflow, keeps sidebar viewport-height and
+  sticky, and scrolls the main content area only.
 - [P3] Brand creator directory had no creators for the QA brand, so
   favorite/unfavorite and direct matched-creator invite could not be covered
   without seeded creator discovery data.
@@ -167,12 +173,13 @@ Creator test account: `pikhane@gmail.com`
 - `cd thesi-web && npm test -- BrandSettingsPaymentMethodsContent.test.tsx DraftCampaignEditForm.accessibility.test.tsx InvoicesPageContent.accessibility.test.tsx`
 - `cd thesi-web && npm test` - 16 files, 40 tests passed after local fixes.
 - `cd thesi-web && npm run build` - passed after local fixes.
+- Local browser layout check on `/app/campaigns/new`: sidebar top/bottom stayed
+  fixed while `.app-content` scrolled to `900px`.
 
 ## Resume Point
 
-- Current live URL: `https://get-thesi.com/app/creators`.
-- Last completed action: converted invite-only campaign to marketplace, then
-  unpublished it again; checked brand creator directory and responsive layout
-  smoke.
-- Next action: optional seeded creator directory/invite test, payment-provider
-  handoff tests, or final launch-readiness signoff.
+- Current local URL: `http://localhost:3001/app/campaigns/new`.
+- Last completed action: fixed and verified static sidebar behavior locally.
+- Next action: deploy sidebar/payment/date/accessibility fixes, then run a
+  short production retest of sidebar scroll, creator payouts coming soon,
+  invoice date handles, and task checkbox label.
