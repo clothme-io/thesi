@@ -132,6 +132,10 @@ Creator test account: `pikhane@gmail.com`
   Job, and Description now use explicit `label htmlFor` associations.
 - [PASS] Brand campaign footer spacing was verified after deploy by the owner
   on the live campaign form.
+- [PASS] Final production product smoke passed in Chrome: homepage,
+  `/creators`, `/creators/apply`, creator dashboard, marketplace, marketplace
+  detail, settings, invoices, and New invoice modal all rendered nonblank with
+  no horizontal overflow and no console errors.
 
 ## Failed Checks
 
@@ -194,6 +198,8 @@ Creator test account: `pikhane@gmail.com`
   passed after explicit invoice label wiring.
 - `./scripts/qa-web-docker-preview.sh` - added to build and run a local Docker
   web preview before deploy.
+- Final Chrome production product smoke: 9 page/form checks, 0 console errors,
+  no horizontal overflow on sampled pages.
 - Local browser layout check on `/app/campaigns/new`: sidebar top/bottom stayed
   fixed while `.app-content` scrolled to `900px`.
 
