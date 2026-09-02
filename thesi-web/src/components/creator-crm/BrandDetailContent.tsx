@@ -310,52 +310,88 @@ export function BrandDetailContent() {
 
         {tab === "Deals" && (
           <div className="crm-detail-panel">
-            {deals.map((deal) => {
-              const contact = deal.primaryContactId
-                ? people.find((p) => p.id === deal.primaryContactId)
-                : undefined;
-              return (
-                <div key={deal.id} className="crm-meta-row">
-                  <span>
-                    {deal.title} · {formatMoney(deal.valueCents)}
-                    {contact ? ` · ${contact.name}` : ""}
-                    {deal.expectedCloseDate
-                      ? ` · Close ${deal.expectedCloseDate}`
-                      : ""}
-                  </span>
-                  <span>{DEAL_STAGE_LABELS[deal.stage]}</span>
-                </div>
-              );
-            })}
+            {deals.length === 0 ? (
+              <div>
+                <p className="crm-contact-sub" style={{ marginBottom: 12 }}>
+                  No deals yet for {brand.name}. Start one from your pipeline
+                  when there is an opportunity to track.
+                </p>
+                <Link href={CRM_ROUTES.pipeline} className="crm-btn-primary">
+                  Open pipeline →
+                </Link>
+              </div>
+            ) : (
+              deals.map((deal) => {
+                const contact = deal.primaryContactId
+                  ? people.find((p) => p.id === deal.primaryContactId)
+                  : undefined;
+                return (
+                  <div key={deal.id} className="crm-meta-row">
+                    <span>
+                      {deal.title} · {formatMoney(deal.valueCents)}
+                      {contact ? ` · ${contact.name}` : ""}
+                      {deal.expectedCloseDate
+                        ? ` · Close ${deal.expectedCloseDate}`
+                        : ""}
+                    </span>
+                    <span>{DEAL_STAGE_LABELS[deal.stage]}</span>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
         {tab === "Jobs" && (
           <div className="crm-detail-panel">
-            {jobs.map((job) => (
-              <div key={job.id} className="crm-meta-row">
-                <span>
-                  <Link href={CRM_ROUTES.job(job.id)}>{job.title}</Link>
-                  {" · due "}
-                  {job.deadline}
-                </span>
-                <span>{JOB_STATUS_LABELS[job.status]}</span>
+            {jobs.length === 0 ? (
+              <div>
+                <p className="crm-contact-sub" style={{ marginBottom: 12 }}>
+                  No jobs yet for {brand.name}. Move a deal to Won to create an
+                  active job.
+                </p>
+                <Link href={CRM_ROUTES.pipeline} className="crm-btn-primary">
+                  Open pipeline →
+                </Link>
               </div>
-            ))}
+            ) : (
+              jobs.map((job) => (
+                <div key={job.id} className="crm-meta-row">
+                  <span>
+                    <Link href={CRM_ROUTES.job(job.id)}>{job.title}</Link>
+                    {" · due "}
+                    {job.deadline}
+                  </span>
+                  <span>{JOB_STATUS_LABELS[job.status]}</span>
+                </div>
+              ))
+            )}
           </div>
         )}
 
         {tab === "Payments" && (
           <div className="crm-detail-panel">
-            {payments.map((payment) => (
-              <div key={payment.id} className="crm-meta-row">
-                <span>
-                  {formatMoney(payment.amountCents)} ·{" "}
-                  {payment.invoiceNumber || "No invoice #"}
-                </span>
-                <span>{PAYMENT_STATUS_LABELS[payment.status]}</span>
+            {payments.length === 0 ? (
+              <div>
+                <p className="crm-contact-sub" style={{ marginBottom: 12 }}>
+                  No payments yet for {brand.name}. Create an invoice when work
+                  is ready to bill.
+                </p>
+                <Link href={CRM_ROUTES.invoices} className="crm-btn-primary">
+                  Open invoices →
+                </Link>
               </div>
-            ))}
+            ) : (
+              payments.map((payment) => (
+                <div key={payment.id} className="crm-meta-row">
+                  <span>
+                    {formatMoney(payment.amountCents)} ·{" "}
+                    {payment.invoiceNumber || "No invoice #"}
+                  </span>
+                  <span>{PAYMENT_STATUS_LABELS[payment.status]}</span>
+                </div>
+              ))
+            )}
           </div>
         )}
 
