@@ -82,6 +82,8 @@ For live browser RC checks, cover both behavior and layout:
   settings/security.
 - A layout check passes only when the page has meaningful content, no horizontal
   overflow, no incoherent overlapping controls, and no console errors.
+- On long authenticated app pages, scroll the main content area and confirm the
+  sidebar remains pinned in the viewport while `window.scrollY` stays `0`.
 
 ## Creator Release Candidate Flow
 
