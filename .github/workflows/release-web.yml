@@ -185,7 +185,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: sha_tag
         run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v5
+      - name: Build image
+        uses: docker/build-push-action@v5
         with:
           context: ./thesi-web
           file: ./thesi-web/Dockerfile
@@ -193,8 +194,20 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=https://dv.get-thesi.com
             NEXT_PUBLIC_AUTH_DEV_MODE=false
-          push: true
+          load: true
           tags: ${{ env.IMAGE_REPOSITORY }}:${{ steps.sha_tag.outputs.tag }}
+      - name: Push image with retry
+        run: |
+          IMAGE="${{ env.IMAGE_REPOSITORY }}:${{ steps.sha_tag.outputs.tag }}"
+          for attempt in 1 2 3; do
+            if docker push "$IMAGE"; then
+              exit 0
+            fi
+            echo "::warning::docker push failed for $IMAGE on attempt $attempt."
+            sleep $((attempt * 10))
+          done
+          echo "::error::docker push failed after 3 attempts for $IMAGE."
+          exit 1
 
   bump-dev:
     needs: [test, build]
