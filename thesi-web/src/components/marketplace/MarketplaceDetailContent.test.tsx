@@ -20,8 +20,8 @@ const listing: MarketplaceListing = {
   type: "tiktok",
   status: "open",
   startDate: "2026-07-01",
-  endDate: "2026-08-01",
-  applicationDeadline: "2026-07-01",
+  endDate: "2099-08-01",
+  applicationDeadline: "2099-07-01",
   brief: "Brief",
   deliverables: "1 video",
   exampleVideoLinks: [],
@@ -193,4 +193,5 @@ describe("MarketplaceDetailContent applicant actions", () => {
       ).not.toBeInTheDocument();
     });
   });
+
 });

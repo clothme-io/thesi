@@ -4,7 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthProvider";
 import { useMarketplace } from "@/lib/marketplace/storage";
-import { getBrowseListingsForCreator, getListingsForBrand } from "@/lib/marketplace/listings";
+import {
+  getBrowseListingsForCreator,
+  getEffectiveListingStatus,
+  getListingsForBrand,
+} from "@/lib/marketplace/listings";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { BRAND_CAMPAIGN_GOAL_TYPE_LABELS } from "@/lib/brand-campaigns/types";
 import {
@@ -163,6 +167,7 @@ export function MarketplacePageContent() {
               const application = data.applications.find((a) => a.listingId === listing.id);
               const applied = Boolean(application);
               const inCrm = data.crmLinkedListingIds.includes(listing.id);
+              const effectiveStatus = getEffectiveListingStatus(listing);
               return (
                 <Link
                   key={listing.id}
@@ -170,8 +175,8 @@ export function MarketplacePageContent() {
                   className="marketplace-card"
                 >
                   <div className="marketplace-card-top">
-                    <span className={`marketplace-status marketplace-status--${listing.status}`}>
-                      {LISTING_STATUS_LABELS[listing.status]}
+                    <span className={`marketplace-status marketplace-status--${effectiveStatus}`}>
+                      {LISTING_STATUS_LABELS[effectiveStatus]}
                     </span>
                     {isBrand && listing.campaignId && (
                       <span className="marketplace-badge marketplace-badge--crm">Your campaign</span>

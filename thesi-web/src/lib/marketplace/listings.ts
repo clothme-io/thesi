@@ -1,6 +1,10 @@
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
 import { buildLabeledRequirements } from "./requirements";
-import type { MarketplaceListing, MarketplacePayment } from "./types";
+import type {
+  MarketplaceListing,
+  MarketplaceListingStatus,
+  MarketplacePayment,
+} from "./types";
 
 function buildRequirements(campaign: BrandCampaign): string[] {
   return buildLabeledRequirements(campaign.requirements);
@@ -82,6 +86,34 @@ export function getListingsForBrand(
   return listings.filter((l) => l.ownerUserId === ownerUserId);
 }
 
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export function isPastApplicationDeadline(
+  listing: Pick<MarketplaceListing, "applicationDeadline">,
+  today = todayIso(),
+) {
+  return Boolean(listing.applicationDeadline && listing.applicationDeadline < today);
+}
+
+export function getEffectiveListingStatus(
+  listing: Pick<MarketplaceListing, "applicationDeadline" | "status">,
+  today = todayIso(),
+): MarketplaceListingStatus {
+  if (listing.status === "closed" || isPastApplicationDeadline(listing, today)) {
+    return "closed";
+  }
+  return listing.status;
+}
+
+export function canCreatorApplyToListing(
+  listing: Pick<MarketplaceListing, "applicationDeadline" | "status">,
+  today = todayIso(),
+) {
+  return getEffectiveListingStatus(listing, today) !== "closed";
+}
+
 export function getBrowseListingsForCreator(listings: MarketplaceListing[]): MarketplaceListing[] {
-  return listings.filter((l) => l.status !== "closed");
+  return listings.filter((listing) => canCreatorApplyToListing(listing));
 }

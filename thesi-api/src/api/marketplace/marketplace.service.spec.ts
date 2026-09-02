@@ -341,8 +341,36 @@ describe('MarketplaceService', () => {
         type: 'tiktok',
         status: 'open',
         startDate: '2026-07-01',
-        endDate: '2026-09-01',
-        applicationDeadline: '2026-09-01',
+        endDate: '2099-09-01',
+        applicationDeadline: '2099-09-01',
+        brief: 'Brief',
+        deliverables: '1 video',
+        exampleVideoLinks: [],
+        requirements: [],
+        files: [],
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
+        location: 'Remote',
+        remoteOk: true,
+        slots: 5,
+        applicantsCount: 0,
+        postedAt: new Date().toISOString(),
+      },
+      {
+        id: 'expired-1',
+        name: 'Expired campaign',
+        brandName: 'Acme',
+        ownerUserId: 'brand-1',
+        campaignId: 'campaign-expired',
+        campaignType: 'community',
+        type: 'mixed_bundle',
+        status: 'open',
+        startDate: '2026-07-01',
+        endDate: '2099-09-01',
+        applicationDeadline: '2000-01-01',
         brief: 'Brief',
         deliverables: '1 video',
         exampleVideoLinks: [],
@@ -412,8 +440,8 @@ describe('MarketplaceService', () => {
         type: 'tiktok',
         status: 'open',
         startDate: '2026-07-01',
-        endDate: '2026-08-01',
-        applicationDeadline: '2026-07-01',
+        endDate: '2099-08-01',
+        applicationDeadline: '2099-07-01',
         brief: 'Brief',
         deliverables: '1 video',
         exampleVideoLinks: [],
@@ -682,6 +710,51 @@ describe('MarketplaceService', () => {
       service.apply('creator-1', 'listing-1', '   ', false),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it('rejects creator applications after the application deadline', async () => {
+    repository.user = {
+      id: 'creator-1',
+      role: 'creator',
+      email: 'creator@example.com',
+      fullName: 'Creator',
+      companyName: null,
+    };
+    repository.listings = [
+      {
+        id: 'listing-1',
+        name: 'Expired listing',
+        brandName: 'Acme',
+        ownerUserId: 'brand-1',
+        campaignId: 'campaign-1',
+        campaignType: 'experience',
+        type: 'tiktok',
+        status: 'open',
+        startDate: '2026-07-01',
+        endDate: '2099-08-01',
+        applicationDeadline: '2000-01-01',
+        brief: 'Brief',
+        deliverables: '1 video',
+        exampleVideoLinks: [],
+        requirements: [],
+        files: [],
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
+        location: 'Remote',
+        remoteOk: true,
+        slots: 5,
+        applicantsCount: 0,
+        postedAt: new Date().toISOString(),
+      },
+    ];
+
+    await expect(
+      service.apply('creator-1', 'listing-1', 'I am a fit', true),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repository.applications).toHaveLength(0);
+  });
 });
 
 function sampleCampaign(
@@ -694,7 +767,7 @@ function sampleCampaign(
     type: 'tiktok',
     status: 'active',
     startDate: '2026-07-01',
-    endDate: '2026-08-01',
+    endDate: '2099-08-01',
     brief: 'Brief',
     deliverables: '1 video',
     exampleVideoLinks: [],
