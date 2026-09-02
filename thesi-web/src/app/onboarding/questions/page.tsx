@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { OnboardingGuard, getOnboardingProgress } from "@/components/auth/OnboardingGuard";
+import { OnboardingGuard } from "@/components/auth/OnboardingGuard";
 import { useAuth } from "@/context/AuthProvider";
 import {
   BRAND_ONBOARDING_QUESTIONS,
@@ -66,12 +66,6 @@ export default function QuestionsPage() {
     <OnboardingGuard>
       <div className="onboarding-page">
         <div className="onboarding-card">
-          <div className="onboarding-progress">
-            <div
-              className="onboarding-progress-bar"
-              style={{ width: `${getOnboardingProgress("/onboarding/questions")}%` }}
-            />
-          </div>
           <p className="eyebrow" style={{ marginBottom: 12 }}>
             Question {step + 1} of {questions.length}
           </p>

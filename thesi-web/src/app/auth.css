@@ -213,21 +213,6 @@
   font-size: 16px;
 }
 
-.onboarding-progress {
-  height: 6px;
-  background: var(--line);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 28px;
-}
-
-.onboarding-progress-bar {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 999px;
-  transition: width 0.25s ease;
-}
-
 .onboarding-founder {
   display: flex;
   gap: 20px;

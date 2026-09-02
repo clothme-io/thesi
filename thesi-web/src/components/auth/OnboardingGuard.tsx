@@ -5,12 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthProvider";
 import { getOnboardingPathForStep, getPostAuthPath } from "@/lib/auth-storage";
 
-const STEP_PATHS = [
-  "/onboarding/change-password",
-  "/onboarding/welcome",
-  "/onboarding/questions",
-] as const;
-
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth();
   const router = useRouter();
@@ -50,12 +44,6 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   if (pathname !== getOnboardingPathForStep(session.user.onboardingStep)) return null;
 
   return <>{children}</>;
-}
-
-export function getOnboardingProgress(pathname: string): number {
-  const index = STEP_PATHS.indexOf(pathname as (typeof STEP_PATHS)[number]);
-  if (index < 0) return 0;
-  return ((index + 1) / STEP_PATHS.length) * 100;
 }
 
 export { getPostAuthPath };

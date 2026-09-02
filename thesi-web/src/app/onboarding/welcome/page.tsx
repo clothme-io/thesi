@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { OnboardingGuard, getOnboardingProgress } from "@/components/auth/OnboardingGuard";
+import { OnboardingGuard } from "@/components/auth/OnboardingGuard";
 import { useAuth } from "@/context/AuthProvider";
 
 export default function WelcomePage() {
@@ -25,12 +25,6 @@ export default function WelcomePage() {
     <OnboardingGuard>
       <div className="onboarding-page">
         <div className="onboarding-card">
-          <div className="onboarding-progress">
-            <div
-              className="onboarding-progress-bar"
-              style={{ width: `${getOnboardingProgress("/onboarding/welcome")}%` }}
-            />
-          </div>
           <h1>Welcome to Thesi</h1>
           {error && (
             <p className="auth-error" role="alert">
