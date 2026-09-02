@@ -332,8 +332,8 @@ export function InvoicesPageContent() {
               for the brand.
             </p>
             <form onSubmit={handleCreate} className="workspace-form">
-              <label className="workspace-field">
-                <span>Brand</span>
+              <div className="workspace-field">
+                <label htmlFor="invoice-brand">Brand</label>
                 <select
                   id="invoice-brand"
                   name="invoiceBrand"
@@ -352,9 +352,9 @@ export function InvoicesPageContent() {
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="workspace-field">
-                <span>Job (optional)</span>
+              </div>
+              <div className="workspace-field">
+                <label htmlFor="invoice-job">Job (optional)</label>
                 <select
                   id="invoice-job"
                   name="invoiceJob"
@@ -370,9 +370,9 @@ export function InvoicesPageContent() {
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="workspace-field">
-                <span>Amount (USD)</span>
+              </div>
+              <div className="workspace-field">
+                <label htmlFor="invoice-amount">Amount (USD)</label>
                 <input
                   id="invoice-amount"
                   name="invoiceAmount"
@@ -384,9 +384,9 @@ export function InvoicesPageContent() {
                   onChange={(event) => setAmountDollars(event.target.value)}
                   required
                 />
-              </label>
-              <label className="workspace-field">
-                <span>Due date</span>
+              </div>
+              <div className="workspace-field">
+                <label htmlFor="invoice-due-date">Due date</label>
                 <input
                   id="invoice-due-date"
                   name="invoiceDueDate"
@@ -396,9 +396,9 @@ export function InvoicesPageContent() {
                   onChange={(event) => setDueDate(event.target.value)}
                   required
                 />
-              </label>
-              <label className="workspace-field">
-                <span>Description</span>
+              </div>
+              <div className="workspace-field">
+                <label htmlFor="invoice-description">Description</label>
                 <textarea
                   id="invoice-description"
                   name="invoiceDescription"
@@ -408,7 +408,7 @@ export function InvoicesPageContent() {
                   rows={3}
                   placeholder="UGC package — July"
                 />
-              </label>
+              </div>
               {actionError ? (
                 <p className="workspace-hint">{actionError}</p>
               ) : null}
@@ -424,6 +424,7 @@ export function InvoicesPageContent() {
                 <button
                   type="submit"
                   className="crm-btn-primary"
+                  data-testid="invoice-create-button"
                   disabled={saving}
                 >
                   {saving ? "Creating…" : "Create invoice"}

@@ -7,7 +7,7 @@ Creator test account: `pikhane@gmail.com`
 
 ## Summary
 
-- Status: Continuing non-payment production RC checks.
+- Status: Production RC retest complete for the fixed scope.
 - Current blocker: none.
 - Marketplace deadline fix has been deployed and verified in production.
 - Previous blocker fixed and verified in production: blank Deals, Jobs, and
@@ -117,6 +117,21 @@ Creator test account: `pikhane@gmail.com`
 - [PASS] Local sidebar scroll regression verified after shell fix: on long
   campaign forms, `.app-content` scrolls while `.app-sidebar` stays pinned at
   viewport top and `window.scrollY` remains `0`.
+- [PASS] Production sidebar retest verified after deploy: `.app-sidebar` is
+  `position: fixed`, remains at viewport `top: 0` after scrolling, and main
+  content starts at `256px`.
+- [PASS] Creator Settings payouts retest verified in production: payout setup
+  shows coming-soon copy, setup action is disabled, and no console errors were
+  logged.
+- [PASS] Creator Tasks retest verified in production: task completion checkbox
+  has an accessible label and a stable test id; no console errors were logged.
+- [PASS] Creator Invoices retest verified in production: opening the New
+  invoice form exposes stable `id`, `name`, and `data-testid` handles for the
+  brand, amount, and due-date controls.
+- [PASS] Invoice modal label wiring fixed locally: Brand, Amount, Due date,
+  Job, and Description now use explicit `label htmlFor` associations.
+- [PASS] Brand campaign footer spacing was verified after deploy by the owner
+  on the live campaign form.
 
 ## Failed Checks
 
@@ -125,7 +140,7 @@ Creator test account: `pikhane@gmail.com`
   - Fix: Added explicit empty states and links to Pipeline/Invoices.
   - Regression: `thesi-web/src/components/creator-crm/BrandDetailContent.test.tsx`.
 
-- [FIXED LOCALLY] Marketplace listing showed `Open` and enabled `Apply` after
+- [FIXED] Marketplace listing showed `Open` and enabled `Apply` after
   the application deadline had passed.
   - Evidence: Listing `Browser QA Campaign 2026-08-27` had `Apply by
     2026-08-27` on 2026-09-02, but still showed `OPEN` and `Apply`.
@@ -140,20 +155,19 @@ Creator test account: `pikhane@gmail.com`
 
 - [P2] Auto-created job from a won deal had blank deadline/deliverables. The
   job was usable, but the table displayed `due` with no date.
-- [P2] Some form controls work visually but are weakly accessible to automated
-  label queries. Examples: CRM/task labels and task completion checkbox without
-  a clear accessible label.
-- [FIXED LOCALLY] Invoice and campaign date fields were difficult to automate
+- [FIXED] Invoice New invoice modal fields now have explicit label/control
+  associations in addition to stable IDs/names/test IDs.
+- [FIXED] Invoice and campaign date fields were difficult to automate
   reliably. Added stable `id`, `name`, and `data-testid` attributes plus
   focused regression tests for invoice and campaign date updates.
-- [FIXED LOCALLY] Campaign and invoice form controls lacked stable field
+- [FIXED] Campaign and invoice form controls lacked stable field
   handles. Added names/test IDs across campaign create/edit and invoice create
   forms; added an accessible task checkbox label.
-- [FIXED LOCALLY] Payment setup surfaces now clearly show `Coming soon` and
+- [FIXED] Payment setup surfaces now clearly show `Coming soon` and
   disable card/payout setup actions while payment rails are offline.
-- [FIXED LOCALLY] Sidebar scrolled away on long app pages. App shell now owns
-  viewport height, hides document overflow, keeps sidebar viewport-height and
-  sticky, and scrolls the main content area only.
+- [FIXED] Sidebar scrolled away on long app pages. App shell now uses a fixed
+  sidebar and offsets main content so long app pages scroll without moving the
+  sidebar.
 - [P3] Brand creator directory had no creators for the QA brand, so
   favorite/unfavorite and direct matched-creator invite could not be covered
   without seeded creator discovery data.
@@ -173,13 +187,20 @@ Creator test account: `pikhane@gmail.com`
 - `cd thesi-web && npm test -- BrandSettingsPaymentMethodsContent.test.tsx DraftCampaignEditForm.accessibility.test.tsx InvoicesPageContent.accessibility.test.tsx`
 - `cd thesi-web && npm test` - 16 files, 40 tests passed after local fixes.
 - `cd thesi-web && npm run build` - passed after local fixes.
+- `./scripts/qa-regression.sh` - added as the repeatable release gate and
+  passed: web tests 40/40, web lint 0 errors / 18 existing warnings, web build
+  passed, API tests 122/122.
+- `cd thesi-web && npm test -- InvoicesPageContent.accessibility.test.tsx` -
+  passed after explicit invoice label wiring.
+- `./scripts/qa-web-docker-preview.sh` - added to build and run a local Docker
+  web preview before deploy.
 - Local browser layout check on `/app/campaigns/new`: sidebar top/bottom stayed
   fixed while `.app-content` scrolled to `900px`.
 
 ## Resume Point
 
-- Current local URL: `http://localhost:3001/app/campaigns/new`.
-- Last completed action: fixed and verified static sidebar behavior locally.
-- Next action: deploy sidebar/payment/date/accessibility fixes, then run a
-  short production retest of sidebar scroll, creator payouts coming soon,
-  invoice date handles, and task checkbox label.
+- Current production URL: `https://get-thesi.com/app/crm/tasks`.
+- Last completed action: fixed-scope production retest and regression playbook
+  update.
+- Next action: use the regression gate and live browser playbook before the
+  next release candidate.
