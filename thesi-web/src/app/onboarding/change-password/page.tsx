@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { OnboardingGuard, getOnboardingProgress } from "@/components/auth/OnboardingGuard";
+import { OnboardingGuard } from "@/components/auth/OnboardingGuard";
 import { useAuth } from "@/context/AuthProvider";
 
 export default function ChangePasswordPage() {
@@ -52,14 +52,6 @@ export default function ChangePasswordPage() {
     <OnboardingGuard>
       <div className="onboarding-page">
         <div className="onboarding-card">
-          {!session?.user.onboardingCompleted && (
-            <div className="onboarding-progress">
-              <div
-                className="onboarding-progress-bar"
-                style={{ width: `${getOnboardingProgress("/onboarding/change-password")}%` }}
-              />
-            </div>
-          )}
           <h1>
             {session?.user.onboardingCompleted
               ? "Change your password"

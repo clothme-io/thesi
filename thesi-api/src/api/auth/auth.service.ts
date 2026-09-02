@@ -16,7 +16,7 @@ import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { PasswordService } from 'src/shared/auth/password.service';
 import { generateRefreshToken, hashToken } from 'src/shared/auth/token.util';
-import { EmailService } from 'src/shared/email/email.service';
+import { NovuService } from 'src/shared/novu/novu.service';
 import {
   AuthSessionDto,
   AuthUserDto,
@@ -47,7 +47,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    private readonly emailService: EmailService,
+    private readonly novu: NovuService,
   ) {}
 
   async signUp(dto: SignUpDto): Promise<AuthSessionDto> {
@@ -74,6 +74,17 @@ export class AuthService {
         onboardingStep: 'welcome',
       })
       .returning();
+
+    await this.novu
+      .trigger({
+        type: 'brand_welcome',
+        toEmail: user.email,
+        subscriberId: user.id,
+        firstName: this.firstName(user.fullName),
+      })
+      .catch((err: { message?: string }) =>
+        this.logger.warn(`Failed to send brand welcome email: ${err?.message}`),
+      );
 
     return this.createSession(user);
   }
@@ -208,8 +219,14 @@ export class AuthService {
       this.logger.log(`Password reset URL (dev): ${resetUrl}`);
     }
 
-    await this.emailService
-      .sendPasswordReset(user.email, user.fullName, resetUrl)
+    await this.novu
+      .trigger({
+        type: 'password_reset',
+        toEmail: user.email,
+        subscriberId: user.id,
+        firstName: this.firstName(user.fullName),
+        resetUrl,
+      })
       .catch((err: { message?: string }) =>
         this.logger.warn(
           `Failed to send password reset email: ${err?.message}`,
@@ -471,6 +488,10 @@ export class AuthService {
       if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
     }
     return true;
+  }
+
+  private firstName(fullName: string | null | undefined): string {
+    return fullName?.trim().split(/\s+/)[0] || 'there';
   }
 
   private resolveOnboardingStep(user: UserRow): OnboardingStep {

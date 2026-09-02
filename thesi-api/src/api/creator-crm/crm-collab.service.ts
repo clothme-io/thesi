@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -15,13 +16,17 @@ import {
   type CrmCollabSnapshot,
   type CrmWorkspaceMemberDto,
 } from './postgres-crm-collab.repository';
+import { NovuService } from 'src/shared/novu/novu.service';
 
 @Injectable()
 export class CrmCollabService {
+  private readonly logger = new Logger(CrmCollabService.name);
+
   constructor(
     private readonly collab: PostgresCrmCollabRepository,
     @Inject(CREATOR_CRM_REPOSITORY)
     private readonly crm: CreatorCrmRepository,
+    private readonly novu: NovuService,
   ) {}
 
   async getSnapshot(userId: string): Promise<CrmCollabSnapshot> {
@@ -52,12 +57,30 @@ export class CrmCollabService {
     if (email === (await this.collab.getUser(userId))?.email?.toLowerCase()) {
       throw new BadRequestException('You already own this workspace');
     }
-    await this.collab.createInvite({
+    const invite = await this.collab.createInvite({
       workspaceId: workspace.id,
       email,
       role,
       invitedByUserId: userId,
     });
+    const inviter = await this.collab.getUser(userId);
+    await this.novu
+      .trigger({
+        type: 'crm_workspace_invite',
+        toEmail: invite.email,
+        subscriberId: `email:${invite.email}`,
+        recipientName: invite.email.split('@')[0] || 'there',
+        inviterName: inviter?.fullName || 'A Thesi creator',
+        workspaceName: workspace.name,
+        inviteToken: invite.inviteToken || '',
+      })
+      .catch((error) =>
+        this.logger.warn(
+          `Novu CRM workspace invite failed for ${invite.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      );
     return this.collab.getSnapshot(userId);
   }
 
@@ -246,8 +269,7 @@ export class CrmCollabService {
         stats: { emails, events },
       });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Sync failed';
+      const message = error instanceof Error ? error.message : 'Sync failed';
       await this.collab.markSynced(connectionId, {
         lastSyncAt: new Date(),
         lastError: message,

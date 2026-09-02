@@ -53,6 +53,7 @@ describe('CrmCollabService', () => {
     createActivity: jest.Mock;
     createCalendarEvent: jest.Mock;
   };
+  let novu: { trigger: jest.Mock };
   let service: CrmCollabService;
 
   beforeEach(() => {
@@ -179,10 +180,14 @@ describe('CrmCollabService', () => {
       })),
       createCalendarEvent: jest.fn(),
     };
+    novu = {
+      trigger: jest.fn().mockResolvedValue('txn-1'),
+    };
 
     service = new CrmCollabService(
       collab as unknown as PostgresCrmCollabRepository,
       crm as unknown as CreatorCrmRepository,
+      novu as never,
     );
   });
 
@@ -193,6 +198,13 @@ describe('CrmCollabService', () => {
     });
     expect(data.members.some((m) => m.email === 'teammate@agency.com')).toBe(
       true,
+    );
+    expect(novu.trigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'crm_workspace_invite',
+        toEmail: 'teammate@agency.com',
+        workspaceName: 'My CRM',
+      }),
     );
   });
 

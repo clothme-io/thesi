@@ -25,6 +25,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       .select({
         id: schema.thesiUser.id,
         role: schema.thesiUser.role,
+        email: schema.thesiUser.email,
         fullName: schema.thesiUser.fullName,
         companyName: schema.thesiUser.companyName,
       })
@@ -151,7 +152,10 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       )
       .leftJoin(
         schema.creatorProfile,
-        eq(schema.creatorProfile.userId, schema.marketplaceApplication.creatorUserId),
+        eq(
+          schema.creatorProfile.userId,
+          schema.marketplaceApplication.creatorUserId,
+        ),
       )
       .where(eq(schema.marketplaceApplication.listingId, listingId))
       .orderBy(desc(schema.marketplaceApplication.appliedAt));
@@ -177,10 +181,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     return rows.map((row) => row.listingId);
   }
 
-  async hasApplied(
-    listingId: string,
-    creatorUserId: string,
-  ): Promise<boolean> {
+  async hasApplied(listingId: string, creatorUserId: string): Promise<boolean> {
     const [row] = await this.db
       .select({ id: schema.marketplaceApplication.id })
       .from(schema.marketplaceApplication)
@@ -222,9 +223,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     };
   }
 
-  async getApplicationById(
-    applicationId: string,
-  ): Promise<
+  async getApplicationById(applicationId: string): Promise<
     | (MarketplaceApplicationRecord & {
         creatorUserId: string;
         creatorEmail: string;
@@ -252,7 +251,10 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       )
       .leftJoin(
         schema.creatorProfile,
-        eq(schema.creatorProfile.userId, schema.marketplaceApplication.creatorUserId),
+        eq(
+          schema.creatorProfile.userId,
+          schema.marketplaceApplication.creatorUserId,
+        ),
       )
       .where(eq(schema.marketplaceApplication.id, applicationId))
       .limit(1);
@@ -320,7 +322,8 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       brandName: row.brandName,
       ownerUserId: row.ownerUserId,
       campaignId: row.campaignId,
-      campaignType: row.campaignType as MarketplaceListingRecord['campaignType'],
+      campaignType:
+        row.campaignType as MarketplaceListingRecord['campaignType'],
       type: row.type as MarketplaceListingRecord['type'],
       status: row.status as MarketplaceListingRecord['status'],
       startDate: row.startDate,

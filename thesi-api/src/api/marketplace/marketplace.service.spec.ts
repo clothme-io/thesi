@@ -91,7 +91,9 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
   }
 
   async listByOwner(ownerUserId: string) {
-    return this.listings.filter((listing) => listing.ownerUserId === ownerUserId);
+    return this.listings.filter(
+      (listing) => listing.ownerUserId === ownerUserId,
+    );
   }
 
   async getById(listingId: string) {
@@ -99,7 +101,9 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
   }
 
   async listApplicationsForCreator(creatorUserId: string) {
-    return this.applications.filter((app) => app.creatorUserId === creatorUserId);
+    return this.applications.filter(
+      (app) => app.creatorUserId === creatorUserId,
+    );
   }
 
   async listApplicationsForListing(
@@ -165,7 +169,9 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
   }
 
   async getApplicationById(applicationId: string) {
-    const application = this.applications.find((app) => app.id === applicationId);
+    const application = this.applications.find(
+      (app) => app.id === applicationId,
+    );
     if (!application) return null;
     return {
       id: application.id,
@@ -184,7 +190,9 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
     applicationId: string,
     status: 'accepted' | 'rejected',
   ) {
-    const application = this.applications.find((app) => app.id === applicationId);
+    const application = this.applications.find(
+      (app) => app.id === applicationId,
+    );
     if (!application || (application.status ?? 'pending') !== 'pending') {
       return null;
     }
@@ -208,6 +216,7 @@ describe('MarketplaceService', () => {
   let repository: FakeMarketplaceRepository;
   let inbox: { notifySelf: jest.Mock };
   let invites: { acceptMarketplaceApplicant: jest.Mock };
+  let novu: { trigger: jest.Mock };
   let service: MarketplaceService;
 
   beforeEach(() => {
@@ -218,6 +227,9 @@ describe('MarketplaceService', () => {
     invites = {
       acceptMarketplaceApplicant: jest.fn().mockResolvedValue({}),
     };
+    novu = {
+      trigger: jest.fn().mockResolvedValue('txn-1'),
+    };
     const creatorCrm = {
       addListingToPipeline: jest.fn().mockResolvedValue(undefined),
     };
@@ -226,6 +238,7 @@ describe('MarketplaceService', () => {
       creatorCrm as never,
       inbox as never,
       invites as never,
+      novu as never,
     );
   });
 
@@ -313,6 +326,7 @@ describe('MarketplaceService', () => {
     repository.user = {
       id: 'creator-1',
       role: 'creator',
+      email: 'creator@example.com',
       fullName: 'Creator',
       companyName: null,
     };
@@ -334,7 +348,11 @@ describe('MarketplaceService', () => {
         exampleVideoLinks: [],
         requirements: [],
         files: [],
-        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
         location: 'Remote',
         remoteOk: true,
         slots: 5,
@@ -358,7 +376,11 @@ describe('MarketplaceService', () => {
         exampleVideoLinks: [],
         requirements: [],
         files: [],
-        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
         location: 'Remote',
         remoteOk: true,
         slots: 5,
@@ -375,6 +397,7 @@ describe('MarketplaceService', () => {
     repository.user = {
       id: 'creator-1',
       role: 'creator',
+      email: 'creator@example.com',
       fullName: 'Creator',
       companyName: null,
     };
@@ -396,7 +419,11 @@ describe('MarketplaceService', () => {
         exampleVideoLinks: [],
         requirements: [],
         files: [],
-        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
         location: 'Remote',
         remoteOk: true,
         slots: 5,
@@ -418,6 +445,13 @@ describe('MarketplaceService', () => {
       expect.objectContaining({
         type: 'application_received',
         href: '/app/marketplace/listing-1',
+      }),
+    );
+    expect(novu.trigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'marketplace_application_received',
+        toEmail: 'creator@example.com',
+        campaignTitle: 'Summer',
       }),
     );
 
@@ -451,7 +485,11 @@ describe('MarketplaceService', () => {
         exampleVideoLinks: [],
         requirements: [],
         files: [],
-        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
         location: 'Remote',
         remoteOk: true,
         slots: 5,
@@ -512,7 +550,11 @@ describe('MarketplaceService', () => {
         exampleVideoLinks: [],
         requirements: [],
         files: [],
-        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
         location: 'Remote',
         remoteOk: true,
         slots: 5,
@@ -559,6 +601,13 @@ describe('MarketplaceService', () => {
       creatorEmail: 'alex@example.com',
       creatorName: 'Alex',
     });
+    expect(novu.trigger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'marketplace_application_status',
+        toEmail: 'alex@example.com',
+        status: 'accepted',
+      }),
+    );
 
     await expect(
       service.respondToApplication('brand-1', 'listing-1', 'app-1', 'rejected'),
@@ -616,7 +665,11 @@ describe('MarketplaceService', () => {
         exampleVideoLinks: [],
         requirements: [],
         files: [],
-        payment: { structure: 'flat_rate', currency: 'USD', flatAmountCents: 1000 },
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
         location: 'Remote',
         remoteOk: true,
         slots: 5,
