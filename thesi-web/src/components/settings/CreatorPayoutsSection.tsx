@@ -18,6 +18,8 @@ const EMPTY: ConnectStatus = {
   readyForPayouts: false,
 };
 
+const PAYOUTS_COMING_SOON = true;
+
 export function CreatorPayoutsSection() {
   const { authenticatedRequest } = useAuth();
   const searchParams = useSearchParams();
@@ -65,6 +67,10 @@ export function CreatorPayoutsSection() {
   }, [searchParams, load]);
 
   const startOnboarding = async () => {
+    if (PAYOUTS_COMING_SOON) {
+      setError("Payout setup is coming soon.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -94,6 +100,10 @@ export function CreatorPayoutsSection() {
   };
 
   const openDashboard = async () => {
+    if (PAYOUTS_COMING_SOON) {
+      setError("Payout dashboard access is coming soon.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -121,8 +131,8 @@ export function CreatorPayoutsSection() {
     <section className="workspace-section">
       <h3>Payouts</h3>
       <p className="workspace-hint" style={{ marginTop: 0 }}>
-        Connect a Stripe Express account to receive campaign payouts. Brands
-        pay you from the campaign page once this account is ready.
+        Stripe Express payouts are coming soon. You can still track invoices and
+        payment status in CRM while payout rails are offline.
       </p>
 
       {error ? (
@@ -135,7 +145,9 @@ export function CreatorPayoutsSection() {
         <div>
           <strong>{CONNECT_STATUS_LABELS[status.status]}</strong>
           <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
-            {status.readyForPayouts
+            {PAYOUTS_COMING_SOON
+              ? "Payout setup is not live yet; no bank account setup is required for this release."
+              : status.readyForPayouts
               ? "Payouts enabled on your Stripe Express account."
               : status.status === "unavailable"
                 ? "Set STRIPE_SECRET_KEY on thesi-api to enable Connect."
@@ -150,12 +162,20 @@ export function CreatorPayoutsSection() {
           ) : null}
         </div>
         <span className="crm-tag">
-          {status.readyForPayouts ? "Ready" : "Action needed"}
+          {PAYOUTS_COMING_SOON
+            ? "Coming soon"
+            : status.readyForPayouts
+              ? "Ready"
+              : "Action needed"}
         </span>
       </div>
 
       <div className="brand-payment-method-actions" style={{ marginTop: 16 }}>
-        {status.status !== "unavailable" && !status.readyForPayouts ? (
+        {PAYOUTS_COMING_SOON ? (
+          <button type="button" className="crm-btn-secondary" disabled>
+            Payout setup coming soon
+          </button>
+        ) : status.status !== "unavailable" && !status.readyForPayouts ? (
           <button
             type="button"
             className="crm-btn-primary"

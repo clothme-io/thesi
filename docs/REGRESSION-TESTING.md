@@ -37,7 +37,51 @@ Run focused tests while fixing a regression:
 ```bash
 cd thesi-web
 npm test -- BrandDetailContent.test.tsx
+npm test -- MarketplaceDetailContent.test.tsx
+npm test -- CampaignDetailContent.test.tsx CampaignsPageContent.test.tsx
+npm test -- BrandSettingsPaymentMethodsContent.test.tsx DraftCampaignEditForm.accessibility.test.tsx InvoicesPageContent.accessibility.test.tsx
+cd ../thesi-api
+npm test -- marketplace.service.spec.ts
 ```
+
+## Automated Coverage Targets
+
+- Marketplace deadline rules:
+  `thesi-web/src/lib/marketplace/listings.test.ts` and
+  `thesi-api/src/api/marketplace/marketplace.service.spec.ts`.
+- Marketplace creator/brand application UI:
+  `thesi-web/src/components/marketplace/MarketplaceDetailContent.test.tsx`.
+- Brand campaign lifecycle:
+  `thesi-web/src/components/brand/campaigns/CampaignDetailContent.test.tsx`
+  and
+  `thesi-web/src/components/brand/campaigns/CampaignsPageContent.test.tsx`.
+- Creator CRM empty related tabs:
+  `thesi-web/src/components/creator-crm/BrandDetailContent.test.tsx`.
+- Form field accessibility and date updates:
+  `thesi-web/src/components/brand/campaigns/DraftCampaignEditForm.accessibility.test.tsx`
+  and
+  `thesi-web/src/components/creator-crm/InvoicesPageContent.accessibility.test.tsx`.
+- Payment setup disabled while offline:
+  `thesi-web/src/components/settings/brand/BrandSettingsPaymentMethodsContent.test.tsx`.
+
+When a live RC pass finds a bug, add or extend one of these tests before
+deploying the fix.
+
+## Browser And Layout Regression
+
+For live browser RC checks, cover both behavior and layout:
+
+- Use production or a production-like preview URL.
+- Use one creator account that already exists; creators should not self-sign-up.
+- Use one fake QA brand account created during the run.
+- For important pages, check desktop `1440x900` and mobile `390x844`.
+- At each viewport, record page URL, primary heading, non-empty body content,
+  horizontal overflow, and console errors.
+- Required layout pages: public homepage, creator marketplace detail, brand
+  marketplace detail, campaign detail, creator CRM brand detail, invoices, and
+  settings/security.
+- A layout check passes only when the page has meaningful content, no horizontal
+  overflow, no incoherent overlapping controls, and no console errors.
 
 ## Creator Release Candidate Flow
 

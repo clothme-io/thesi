@@ -7,9 +7,9 @@ Creator test account: `pikhane@gmail.com`
 
 ## Summary
 
-- Status: Paused for deploy after marketplace deadline fix.
-- Current blocker fixed locally: expired marketplace listings could still appear
-  open and allow creators to begin applying.
+- Status: Continuing non-payment production RC checks.
+- Current blocker: none.
+- Marketplace deadline fix has been deployed and verified in production.
 - Previous blocker fixed and verified in production: blank Deals, Jobs, and
   Payments tabs on an empty CRM brand detail.
 
@@ -53,6 +53,67 @@ Creator test account: `pikhane@gmail.com`
 - [PASS] QA calendar event was created and displayed.
 - [PASS] Remaining creator settings routes loaded with no console errors:
   Social, Integrations, Team, Notifications.
+- [PASS] Marketplace deadline fix verified after deploy: expired creator
+  listing URL no longer exposes Apply, and creator marketplace browse showed no
+  expired listings.
+- [PASS] Creator Security page loaded with no console errors.
+- [PASS] Creator forced password-change flow was manually tested by the owner
+  during first sign-in with the creator account.
+- [PASS] Creator sign-out landed on `/sign-in`.
+- [PASS] Fake brand account created:
+  `qa.brand.owner.1788376149527@example.com`.
+- [PASS] Brand onboarding welcome page loaded.
+- [PASS] Empty brand onboarding question submit was blocked with
+  `Please select an option to continue.`
+- [PASS] Brand onboarding questions completed and redirected to brand
+  dashboard.
+- [PASS] Brand route smoke loaded with no console errors: Dashboard, Campaigns,
+  Creators, Marketplace, Inbox, Brand profile, Settings.
+- [PASS] Brand settings subroutes loaded with no console errors: Billing,
+  Payment methods, Payment history, Preferences, Notifications, Security.
+- [PASS] Brand campaign form loaded with expected basics, brief, creator
+  criteria, compensation, marketplace visibility, upload, and invite controls.
+- [PASS] QA campaign draft saved and remained visible in campaign list:
+  `QA Marketplace Campaign 1788376438665`.
+- [PASS] QA campaign published successfully and campaign detail showed Active.
+- [PASS] Public marketplace campaign appeared in brand marketplace with Product
+  Campaigns and `$250.00` compensation.
+- [PASS] Invite-only campaign published successfully:
+  `QA Invite Only Campaign 1788376953195`.
+- [PASS] Invite-only campaign remained hidden from the marketplace list while
+  the public campaign stayed visible.
+- [PASS] Invite creators drawer opened for invite-only campaign; with zero
+  matching creators, Send invites was disabled and no outbound invite was sent.
+- [PASS] Brand sign-out landed on `/sign-in` after exact sidebar button click.
+- [PASS] Creator marketplace showed the public QA listing and hid the
+  invite-only QA campaign.
+- [PASS] Creator marketplace detail showed the correct brand, payout, brief,
+  deliverables, criteria, timeline, applicant count, `Add to CRM`, and `Apply`.
+- [PASS] Empty creator marketplace application submit did not submit and stayed
+  in the modal.
+- [PASS] Creator submitted QA application with `Add to CRM on apply` enabled.
+- [PASS] Creator listing detail changed to `Pending`, removed the Apply button,
+  showed `View in pipeline`, and incremented applicants to `1`.
+- [PASS] Creator pipeline contained the marketplace application record for
+  `QA Marketplace Campaign 1788376438665`.
+- [PASS] Brand marketplace detail showed `Applicants (1)`,
+  `pikhane@gmail.com`, the submitted pitch, and `Accept` / `Reject`.
+- [PASS] Brand accepted the QA application; status changed to `Accepted`, and
+  decision buttons disappeared.
+- [PASS] Creator listing detail showed `Accepted` after brand approval and did
+  not show an Apply button.
+- [PASS] Invite-only campaign converted to marketplace via
+  `Post to marketplace`; it appeared in the marketplace list.
+- [PASS] Converted invite-only campaign was unpublished again and returned to
+  `Private invite only`.
+- [PASS] Brand creator directory loaded with empty-state copy and no console
+  errors.
+- [PASS] Responsive layout smoke passed for brand marketplace detail at
+  desktop `1440x900` and mobile `390x844`: nonblank, no horizontal overflow,
+  no console errors.
+- [PASS] Responsive layout smoke passed for brand campaign detail at desktop
+  `1440x900` and mobile `390x844`: nonblank, no horizontal overflow, no
+  console errors.
 
 ## Failed Checks
 
@@ -79,9 +140,17 @@ Creator test account: `pikhane@gmail.com`
 - [P2] Some form controls work visually but are weakly accessible to automated
   label queries. Examples: CRM/task labels and task completion checkbox without
   a clear accessible label.
-- [P3] Invoice date input did not update through one automation fill method,
-  but keyboard/manual interaction changed it. Treat as retest item for real user
-  input and Playwright regression coverage.
+- [FIXED LOCALLY] Invoice and campaign date fields were difficult to automate
+  reliably. Added stable `id`, `name`, and `data-testid` attributes plus
+  focused regression tests for invoice and campaign date updates.
+- [FIXED LOCALLY] Campaign and invoice form controls lacked stable field
+  handles. Added names/test IDs across campaign create/edit and invoice create
+  forms; added an accessible task checkbox label.
+- [FIXED LOCALLY] Payment setup surfaces now clearly show `Coming soon` and
+  disable card/payout setup actions while payment rails are offline.
+- [P3] Brand creator directory had no creators for the QA brand, so
+  favorite/unfavorite and direct matched-creator invite could not be covered
+  without seeded creator discovery data.
 
 ## Verification Added
 
@@ -92,11 +161,18 @@ Creator test account: `pikhane@gmail.com`
 - `cd thesi-web && npm run lint`
 - `cd thesi-web && npm run build`
 - `cd thesi-api && npm run build`
+- `cd thesi-web && npm test -- MarketplaceDetailContent.test.tsx`
+- `cd thesi-web && npm test -- CampaignDetailContent.test.tsx CampaignsPageContent.test.tsx`
+- `cd thesi-api && npm test -- marketplace.service.spec.ts`
+- `cd thesi-web && npm test -- BrandSettingsPaymentMethodsContent.test.tsx DraftCampaignEditForm.accessibility.test.tsx InvoicesPageContent.accessibility.test.tsx`
+- `cd thesi-web && npm test` - 16 files, 40 tests passed after local fixes.
+- `cd thesi-web && npm run build` - passed after local fixes.
 
 ## Resume Point
 
-- Deploy current marketplace deadline fix.
-- Resume at `https://get-thesi.com/app/marketplace`.
-- Expected result after deploy: expired listing should not appear in creator
-  browse. Direct URL should show `Closed` / `Applications closed` and no
-  `Apply` button.
+- Current live URL: `https://get-thesi.com/app/creators`.
+- Last completed action: converted invite-only campaign to marketplace, then
+  unpublished it again; checked brand creator directory and responsive layout
+  smoke.
+- Next action: optional seeded creator directory/invite test, payment-provider
+  handoff tests, or final launch-readiness signoff.

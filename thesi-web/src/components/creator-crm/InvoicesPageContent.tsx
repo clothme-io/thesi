@@ -335,6 +335,9 @@ export function InvoicesPageContent() {
               <label className="workspace-field">
                 <span>Brand</span>
                 <select
+                  id="invoice-brand"
+                  name="invoiceBrand"
+                  data-testid="invoice-brand-select"
                   value={brandId}
                   onChange={(event) => {
                     setBrandId(event.target.value);
@@ -353,6 +356,9 @@ export function InvoicesPageContent() {
               <label className="workspace-field">
                 <span>Job (optional)</span>
                 <select
+                  id="invoice-job"
+                  name="invoiceJob"
+                  data-testid="invoice-job-select"
                   value={jobId}
                   onChange={(event) => setJobId(event.target.value)}
                   disabled={!brandId}
@@ -368,6 +374,9 @@ export function InvoicesPageContent() {
               <label className="workspace-field">
                 <span>Amount (USD)</span>
                 <input
+                  id="invoice-amount"
+                  name="invoiceAmount"
+                  data-testid="invoice-amount-input"
                   type="number"
                   min="0.01"
                   step="0.01"
@@ -379,6 +388,9 @@ export function InvoicesPageContent() {
               <label className="workspace-field">
                 <span>Due date</span>
                 <input
+                  id="invoice-due-date"
+                  name="invoiceDueDate"
+                  data-testid="invoice-due-date-input"
                   type="date"
                   value={dueDate}
                   onChange={(event) => setDueDate(event.target.value)}
@@ -388,6 +400,9 @@ export function InvoicesPageContent() {
               <label className="workspace-field">
                 <span>Description</span>
                 <textarea
+                  id="invoice-description"
+                  name="invoiceDescription"
+                  data-testid="invoice-description-textarea"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   rows={3}
