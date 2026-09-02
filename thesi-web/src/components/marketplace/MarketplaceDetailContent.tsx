@@ -13,6 +13,10 @@ import {
   fetchListingApplications,
   respondToListingApplication,
 } from "@/lib/marketplace/storage";
+import {
+  canCreatorApplyToListing,
+  getEffectiveListingStatus,
+} from "@/lib/marketplace/listings";
 import { listingInviteCampaignId, listingToInviteCriteria } from "@/lib/marketplace/invite-criteria";
 import { requirementRowsFromListing } from "@/lib/marketplace/requirements";
 import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
@@ -101,6 +105,8 @@ export function MarketplaceDetailContent() {
 
   const applied = hasApplied(data, listing.id);
   const inCrm = isInCrm(data, listing.id);
+  const effectiveStatus = getEffectiveListingStatus(listing);
+  const canApply = canCreatorApplyToListing(listing);
   const brandName = session?.user.fullName ?? listing.brandName;
   const inviteCampaignId = listingInviteCampaignId(listing);
   const invites = isBrand ? getInvitesForCampaign(inviteData, inviteCampaignId) : [];
@@ -118,6 +124,11 @@ export function MarketplaceDetailContent() {
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canApply) {
+      setActionError("Applications are closed for this listing.");
+      setShowApply(false);
+      return;
+    }
     if (!pitch.trim()) return;
     setSubmitting(true);
     setActionError("");
@@ -229,6 +240,10 @@ export function MarketplaceDetailContent() {
                     ]
                   }
                 </span>
+              ) : !canApply ? (
+                <span className="marketplace-status marketplace-status--closed">
+                  Applications closed
+                </span>
               ) : (
                 <button type="button" className="crm-btn-primary" onClick={() => setShowApply(true)}>
                   Apply
@@ -249,8 +264,8 @@ export function MarketplaceDetailContent() {
           <div className="marketplace-detail-main">
             <section className="marketplace-panel">
               <div className="marketplace-detail-badges">
-                <span className={`marketplace-status marketplace-status--${listing.status}`}>
-                  {LISTING_STATUS_LABELS[listing.status]}
+                <span className={`marketplace-status marketplace-status--${effectiveStatus}`}>
+                  {LISTING_STATUS_LABELS[effectiveStatus]}
                 </span>
                 <span className="marketplace-tag">
                   {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??

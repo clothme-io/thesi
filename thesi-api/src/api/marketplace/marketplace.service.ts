@@ -97,7 +97,9 @@ export class MarketplaceService implements MarketplaceCampaignSync {
         this.marketplace.listCrmLinkedListingIds(userId),
       ]);
       return {
-        listings: listings.filter((listing) => listing.status !== 'closed'),
+        listings: listings.filter(
+          (listing) => !this.isClosedForApplications(listing),
+        ),
         applications,
         crmLinkedListingIds,
       };
@@ -153,7 +155,7 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     if (!listing) {
       throw new NotFoundException('Listing not found');
     }
-    if (listing.status === 'closed') {
+    if (this.isClosedForApplications(listing)) {
       throw new BadRequestException('This listing is closed');
     }
     const trimmed = pitch.trim();
@@ -328,5 +330,13 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       throw new ForbiddenException('Creator account required');
     }
     return user;
+  }
+
+  private isClosedForApplications(listing: MarketplaceListingRecord): boolean {
+    if (listing.status === 'closed') return true;
+    const today = new Date().toISOString().slice(0, 10);
+    return Boolean(
+      listing.applicationDeadline && listing.applicationDeadline < today,
+    );
   }
 }
