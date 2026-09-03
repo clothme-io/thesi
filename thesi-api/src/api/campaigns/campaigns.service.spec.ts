@@ -311,6 +311,68 @@ describe('CampaignsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('normalizes sparse draft campaign input before saving', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+
+    const campaign = await service.create('brand-1', {
+      status: 'draft',
+      payment: { model: 'milestone', milestones: [] },
+    } as UpsertCampaignDto);
+
+    expect(campaign).toEqual(
+      expect.objectContaining({
+        name: 'Untitled campaign',
+        status: 'draft',
+        campaignType: 'experience',
+        contentTypes: ['tiktok'],
+        brief: '',
+        deliverables: '',
+        payment: { model: 'milestone', milestones: [] },
+        postToMarketplace: false,
+      }),
+    );
+    expect(campaign.requirements).toEqual({
+      niches: [],
+      minFollowersRange: '',
+      location: '',
+      platforms: [],
+    });
+  });
+
+  it('keeps existing values when updating a draft with partial input', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        name: 'Original draft',
+        payment: { model: 'flat_rate', flatRateCents: 25_000 },
+      }),
+    );
+
+    const updated = await service.update('brand-1', campaign.id, {
+      status: 'draft',
+      payment: { model: 'milestone', milestones: [] },
+    } as UpsertCampaignDto);
+
+    expect(updated).toEqual(
+      expect.objectContaining({
+        name: 'Original draft',
+        status: 'draft',
+        payment: { model: 'milestone', milestones: [] },
+      }),
+    );
+  });
+
+  it('rejects sparse active campaign creation', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+
+    await expect(
+      service.create('brand-1', {
+        status: 'active',
+      } as UpsertCampaignDto),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('prevents creators from managing campaigns', async () => {
     repository.user = { id: 'creator-1', role: 'creator' };
 
@@ -502,7 +564,7 @@ function sampleCampaign(
   return {
     name: 'Untitled campaign',
     campaignType: 'experience',
-    type: 'tiktok',
+    contentTypes: ['tiktok'],
     status: 'draft',
     startDate: '2026-07-01',
     endDate: '2026-08-01',
@@ -520,6 +582,18 @@ function sampleCampaign(
       model: 'flat_rate',
       flatRateCents: 25000,
     },
+    requiredTasks: [],
+    creatorBenefits: {
+      productsKept: false,
+      bonusEligibility: false,
+      creatorPoolEligibility: false,
+      foundingCreatorRecognition: false,
+      portfolioUse: false,
+      priorityFutureCampaigns: false,
+      brandOpportunityAccess: false,
+      customBenefits: [],
+    },
+    productsProvided: [],
     postToMarketplace: false,
     ...overrides,
   };

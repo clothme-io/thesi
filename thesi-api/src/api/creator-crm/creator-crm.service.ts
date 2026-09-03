@@ -1094,7 +1094,7 @@ export class CreatorCrmService {
     const valueCents = listingValueCents(listing.payment);
     const dealNotes = [
       `Source: Marketplace — ${listing.name}`,
-      `Type: ${listing.type}`,
+      `Content types: ${listing.contentTypes.join(', ') || 'Not specified'}`,
       listing.brief.slice(0, 200),
     ].join('\n');
 

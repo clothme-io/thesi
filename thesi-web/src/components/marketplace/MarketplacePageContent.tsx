@@ -17,6 +17,7 @@ import {
   LISTING_STATUS_LABELS,
   APPLICATION_STATUS_LABELS,
   formatListingPayment,
+  formatListingContentTypes,
   type MarketplaceListingType,
   type PaymentStructure,
   type MarketplaceListingStatus,
@@ -62,7 +63,7 @@ export function MarketplacePageContent() {
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     return sourceListings.filter((listing) => {
-      if (typeFilter !== "all" && listing.type !== typeFilter) return false;
+      if (typeFilter !== "all" && !listing.contentTypes.includes(typeFilter)) return false;
       if (paymentFilter !== "all" && listing.payment.structure !== paymentFilter) return false;
       if (statusFilter !== "all" && listing.status !== statusFilter) return false;
       if (!query) return true;
@@ -195,7 +196,7 @@ export function MarketplacePageContent() {
                       {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??
                         listing.campaignType}
                     </span>
-                    <span>{LISTING_TYPE_LABELS[listing.type]}</span>
+                    <span>{formatListingContentTypes(listing.contentTypes)}</span>
                     <span>{formatListingPayment(listing.payment)}</span>
                   </div>
                   <p className="marketplace-card-brief">{listing.brief}</p>

@@ -108,17 +108,20 @@ export class CampaignsService {
     dto: UpsertCampaignDto,
   ): Promise<CampaignRecord> {
     await this.requireBrand(userId);
-    this.assertDateRange(dto);
-    const needsFee = this.requiresPlatformFee(dto);
+    this.assertPublishReady(dto);
+    const input = this.normalizeCampaignInput(dto);
+    this.assertDateRange(input);
+    const needsFee = this.requiresPlatformFee(input);
     const createDto = needsFee
-      ? { ...dto, status: 'draft' as const, postToMarketplace: false }
-      : dto;
+      ? { ...input, status: 'draft' as const, postToMarketplace: false }
+      : input;
     let campaign = await this.campaigns.create(userId, createDto);
     if (needsFee) {
       try {
         await this.collectPlatformFee(userId, campaign);
         campaign =
-          (await this.campaigns.update(userId, campaign.id, dto)) ?? campaign;
+          (await this.campaigns.update(userId, campaign.id, input)) ??
+          campaign;
       } catch (error) {
         throw error;
       }
@@ -133,21 +136,23 @@ export class CampaignsService {
     dto: UpsertCampaignDto,
   ): Promise<CampaignRecord> {
     await this.requireBrand(userId);
-    this.assertDateRange(dto);
     const existing = await this.campaigns.getByIdForOwner(userId, campaignId);
     if (!existing) {
       throw new NotFoundException('Campaign not found');
     }
+    this.assertPublishReady(dto, existing);
+    const input = this.normalizeCampaignInput(dto, existing);
+    this.assertDateRange(input);
 
-    if (this.requiresPlatformFee(dto)) {
+    if (this.requiresPlatformFee(input)) {
       await this.collectPlatformFee(userId, {
         ...existing,
-        payment: dto.payment,
-        name: dto.name,
+        payment: input.payment,
+        name: input.name,
       });
     }
 
-    const campaign = await this.campaigns.update(userId, campaignId, dto);
+    const campaign = await this.campaigns.update(userId, campaignId, input);
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
@@ -444,6 +449,119 @@ export class CampaignsService {
     }
   }
 
+  private assertPublishReady(
+    dto: UpsertCampaignDto,
+    existing?: CampaignRecord,
+  ): void {
+    if (dto.status !== 'active') {
+      return;
+    }
+
+    const missing: string[] = [];
+    if (!hasValue(dto.name, existing?.name)) missing.push('name');
+    if (!hasValue(dto.campaignType, existing?.campaignType)) {
+      missing.push('campaignType');
+    }
+    if (!hasValue(dto.contentTypes, existing?.contentTypes)) {
+      missing.push('contentTypes');
+    }
+    if (!hasValue(dto.startDate, existing?.startDate)) {
+      missing.push('startDate');
+    }
+    if (!hasValue(dto.endDate, existing?.endDate)) missing.push('endDate');
+    if (!hasValue(dto.brief, existing?.brief)) missing.push('brief');
+    if (!hasValue(dto.deliverables, existing?.deliverables)) {
+      missing.push('deliverables');
+    }
+    if (!hasValue(dto.exampleVideoLinks, existing?.exampleVideoLinks)) {
+      missing.push('exampleVideoLinks');
+    }
+    if (!hasValue(dto.requirements, existing?.requirements)) {
+      missing.push('requirements');
+    }
+    if (!hasValue(dto.payment?.model, existing?.payment.model)) {
+      missing.push('payment.model');
+    }
+    if (!hasValue(dto.postToMarketplace, existing?.postToMarketplace)) {
+      missing.push('postToMarketplace');
+    }
+
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `Active campaigns require: ${missing.join(', ')}`,
+      );
+    }
+  }
+
+  private normalizeCampaignInput(
+    dto: UpsertCampaignDto,
+    existing?: CampaignRecord,
+  ): UpsertCampaignDto {
+    const now = new Date();
+    const defaultStartDate = existing?.startDate ?? formatDateOnly(now);
+    const defaultEndDate =
+      existing?.endDate ?? formatDateOnly(addMonths(now, 1));
+    const requirements = dto.requirements ?? existing?.requirements;
+    const payment = dto.payment ?? existing?.payment;
+    const benefits = dto.creatorBenefits ?? existing?.creatorBenefits;
+
+    return {
+      name: normalizeString(dto.name, existing?.name, 'Untitled campaign'),
+      campaignType: dto.campaignType ?? existing?.campaignType ?? 'experience',
+      contentTypes: dto.contentTypes ?? existing?.contentTypes ?? ['tiktok'],
+      status: dto.status,
+      startDate: dto.startDate ?? defaultStartDate,
+      endDate: dto.endDate ?? defaultEndDate,
+      brief: dto.brief ?? existing?.brief ?? '',
+      deliverables: dto.deliverables ?? existing?.deliverables ?? '',
+      exampleVideoLinks:
+        dto.exampleVideoLinks ?? existing?.exampleVideoLinks ?? [],
+      requirements: {
+        niches: requirements?.niches ?? [],
+        minFollowersRange: requirements?.minFollowersRange ?? '',
+        location: requirements?.location ?? '',
+        platforms: requirements?.platforms ?? [],
+      },
+      files: dto.files ?? existing?.files ?? [],
+      payment: {
+        model: payment?.model ?? 'flat_rate',
+        ...(payment?.flatRateCents !== undefined
+          ? { flatRateCents: payment.flatRateCents }
+          : {}),
+        ...(payment?.milestones !== undefined
+          ? { milestones: payment.milestones }
+          : {}),
+        ...(payment?.royaltyPercent !== undefined
+          ? { royaltyPercent: payment.royaltyPercent }
+          : {}),
+        ...(payment?.notes !== undefined ? { notes: payment.notes } : {}),
+      },
+      requiredTasks: dto.requiredTasks ?? existing?.requiredTasks ?? [],
+      creatorBenefits: {
+        ...(benefits?.guaranteedPaymentCents !== undefined
+          ? { guaranteedPaymentCents: benefits.guaranteedPaymentCents }
+          : {}),
+        productsKept: benefits?.productsKept ?? false,
+        bonusEligibility: benefits?.bonusEligibility ?? false,
+        creatorPoolEligibility: benefits?.creatorPoolEligibility ?? false,
+        foundingCreatorRecognition:
+          benefits?.foundingCreatorRecognition ?? false,
+        portfolioUse: benefits?.portfolioUse ?? false,
+        priorityFutureCampaigns:
+          benefits?.priorityFutureCampaigns ?? false,
+        brandOpportunityAccess: benefits?.brandOpportunityAccess ?? false,
+        customBenefits: benefits?.customBenefits ?? [],
+      },
+      productsProvided:
+        dto.productsProvided ?? existing?.productsProvided ?? [],
+      ...(dto.creatorCapacity ?? existing?.creatorCapacity
+        ? { creatorCapacity: dto.creatorCapacity ?? existing?.creatorCapacity }
+        : {}),
+      postToMarketplace:
+        dto.postToMarketplace ?? existing?.postToMarketplace ?? false,
+    };
+  }
+
   private requiresPlatformFee(dto: UpsertCampaignDto): boolean {
     // Temporarily disabled — payment UX removed from create/publish for now.
     // Re-enable: return dto.status === 'active';
@@ -538,4 +656,26 @@ function isAllowedMime(mime: string): boolean {
   return ALLOWED_MIME_PREFIXES.some(
     (prefix) => mime === prefix || mime.startsWith(prefix),
   );
+}
+
+function addMonths(date: Date, months: number): Date {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+}
+
+function formatDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function normalizeString(
+  value: string | undefined,
+  fallback: string | undefined,
+  defaultValue: string,
+): string {
+  return value?.trim() || fallback?.trim() || defaultValue;
+}
+
+function hasValue<T>(value: T | undefined, fallback: T | undefined): boolean {
+  return value !== undefined || fallback !== undefined;
 }

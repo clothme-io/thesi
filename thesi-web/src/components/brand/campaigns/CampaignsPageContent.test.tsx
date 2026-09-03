@@ -35,7 +35,7 @@ const draftCampaign: BrandCampaign = {
   id: "campaign-draft-1",
   name: "Monthly Retainer",
   campaignType: "product",
-  type: "mixed_bundle",
+  contentTypes: ["mixed_bundle"],
   status: "draft",
   startDate: "2026-08-14",
   endDate: "2026-09-14",

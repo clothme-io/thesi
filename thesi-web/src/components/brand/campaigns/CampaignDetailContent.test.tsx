@@ -15,7 +15,7 @@ function buildCampaign(
     id: "campaign-1",
     name: "Summer Drop",
     campaignType: "experience",
-    type: "tiktok",
+    contentTypes: ["tiktok"],
     status: "active",
     startDate: "2026-07-01",
     endDate: "2026-08-01",
@@ -234,6 +234,44 @@ describe("CampaignDetailContent lifecycle buttons", () => {
       );
     });
     expect(await screen.findByText("Draft saved")).toBeInTheDocument();
+  });
+
+  it("saves a draft with incomplete milestone amounts", async () => {
+    activeCampaign = buildCampaign({
+      status: "draft",
+      payment: {
+        model: "milestone",
+        milestones: [
+          {
+            id: "m1",
+            label: "Draft delivered",
+            trigger: "First draft approved",
+            amountCents: 0,
+          },
+        ],
+      },
+    });
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    const user = userEvent.setup();
+    render(<CampaignDetailContent />);
+
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() => {
+      expect(updateCampaign).toHaveBeenCalledWith(
+        "campaign-1",
+        expect.objectContaining({
+          status: "draft",
+          payment: expect.objectContaining({
+            model: "milestone",
+            milestones: [],
+          }),
+        }),
+      );
+    });
+    expect(
+      screen.queryByText(/Add at least one milestone/i),
+    ).not.toBeInTheDocument();
   });
 
   it("pays an accepted creator invite", async () => {

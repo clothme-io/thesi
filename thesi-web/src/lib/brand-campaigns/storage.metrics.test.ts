@@ -10,7 +10,7 @@ function campaign(overrides: Partial<BrandCampaign> = {}): BrandCampaign {
     id: "c1",
     name: "Test",
     campaignType: "product",
-    type: "tiktok",
+    contentTypes: ["tiktok"],
     status: "draft",
     startDate: "2026-08-14",
     endDate: "2026-09-14",

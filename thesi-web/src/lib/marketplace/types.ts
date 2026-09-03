@@ -44,7 +44,7 @@ export interface MarketplaceListing {
   ownerUserId?: string;
   campaignId?: string;
   campaignType: BrandCampaignGoalType;
-  type: MarketplaceListingType;
+  contentTypes: MarketplaceListingType[];
   status: MarketplaceListingStatus;
   startDate: string;
   endDate: string;
@@ -55,6 +55,29 @@ export interface MarketplaceListing {
   requirements: string[];
   files: MarketplaceFile[];
   payment: MarketplacePayment;
+  requiredTasks: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    required: boolean;
+  }>;
+  creatorBenefits: {
+    guaranteedPaymentCents?: number;
+    productsKept: boolean;
+    bonusEligibility: boolean;
+    creatorPoolEligibility: boolean;
+    foundingCreatorRecognition: boolean;
+    portfolioUse: boolean;
+    priorityFutureCampaigns: boolean;
+    brandOpportunityAccess: boolean;
+    customBenefits: string[];
+  };
+  productsProvided: Array<{
+    id: string;
+    name: string;
+    quantity?: number;
+    creatorKeeps: boolean;
+  }>;
   location: string;
   remoteOk: boolean;
   slots: number;
@@ -96,11 +119,32 @@ export const LISTING_TYPE_LABELS: Record<MarketplaceListingType, string> = {
   long_form: "Long Form",
 };
 
+export function formatListingContentTypes(
+  contentTypes: MarketplaceListingType[],
+): string {
+  if (contentTypes.length === 0) return "—";
+  return contentTypes
+    .map((type) => LISTING_TYPE_LABELS[type])
+    .filter(Boolean)
+    .join(", ");
+}
+
 export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
   flat_rate: "Flat Rate",
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
+};
+
+export const EMPTY_LISTING_CREATOR_BENEFITS: MarketplaceListing["creatorBenefits"] = {
+  productsKept: false,
+  bonusEligibility: false,
+  creatorPoolEligibility: false,
+  foundingCreatorRecognition: false,
+  portfolioUse: false,
+  priorityFutureCampaigns: false,
+  brandOpportunityAccess: false,
+  customBenefits: [],
 };
 
 export const LISTING_STATUS_LABELS: Record<MarketplaceListingStatus, string> = {

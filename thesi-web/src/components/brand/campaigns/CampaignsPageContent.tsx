@@ -8,8 +8,8 @@ import { useBrandCampaigns, campaignMarketplaceLabel } from "@/lib/brand-campaig
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_STATUS_LABELS,
-  BRAND_CAMPAIGN_TYPE_LABELS,
   getCampaignBudgetLabel,
+  getCampaignContentTypesLabel,
   type BrandCampaignStatus,
 } from "@/lib/brand-campaigns/types";
 
@@ -39,7 +39,9 @@ export function CampaignsPageContent() {
         BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType]
           ?.toLowerCase()
           .includes(q) ||
-        BRAND_CAMPAIGN_TYPE_LABELS[campaign.type].toLowerCase().includes(q)
+        getCampaignContentTypesLabel(campaign.contentTypes)
+          .toLowerCase()
+          .includes(q)
       );
     });
   }, [data.campaigns, query, status]);
@@ -115,7 +117,7 @@ export function CampaignsPageContent() {
                     {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType] ??
                       campaign.campaignType}
                   </td>
-                  <td>{BRAND_CAMPAIGN_TYPE_LABELS[campaign.type]}</td>
+                  <td>{getCampaignContentTypesLabel(campaign.contentTypes)}</td>
                   <td>{BRAND_CAMPAIGN_STATUS_LABELS[campaign.status]}</td>
                   <td>{campaign.startDate}</td>
                   <td>{campaign.endDate}</td>

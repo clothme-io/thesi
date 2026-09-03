@@ -13,7 +13,7 @@ const baseListing: MarketplaceListing = {
   ownerUserId: "brand-1",
   campaignId: "campaign-1",
   campaignType: "experience",
-  type: "tiktok",
+  contentTypes: ["tiktok"],
   status: "open",
   startDate: "2026-09-01",
   endDate: "2099-09-30",

@@ -1,4 +1,4 @@
-import type { BrandCampaignData } from "./types";
+import { EMPTY_CREATOR_BENEFITS, type BrandCampaignData } from "./types";
 
 export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
   campaigns: [
@@ -6,7 +6,7 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
       id: "campaign-1",
       name: "Summer Running Campaign",
       campaignType: "experience",
-      type: "mixed_bundle",
+      contentTypes: ["mixed_bundle"],
       status: "active",
       startDate: "2026-07-15",
       endDate: "2026-08-30",
@@ -33,6 +33,21 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
         ],
         notes: "Net 30 terms.",
       },
+      requiredTasks: [
+        { id: "task-1", title: "Test the summer running collection", required: true },
+        { id: "task-2", title: "Submit draft content for review", required: true },
+      ],
+      creatorBenefits: {
+        ...EMPTY_CREATOR_BENEFITS,
+        guaranteedPaymentCents: 450000,
+        productsKept: true,
+        portfolioUse: true,
+      },
+      productsProvided: [
+        { id: "product-1", name: "Running top", creatorKeeps: true },
+        { id: "product-2", name: "Running shorts", creatorKeeps: true },
+      ],
+      creatorCapacity: 20,
       postToMarketplace: true,
       createdAt: "2026-07-01T10:00:00.000Z",
       updatedAt: "2026-07-04T10:00:00.000Z",
@@ -41,7 +56,7 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
       id: "campaign-2",
       name: "Fall Lookbook UGC",
       campaignType: "experience",
-      type: "instagram_reels",
+      contentTypes: ["instagram_reels"],
       status: "draft",
       startDate: "2026-08-05",
       endDate: "2026-09-10",
@@ -59,6 +74,16 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
         model: "flat_rate",
         flatRateCents: 180000,
       },
+      requiredTasks: [],
+      creatorBenefits: {
+        ...EMPTY_CREATOR_BENEFITS,
+        guaranteedPaymentCents: 180000,
+        productsKept: true,
+      },
+      productsProvided: [
+        { id: "product-3", name: "Fall lookbook outfit", creatorKeeps: true },
+      ],
+      creatorCapacity: 8,
       postToMarketplace: false,
       createdAt: "2026-07-03T09:00:00.000Z",
       updatedAt: "2026-07-03T09:00:00.000Z",
@@ -67,7 +92,7 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
       id: "campaign-3",
       name: "Creator Store Promo Q3",
       campaignType: "experience",
-      type: "mixed_bundle",
+      contentTypes: ["mixed_bundle"],
       status: "paused",
       startDate: "2026-07-01",
       endDate: "2026-07-31",
@@ -86,10 +111,20 @@ export const SEED_BRAND_CAMPAIGN_DATA: BrandCampaignData = {
         flatRateCents: 200000,
         royaltyPercent: 5,
       },
+      requiredTasks: [
+        { id: "task-3", title: "Publish approved creator store promo", required: true },
+      ],
+      creatorBenefits: {
+        ...EMPTY_CREATOR_BENEFITS,
+        guaranteedPaymentCents: 200000,
+        creatorPoolEligibility: true,
+        priorityFutureCampaigns: true,
+      },
+      productsProvided: [],
+      creatorCapacity: 12,
       postToMarketplace: true,
       createdAt: "2026-06-20T10:00:00.000Z",
       updatedAt: "2026-07-02T12:00:00.000Z",
     },
   ],
 };
-

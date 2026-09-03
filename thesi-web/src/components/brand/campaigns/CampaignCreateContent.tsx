@@ -15,11 +15,13 @@ import {
   type MilestoneFormRow,
 } from "@/lib/brand-campaigns/payment-form";
 import type {
+  BrandCampaignCreatorBenefits,
   BrandCampaignGoalType,
   BrandCampaignPaymentModel,
   BrandCampaignStatus,
   BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
+import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { MilestoneBuilder } from "./MilestoneBuilder";
 import {
@@ -59,11 +61,42 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Hybrid", value: "hybrid" },
 ];
 
+const PLATFORM_OPTIONS = ["TikTok", "Instagram", "YouTube"] as const;
+
+const BENEFIT_FLAG_OPTIONS: Array<{
+  key: keyof Omit<
+    BrandCampaignCreatorBenefits,
+    "guaranteedPaymentCents" | "customBenefits"
+  >;
+  label: string;
+}> = [
+  { key: "productsKept", label: "Products are theirs to keep" },
+  { key: "foundingCreatorRecognition", label: "Founding Creator campaign participation" },
+  { key: "portfolioUse", label: "Portfolio-ready UGC experience" },
+  { key: "priorityFutureCampaigns", label: "Priority consideration for upcoming campaigns" },
+  { key: "creatorPoolEligibility", label: "Eligibility for future Creator Pool campaigns" },
+  { key: "bonusEligibility", label: "Performance bonus eligibility" },
+  { key: "brandOpportunityAccess", label: "Future brand and boutique opportunities" },
+];
+
 function parseList(raw: string): string[] {
   return raw
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+function listToRows(raw: string): string[] {
+  return raw
+    .split(/\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toggleArrayItem<T>(items: T[], item: T): T[] {
+  return items.includes(item)
+    ? items.filter((value) => value !== item)
+    : [...items, item];
 }
 
 const defaultDates = () => {
@@ -89,7 +122,7 @@ export function CampaignCreateContent() {
   const [name, setName] = useState("");
   const [campaignType, setCampaignType] =
     useState<BrandCampaignGoalType>("experience");
-  const [type, setType] = useState<BrandCampaignType>("tiktok");
+  const [contentTypes, setContentTypes] = useState<BrandCampaignType[]>(["tiktok"]);
   const [startDate, setStartDate] = useState(dates.start);
   const [endDate, setEndDate] = useState(dates.end);
   const [brief, setBrief] = useState("");
@@ -98,7 +131,15 @@ export function CampaignCreateContent() {
   const [niches, setNiches] = useState("Fitness, Lifestyle");
   const [minFollowersRange, setMinFollowersRange] = useState("5k+");
   const [location, setLocation] = useState("US");
-  const [platforms, setPlatforms] = useState("TikTok, Instagram");
+  const [platforms, setPlatforms] = useState<string[]>(["TikTok", "Instagram"]);
+  const [requiredTasks, setRequiredTasks] = useState("");
+  const [productsProvided, setProductsProvided] = useState("");
+  const [creatorCapacity, setCreatorCapacity] = useState("");
+  const [creatorBenefits, setCreatorBenefits] = useState({
+    ...EMPTY_CREATOR_BENEFITS,
+    productsKept: true,
+    portfolioUse: true,
+  });
   const [paymentModel, setPaymentModel] = useState<BrandCampaignPaymentModel>("flat_rate");
   const [flatAmount, setFlatAmount] = useState("");
   const [milestones, setMilestones] = useState<MilestoneFormRow[]>([]);
@@ -126,7 +167,7 @@ export function CampaignCreateContent() {
     hydratedRef.current = true;
     setName(`${source.name} (copy)`);
     setCampaignType(source.campaignType);
-    setType(source.type);
+    setContentTypes(source.contentTypes);
     setStartDate(source.startDate.slice(0, 10));
     setEndDate(source.endDate.slice(0, 10));
     setBrief(source.brief);
@@ -137,7 +178,7 @@ export function CampaignCreateContent() {
     setNiches(source.requirements.niches.join(", "));
     setMinFollowersRange(source.requirements.minFollowersRange);
     setLocation(source.requirements.location);
-    setPlatforms(source.requirements.platforms.join(", "));
+    setPlatforms(source.requirements.platforms);
     setPaymentModel(source.payment.model);
     setFlatAmount(
       source.payment.flatRateCents
@@ -151,6 +192,10 @@ export function CampaignCreateContent() {
       })),
     );
     setPaymentNotes(source.payment.notes ?? "");
+    setRequiredTasks(source.requiredTasks.map((task) => task.title).join("\n"));
+    setProductsProvided(source.productsProvided.map((product) => product.name).join("\n"));
+    setCreatorCapacity(source.creatorCapacity ? String(source.creatorCapacity) : "");
+    setCreatorBenefits(source.creatorBenefits);
     setPostToMarketplace(source.postToMarketplace);
   }, [ready, duplicateFromId, data]);
 
@@ -164,7 +209,7 @@ export function CampaignCreateContent() {
   const buildCampaignPayload = (status: BrandCampaignStatus) => ({
     name: name.trim() || "Untitled campaign",
     campaignType,
-    type,
+    contentTypes,
     status,
     startDate,
     endDate,
@@ -175,7 +220,7 @@ export function CampaignCreateContent() {
       niches: parseList(niches),
       minFollowersRange,
       location,
-      platforms: parseList(platforms),
+      platforms,
     },
     files: [],
     payment: buildCampaignPayment({
@@ -184,6 +229,23 @@ export function CampaignCreateContent() {
       notes: paymentNotes,
       milestones,
     }),
+    requiredTasks: listToRows(requiredTasks).map((title, index) => ({
+      id: `task-${index + 1}`,
+      title,
+      required: true,
+    })),
+    creatorBenefits: {
+      ...creatorBenefits,
+      customBenefits: listToRows(creatorBenefits.customBenefits.join("\n")),
+    },
+    productsProvided: listToRows(productsProvided).map((product, index) => ({
+      id: `product-${index + 1}`,
+      name: product,
+      creatorKeeps: creatorBenefits.productsKept,
+    })),
+    ...(creatorCapacity.trim()
+      ? { creatorCapacity: Number(creatorCapacity) }
+      : {}),
     postToMarketplace,
   });
 
@@ -201,11 +263,11 @@ export function CampaignCreateContent() {
     return uploaded;
   };
 
-  const saveDraft = async (): Promise<{ id: string; name: string }> => {
-    const milestoneError = requireMilestonePayment();
-    if (milestoneError) {
-      throw new Error(milestoneError);
-    }
+  const saveDraft = async (): Promise<{
+    id: string;
+    name: string;
+    fileUploadFailed: boolean;
+  }> => {
     const payload = buildCampaignPayload("draft");
     const campaign = draftRef.current
       ? await updateCampaign(draftRef.current.id, payload)
@@ -213,8 +275,13 @@ export function CampaignCreateContent() {
     const context = { id: campaign.id, name: campaign.name };
     draftRef.current = context;
     setInviteContext(context);
-    await flushPendingUploads(campaign.id);
-    return context;
+    let fileUploadFailed = false;
+    try {
+      await flushPendingUploads(campaign.id);
+    } catch {
+      fileUploadFailed = true;
+    }
+    return { ...context, fileUploadFailed };
   };
 
   const handleSaveDraft = async () => {
@@ -223,7 +290,11 @@ export function CampaignCreateContent() {
     setSaveMessage("");
     try {
       const context = await saveDraft();
-      setSaveMessage(`Draft saved — ${context.name}`);
+      setSaveMessage(
+        context.fileUploadFailed
+          ? `Draft saved — ${context.name}. Some files could not be uploaded.`
+          : `Draft saved — ${context.name}`,
+      );
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -285,6 +356,11 @@ export function CampaignCreateContent() {
     try {
       const context = await saveDraft();
       setInviteContext(context);
+      if (context.fileUploadFailed) {
+        setSaveMessage(
+          `Draft saved — ${context.name}. Some files could not be uploaded.`,
+        );
+      }
       setInviteOpen(true);
     } catch (requestError) {
       setError(
@@ -375,25 +451,28 @@ export function CampaignCreateContent() {
                   {BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES[campaignType]}
                 </span>
               </label>
-              <label className="workspace-field">
+              <div className="workspace-field">
                 <span>Content type</span>
-                <select
-                  id="campaign-content-type"
-                  name="campaignContentType"
-                  data-testid="campaign-content-type-select"
-                  value={type}
-                  onChange={(e) => setType(e.target.value as BrandCampaignType)}
-                >
+                <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
                   {CONTENT_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
+                    <label key={opt.value} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        name="campaignContentTypes"
+                        data-testid={`campaign-content-type-${opt.value}`}
+                        type="checkbox"
+                        checked={contentTypes.includes(opt.value)}
+                        onChange={() =>
+                          setContentTypes((prev) => toggleArrayItem(prev, opt.value))
+                        }
+                      />
+                      <span>{opt.label}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
                 <span className="workspace-hint" style={{ marginTop: 6 }}>
-                  Applies to all campaign types.
+                  Select every format creators may produce.
                 </span>
-              </label>
+              </div>
               <label className="workspace-field">
                 <span>Start date</span>
                 <input
@@ -531,15 +610,132 @@ export function CampaignCreateContent() {
                   onChange={(e) => setLocation(e.target.value)}
                 />
               </label>
+              <div className="workspace-field workspace-field--full">
+                <span>Platforms</span>
+                <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
+                  {PLATFORM_OPTIONS.map((platform) => (
+                    <label key={platform} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        name="campaignPlatforms"
+                        data-testid={`campaign-platform-${platform.toLowerCase()}`}
+                        type="checkbox"
+                        checked={platforms.includes(platform)}
+                        onChange={() =>
+                          setPlatforms((prev) => toggleArrayItem(prev, platform))
+                        }
+                      />
+                      <span>{platform}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="workspace-section">
+            <h3>Creator work</h3>
+            <div className="workspace-grid">
               <label className="workspace-field workspace-field--full">
-                <span>Platforms (comma-separated)</span>
+                <span>Required tasks</span>
+                <textarea
+                  id="campaign-required-tasks"
+                  name="campaignRequiredTasks"
+                  data-testid="campaign-required-tasks-textarea"
+                  rows={4}
+                  placeholder="Download ClothME&#10;Create Fit Profile&#10;Test products&#10;Complete feedback"
+                  value={requiredTasks}
+                  onChange={(e) => setRequiredTasks(e.target.value)}
+                />
+              </label>
+              <label className="workspace-field">
+                <span>Creator capacity</span>
                 <input
-                  id="campaign-platforms"
-                  name="campaignPlatforms"
-                  data-testid="campaign-platforms-input"
+                  id="campaign-creator-capacity"
+                  name="campaignCreatorCapacity"
+                  data-testid="campaign-creator-capacity-input"
+                  type="number"
+                  min="1"
+                  placeholder="20"
+                  value={creatorCapacity}
+                  onChange={(e) => setCreatorCapacity(e.target.value)}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="workspace-section">
+            <h3>Creator benefits</h3>
+            <div className="workspace-grid">
+              <label className="workspace-field">
+                <span>Guaranteed payment</span>
+                <input
+                  id="campaign-guaranteed-payment"
+                  name="campaignGuaranteedPayment"
+                  data-testid="campaign-guaranteed-payment-input"
                   type="text"
-                  value={platforms}
-                  onChange={(e) => setPlatforms(e.target.value)}
+                  placeholder="$300"
+                  value={
+                    creatorBenefits.guaranteedPaymentCents
+                      ? String(creatorBenefits.guaranteedPaymentCents / 100)
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setCreatorBenefits((prev) => ({
+                      ...prev,
+                      guaranteedPaymentCents: e.target.value.trim()
+                        ? Math.round(Number(e.target.value.replace(/[^0-9.]/g, "")) * 100)
+                        : undefined,
+                    }))
+                  }
+                />
+              </label>
+              <label className="workspace-field workspace-field--full">
+                <span>Products provided</span>
+                <textarea
+                  id="campaign-products-provided"
+                  name="campaignProductsProvided"
+                  data-testid="campaign-products-provided-textarea"
+                  rows={3}
+                  placeholder="T-shirt&#10;Pants&#10;Pyjamas"
+                  value={productsProvided}
+                  onChange={(e) => setProductsProvided(e.target.value)}
+                />
+              </label>
+              <div className="workspace-field workspace-field--full">
+                <span>Benefit flags</span>
+                <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                  {BENEFIT_FLAG_OPTIONS.map(({ key, label }) => (
+                    <label key={key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={creatorBenefits[key]}
+                        onChange={() =>
+                          setCreatorBenefits((prev) => ({
+                            ...prev,
+                            [key]: !prev[key],
+                          }))
+                        }
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <label className="workspace-field workspace-field--full">
+                <span>Custom benefits</span>
+                <textarea
+                  id="campaign-custom-benefits"
+                  name="campaignCustomBenefits"
+                  data-testid="campaign-custom-benefits-textarea"
+                  rows={3}
+                  placeholder="Future opportunities with participating fashion brands and boutiques"
+                  value={creatorBenefits.customBenefits.join("\n")}
+                  onChange={(e) =>
+                    setCreatorBenefits((prev) => ({
+                      ...prev,
+                      customBenefits: listToRows(e.target.value),
+                    }))
+                  }
                 />
               </label>
             </div>
@@ -751,7 +947,7 @@ export function CampaignCreateContent() {
             niches: parseList(niches),
             minFollowersRange,
             location,
-            platforms: parseList(platforms),
+            platforms,
           }}
         />
       )}

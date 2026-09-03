@@ -25,11 +25,11 @@ import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
 import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
 import { BRAND_CAMPAIGN_GOAL_TYPE_LABELS } from "@/lib/brand-campaigns/types";
 import {
-  LISTING_TYPE_LABELS,
   PAYMENT_STRUCTURE_LABELS,
   LISTING_STATUS_LABELS,
   APPLICATION_STATUS_LABELS,
   formatListingPayment,
+  formatListingContentTypes,
   type MarketplaceBrandApplication,
 } from "@/lib/marketplace/types";
 
@@ -112,6 +112,7 @@ export function MarketplaceDetailContent() {
   const invites = isBrand ? getInvitesForCampaign(inviteData, inviteCampaignId) : [];
   const requirementRows = requirementRowsFromListing(listing);
   const paymentSummary = formatListingPayment(listing.payment);
+  const contentTypesSummary = formatListingContentTypes(listing.contentTypes);
 
   const refreshInvites = () => {
     void reloadInvites(inviteCampaignId);
@@ -212,7 +213,7 @@ export function MarketplaceDetailContent() {
             {listing.brandName} ·{" "}
             {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??
               listing.campaignType}{" "}
-            · {LISTING_TYPE_LABELS[listing.type]}
+            · {contentTypesSummary}
           </span>
         </div>
         <div className="marketplace-detail-actions">
@@ -272,7 +273,7 @@ export function MarketplaceDetailContent() {
                     listing.campaignType}
                 </span>
                 <span className="marketplace-tag">
-                  {LISTING_TYPE_LABELS[listing.type]}
+                  {contentTypesSummary}
                 </span>
               </div>
 
@@ -298,6 +299,71 @@ export function MarketplaceDetailContent() {
                 <h3>What you’ll create</h3>
                 <p>{listing.deliverables || "See brief for deliverables."}</p>
               </div>
+
+              {listing.requiredTasks.length > 0 && (
+                <div className="marketplace-section-block">
+                  <h3>What you’ll do</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {listing.requiredTasks.map((task) => (
+                      <li key={task.id}>{task.title}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {(listing.creatorBenefits.guaranteedPaymentCents ||
+                listing.productsProvided.length > 0 ||
+                listing.creatorBenefits.productsKept ||
+                listing.creatorBenefits.bonusEligibility ||
+                listing.creatorBenefits.creatorPoolEligibility ||
+                listing.creatorBenefits.foundingCreatorRecognition ||
+                listing.creatorBenefits.portfolioUse ||
+                listing.creatorBenefits.priorityFutureCampaigns ||
+                listing.creatorBenefits.brandOpportunityAccess ||
+                listing.creatorBenefits.customBenefits.length > 0) && (
+                <div className="marketplace-section-block">
+                  <h3>What you’ll receive</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {listing.creatorBenefits.guaranteedPaymentCents ? (
+                      <li>
+                        {new Intl.NumberFormat("en-US", {
+                          style: "currency",
+                          currency: "USD",
+                        }).format(
+                          listing.creatorBenefits.guaranteedPaymentCents / 100,
+                        )} guaranteed campaign payment
+                      </li>
+                    ) : null}
+                    {listing.productsProvided.map((product) => (
+                      <li key={product.id}>
+                        {product.name}
+                        {product.creatorKeeps ? " — yours to keep" : ""}
+                      </li>
+                    ))}
+                    {listing.creatorBenefits.foundingCreatorRecognition && (
+                      <li>Founding Creator campaign participation</li>
+                    )}
+                    {listing.creatorBenefits.portfolioUse && (
+                      <li>Portfolio-ready UGC experience</li>
+                    )}
+                    {listing.creatorBenefits.priorityFutureCampaigns && (
+                      <li>Priority consideration for upcoming campaigns</li>
+                    )}
+                    {listing.creatorBenefits.creatorPoolEligibility && (
+                      <li>Eligibility for future Creator Pool campaigns</li>
+                    )}
+                    {listing.creatorBenefits.bonusEligibility && (
+                      <li>Performance bonus eligibility</li>
+                    )}
+                    {listing.creatorBenefits.brandOpportunityAccess && (
+                      <li>Future brand and boutique opportunities</li>
+                    )}
+                    {listing.creatorBenefits.customBenefits.map((benefit) => (
+                      <li key={benefit}>{benefit}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {(listing.exampleVideoLinks?.length ?? 0) > 0 && (
                 <div className="marketplace-section-block">

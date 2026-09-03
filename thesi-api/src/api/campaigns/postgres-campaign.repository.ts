@@ -71,7 +71,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         ownerUserId,
         name: input.name,
         campaignType: input.campaignType,
-        type: input.type,
+        contentTypes: input.contentTypes,
         status: input.status,
         startDate: input.startDate,
         endDate: input.endDate,
@@ -81,6 +81,10 @@ export class PostgresCampaignRepository implements CampaignRepository {
         requirements: input.requirements,
         files: [],
         payment: input.payment,
+        requiredTasks: input.requiredTasks,
+        creatorBenefits: input.creatorBenefits,
+        productsProvided: input.productsProvided,
+        creatorCapacity: input.creatorCapacity,
         postToMarketplace: input.postToMarketplace,
       })
       .returning();
@@ -97,7 +101,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
       .set({
         name: input.name,
         campaignType: input.campaignType,
-        type: input.type,
+        contentTypes: input.contentTypes,
         status: input.status,
         startDate: input.startDate,
         endDate: input.endDate,
@@ -107,6 +111,10 @@ export class PostgresCampaignRepository implements CampaignRepository {
         requirements: input.requirements,
         // files are managed via /campaigns/:id/files — do not clobber
         payment: input.payment,
+        requiredTasks: input.requiredTasks,
+        creatorBenefits: input.creatorBenefits,
+        productsProvided: input.productsProvided,
+        creatorCapacity: input.creatorCapacity,
         postToMarketplace: input.postToMarketplace,
         updatedAt: new Date(),
       })
@@ -375,7 +383,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
       id: row.id,
       name: row.name,
       campaignType: row.campaignType as CampaignRecord['campaignType'],
-      type: row.type as CampaignRecord['type'],
+      contentTypes: normalizeContentTypes(row.contentTypes),
       status: row.status as CampaignRecord['status'],
       startDate: row.startDate,
       endDate: row.endDate,
@@ -385,6 +393,10 @@ export class PostgresCampaignRepository implements CampaignRepository {
       requirements: normalizeRequirements(row.requirements),
       files: fileRows.map(toFileMeta),
       payment: normalizePayment(row.payment),
+      requiredTasks: normalizeRequiredTasks(row.requiredTasks),
+      creatorBenefits: normalizeCreatorBenefits(row.creatorBenefits),
+      productsProvided: normalizeProductsProvided(row.productsProvided),
+      ...(row.creatorCapacity ? { creatorCapacity: row.creatorCapacity } : {}),
       postToMarketplace: row.postToMarketplace,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
@@ -417,6 +429,61 @@ function normalizeRequirements(
     location: value?.location ?? '',
     platforms: Array.isArray(value?.platforms) ? value.platforms : [],
   };
+}
+
+function normalizeContentTypes(value: unknown): CampaignRecord['contentTypes'] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is CampaignRecord['contentTypes'][number] =>
+    typeof item === 'string',
+  );
+}
+
+function normalizeRequiredTasks(
+  value: typeof schema.campaign.$inferSelect['requiredTasks'],
+): CampaignRecord['requiredTasks'] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item.title === 'string')
+    .map((item) => ({
+      id: item.id || item.title,
+      title: item.title,
+      ...(item.description ? { description: item.description } : {}),
+      required: item.required ?? true,
+    }));
+}
+
+function normalizeCreatorBenefits(
+  value: typeof schema.campaign.$inferSelect['creatorBenefits'],
+): CampaignRecord['creatorBenefits'] {
+  return {
+    ...(value?.guaranteedPaymentCents !== undefined
+      ? { guaranteedPaymentCents: value.guaranteedPaymentCents }
+      : {}),
+    productsKept: value?.productsKept ?? false,
+    bonusEligibility: value?.bonusEligibility ?? false,
+    creatorPoolEligibility: value?.creatorPoolEligibility ?? false,
+    foundingCreatorRecognition: value?.foundingCreatorRecognition ?? false,
+    portfolioUse: value?.portfolioUse ?? false,
+    priorityFutureCampaigns: value?.priorityFutureCampaigns ?? false,
+    brandOpportunityAccess: value?.brandOpportunityAccess ?? false,
+    customBenefits: Array.isArray(value?.customBenefits)
+      ? value.customBenefits
+      : [],
+  };
+}
+
+function normalizeProductsProvided(
+  value: typeof schema.campaign.$inferSelect['productsProvided'],
+): CampaignRecord['productsProvided'] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item.name === 'string')
+    .map((item) => ({
+      id: item.id || item.name,
+      name: item.name,
+      ...(item.quantity ? { quantity: item.quantity } : {}),
+      creatorKeeps: item.creatorKeeps ?? true,
+    }));
 }
 
 function normalizePayment(
