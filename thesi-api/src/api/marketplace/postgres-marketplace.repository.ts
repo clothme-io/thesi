@@ -324,7 +324,9 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       campaignId: row.campaignId,
       campaignType:
         row.campaignType as MarketplaceListingRecord['campaignType'],
-      type: row.type as MarketplaceListingRecord['type'],
+      contentTypes: Array.isArray(row.contentTypes)
+        ? (row.contentTypes as MarketplaceListingRecord['contentTypes'])
+        : [],
       status: row.status as MarketplaceListingRecord['status'],
       startDate: row.startDate,
       endDate: row.endDate,
@@ -339,6 +341,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       files: Array.isArray(row.files) ? row.files : [],
       payment: row.payment,
+      requiredTasks: Array.isArray(row.requiredTasks) ? row.requiredTasks : [],
+      creatorBenefits: row.creatorBenefits,
+      productsProvided: Array.isArray(row.productsProvided)
+        ? row.productsProvided
+        : [],
       location: row.location,
       remoteOk: row.remoteOk,
       slots: row.slots,

@@ -36,6 +36,32 @@ export type MarketplaceFileJson = {
   sizeLabel: string;
 };
 
+export type MarketplaceRequiredTaskJson = {
+  id: string;
+  title: string;
+  description?: string;
+  required: boolean;
+};
+
+export type MarketplaceCreatorBenefitsJson = {
+  guaranteedPaymentCents?: number;
+  productsKept: boolean;
+  bonusEligibility: boolean;
+  creatorPoolEligibility: boolean;
+  foundingCreatorRecognition: boolean;
+  portfolioUse: boolean;
+  priorityFutureCampaigns: boolean;
+  brandOpportunityAccess: boolean;
+  customBenefits: string[];
+};
+
+export type MarketplaceProductProvidedJson = {
+  id: string;
+  name: string;
+  quantity?: number;
+  creatorKeeps: boolean;
+};
+
 export const marketplaceListing = thesiSchema.table('marketplace_listing', {
   id: uuid('id').primaryKey().defaultRandom(),
   campaignId: uuid('campaign_id')
@@ -48,7 +74,7 @@ export const marketplaceListing = thesiSchema.table('marketplace_listing', {
   brandName: text('brand_name').notNull(),
   name: text('name').notNull(),
   campaignType: text('campaign_type').notNull().default('experience'),
-  type: text('type').notNull(),
+  contentTypes: jsonb('content_types').$type<string[]>().notNull().default([]),
   status: text('status').notNull(),
   startDate: date('start_date').notNull(),
   endDate: date('end_date').notNull(),
@@ -65,6 +91,27 @@ export const marketplaceListing = thesiSchema.table('marketplace_listing', {
     .$type<MarketplacePaymentJson>()
     .notNull()
     .default({ structure: 'flat_rate', currency: 'USD', flatAmountCents: 0 }),
+  requiredTasks: jsonb('required_tasks')
+    .$type<MarketplaceRequiredTaskJson[]>()
+    .notNull()
+    .default([]),
+  creatorBenefits: jsonb('creator_benefits')
+    .$type<MarketplaceCreatorBenefitsJson>()
+    .notNull()
+    .default({
+      productsKept: false,
+      bonusEligibility: false,
+      creatorPoolEligibility: false,
+      foundingCreatorRecognition: false,
+      portfolioUse: false,
+      priorityFutureCampaigns: false,
+      brandOpportunityAccess: false,
+      customBenefits: [],
+    }),
+  productsProvided: jsonb('products_provided')
+    .$type<MarketplaceProductProvidedJson[]>()
+    .notNull()
+    .default([]),
   location: text('location').notNull().default('Remote'),
   remoteOk: boolean('remote_ok').notNull().default(true),
   slots: integer('slots').notNull().default(5),

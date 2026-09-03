@@ -29,7 +29,7 @@ export type CampaignRecord = {
   id: string;
   name: string;
   campaignType: UpsertCampaignDto['campaignType'];
-  type: UpsertCampaignDto['type'];
+  contentTypes: UpsertCampaignDto['contentTypes'];
   status: UpsertCampaignDto['status'];
   startDate: string;
   endDate: string;
@@ -39,6 +39,10 @@ export type CampaignRecord = {
   requirements: UpsertCampaignDto['requirements'];
   files: CampaignFileMeta[];
   payment: UpsertCampaignDto['payment'];
+  requiredTasks: UpsertCampaignDto['requiredTasks'];
+  creatorBenefits: UpsertCampaignDto['creatorBenefits'];
+  productsProvided: UpsertCampaignDto['productsProvided'];
+  creatorCapacity?: number;
   postToMarketplace: boolean;
   createdAt: string;
   updatedAt: string;

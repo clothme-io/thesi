@@ -17,9 +17,10 @@ import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_PAYMENT_LABELS,
   BRAND_CAMPAIGN_STATUS_LABELS,
-  BRAND_CAMPAIGN_TYPE_LABELS,
+  EMPTY_CREATOR_BENEFITS,
   formatMoney,
   getCampaignBudgetLabel,
+  getCampaignContentTypesLabel,
   type BrandCampaign,
   type BrandCampaignStatus,
 } from "@/lib/brand-campaigns/types";
@@ -36,7 +37,7 @@ function toCampaignInput(campaign: BrandCampaign): CampaignInput {
   return {
     name: campaign.name,
     campaignType: campaign.campaignType,
-    type: campaign.type,
+    contentTypes: campaign.contentTypes,
     status: campaign.status,
     startDate: toDateInputValue(campaign.startDate),
     endDate: toDateInputValue(campaign.endDate),
@@ -46,6 +47,10 @@ function toCampaignInput(campaign: BrandCampaign): CampaignInput {
     requirements: campaign.requirements,
     files: campaign.files,
     payment: campaign.payment,
+    requiredTasks: campaign.requiredTasks ?? [],
+    creatorBenefits: campaign.creatorBenefits ?? EMPTY_CREATOR_BENEFITS,
+    productsProvided: campaign.productsProvided ?? [],
+    ...(campaign.creatorCapacity ? { creatorCapacity: campaign.creatorCapacity } : {}),
     postToMarketplace: campaign.postToMarketplace,
   };
 }
@@ -97,6 +102,9 @@ export function CampaignDetailContent() {
     () => (ready && id ? getCampaignById(data, id) : null),
     [ready, id, data],
   );
+  const requiredTasks = campaign?.requiredTasks ?? [];
+  const creatorBenefits = campaign?.creatorBenefits ?? EMPTY_CREATOR_BENEFITS;
+  const productsProvided = campaign?.productsProvided ?? [];
   const { form, setForm } = useDraftForm(
     campaign?.status === "draft" ? campaign : null,
   );
@@ -183,7 +191,7 @@ export function CampaignDetailContent() {
         isDraft && form
           ? draftFormToInput(form)
           : toCampaignInput(campaign);
-      if (isDraft && form) {
+      if (patch.status === "active" && isDraft && form) {
         const milestoneError = paymentFormError(
           form.paymentModel,
           form.milestones,
@@ -215,21 +223,24 @@ export function CampaignDetailContent() {
     setLifecycleError("");
     setSaveMessage("");
     try {
-      const milestoneError = paymentFormError(
-        form.paymentModel,
-        form.milestones,
-      );
-      if (milestoneError) {
-        setLifecycleError(milestoneError);
-        return;
-      }
       const payload = draftFormToInput(form);
       await updateCampaign(campaign.id, payload);
+      let fileUploadFailed = false;
       for (const file of pendingFiles) {
-        await uploadCampaignFile(campaign.id, file);
+        try {
+          await uploadCampaignFile(campaign.id, file);
+        } catch {
+          fileUploadFailed = true;
+        }
       }
-      setPendingFiles([]);
-      setSaveMessage("Draft saved");
+      if (!fileUploadFailed) {
+        setPendingFiles([]);
+      }
+      setSaveMessage(
+        fileUploadFailed
+          ? "Draft saved. Some files could not be uploaded."
+          : "Draft saved",
+      );
     } catch (requestError) {
       setLifecycleError(
         requestError instanceof Error
@@ -419,8 +430,8 @@ export function CampaignDetailContent() {
                 </span>
               </div>
               <div className="crm-meta-row">
-                <span>Content type</span>
-                <span>{BRAND_CAMPAIGN_TYPE_LABELS[campaign.type]}</span>
+                <span>Content types</span>
+                <span>{getCampaignContentTypesLabel(campaign.contentTypes)}</span>
               </div>
               <div className="crm-meta-row">
                 <span>Status</span>
@@ -447,6 +458,67 @@ export function CampaignDetailContent() {
               <p>{campaign.brief}</p>
               <h3 style={{ marginTop: 24 }}>Deliverables</h3>
               <p>{campaign.deliverables}</p>
+              {requiredTasks.length > 0 && (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Required tasks</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {requiredTasks.map((task) => (
+                      <li key={task.id}>
+                        {task.title}
+                        {task.description ? ` — ${task.description}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {(creatorBenefits.guaranteedPaymentCents ||
+                productsProvided.length > 0 ||
+                creatorBenefits.productsKept ||
+                creatorBenefits.bonusEligibility ||
+                creatorBenefits.creatorPoolEligibility ||
+                creatorBenefits.foundingCreatorRecognition ||
+                creatorBenefits.portfolioUse ||
+                creatorBenefits.priorityFutureCampaigns ||
+                creatorBenefits.brandOpportunityAccess ||
+                creatorBenefits.customBenefits.length > 0) && (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Creator benefits</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {creatorBenefits.guaranteedPaymentCents ? (
+                      <li>
+                        {formatMoney(creatorBenefits.guaranteedPaymentCents)} guaranteed campaign payment
+                      </li>
+                    ) : null}
+                    {productsProvided.map((product) => (
+                      <li key={product.id}>
+                        {product.name}
+                        {product.creatorKeeps ? " — yours to keep" : ""}
+                      </li>
+                    ))}
+                    {creatorBenefits.foundingCreatorRecognition && (
+                      <li>Founding Creator campaign participation</li>
+                    )}
+                    {creatorBenefits.portfolioUse && (
+                      <li>Portfolio-ready UGC experience</li>
+                    )}
+                    {creatorBenefits.priorityFutureCampaigns && (
+                      <li>Priority consideration for upcoming campaigns</li>
+                    )}
+                    {creatorBenefits.creatorPoolEligibility && (
+                      <li>Eligibility for future Creator Pool campaigns</li>
+                    )}
+                    {creatorBenefits.bonusEligibility && (
+                      <li>Performance bonus eligibility</li>
+                    )}
+                    {creatorBenefits.brandOpportunityAccess && (
+                      <li>Future brand and boutique opportunities</li>
+                    )}
+                    {creatorBenefits.customBenefits.map((benefit) => (
+                      <li key={benefit}>{benefit}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
               {(campaign.exampleVideoLinks?.length ?? 0) > 0 && (
                 <>
                   <h3 style={{ marginTop: 24 }}>Example videos</h3>
@@ -485,6 +557,10 @@ export function CampaignDetailContent() {
                   <span>
                     {campaign.requirements.platforms.join(", ") || "—"}
                   </span>
+                </div>
+                <div className="crm-meta-row">
+                  <span>Creator capacity</span>
+                  <span>{campaign.creatorCapacity ?? "—"}</span>
                 </div>
               </div>
 
@@ -658,10 +734,7 @@ export function CampaignDetailContent() {
                   .filter(Boolean),
                 minFollowersRange: form.minFollowersRange,
                 location: form.location,
-                platforms: form.platforms
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
+                platforms: form.platforms,
               }
             : campaign.requirements
         }

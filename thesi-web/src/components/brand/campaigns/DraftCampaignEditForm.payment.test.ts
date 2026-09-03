@@ -10,7 +10,7 @@ function campaign(overrides: Partial<BrandCampaign> = {}): BrandCampaign {
     id: "c1",
     name: "Waitlist",
     campaignType: "growth",
-    type: "instagram_reels",
+    contentTypes: ["instagram_reels"],
     status: "draft",
     startDate: "2026-08-27",
     endDate: "2026-10-15",

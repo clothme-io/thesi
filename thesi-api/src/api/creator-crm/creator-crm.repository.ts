@@ -257,7 +257,7 @@ export type MarketplaceListingForCrm = {
   name: string;
   brandName: string;
   ownerUserId: string;
-  type: string;
+  contentTypes: string[];
   applicationDeadline: string;
   brief: string;
   payment: {

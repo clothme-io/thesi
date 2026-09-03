@@ -1,7 +1,7 @@
 import type { CampaignInviteCriteria } from "@/lib/invites/types";
-import type { MarketplaceListing } from "./types";
+import type { MarketplaceListing, MarketplaceListingType } from "./types";
 
-const TYPE_PLATFORMS: Record<MarketplaceListing["type"], string[]> = {
+const TYPE_PLATFORMS: Record<MarketplaceListingType, string[]> = {
   tiktok: ["TikTok"],
   instagram_reels: ["Instagram"],
   youtube_shorts: ["YouTube"],
@@ -24,7 +24,8 @@ export function listingToInviteCriteria(listing: MarketplaceListing): CampaignIn
   const niches: string[] = [];
   let minFollowersRange = "";
   let location = listing.remoteOk ? listing.location || "Remote" : listing.location;
-  let platforms = TYPE_PLATFORMS[listing.type] ?? [];
+  let platforms = listing.contentTypes.flatMap((type) => TYPE_PLATFORMS[type] ?? []);
+  platforms = [...new Set(platforms)];
 
   for (const req of listing.requirements) {
     const labeled = req.match(/^([^:]+):\s*(.+)$/);

@@ -20,7 +20,7 @@ export type MarketplaceListingRecord = {
   ownerUserId: string;
   campaignId: string;
   campaignType: CampaignRecord['campaignType'];
-  type: CampaignRecord['type'];
+  contentTypes: CampaignRecord['contentTypes'];
   status: 'open' | 'closing_soon' | 'closed';
   startDate: string;
   endDate: string;
@@ -31,6 +31,9 @@ export type MarketplaceListingRecord = {
   requirements: string[];
   files: Array<{ id: string; name: string; sizeLabel: string }>;
   payment: MarketplacePaymentJson;
+  requiredTasks: CampaignRecord['requiredTasks'];
+  creatorBenefits: CampaignRecord['creatorBenefits'];
+  productsProvided: CampaignRecord['productsProvided'];
   location: string;
   remoteOk: boolean;
   slots: number;

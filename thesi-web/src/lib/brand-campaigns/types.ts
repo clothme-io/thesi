@@ -29,11 +29,37 @@ export interface BrandCampaignMilestone {
   amountCents: number;
 }
 
+export interface BrandCampaignRequiredTask {
+  id: string;
+  title: string;
+  description?: string;
+  required: boolean;
+}
+
+export interface BrandCampaignCreatorBenefits {
+  guaranteedPaymentCents?: number;
+  productsKept: boolean;
+  bonusEligibility: boolean;
+  creatorPoolEligibility: boolean;
+  foundingCreatorRecognition: boolean;
+  portfolioUse: boolean;
+  priorityFutureCampaigns: boolean;
+  brandOpportunityAccess: boolean;
+  customBenefits: string[];
+}
+
+export interface BrandCampaignProductProvided {
+  id: string;
+  name: string;
+  quantity?: number;
+  creatorKeeps: boolean;
+}
+
 export interface BrandCampaign {
   id: string;
   name: string;
   campaignType: BrandCampaignGoalType;
-  type: BrandCampaignType;
+  contentTypes: BrandCampaignType[];
   status: BrandCampaignStatus;
   startDate: string;
   endDate: string;
@@ -54,6 +80,10 @@ export interface BrandCampaign {
     royaltyPercent?: number;
     notes?: string;
   };
+  requiredTasks: BrandCampaignRequiredTask[];
+  creatorBenefits: BrandCampaignCreatorBenefits;
+  productsProvided: BrandCampaignProductProvided[];
+  creatorCapacity?: number;
   postToMarketplace: boolean;
   createdAt: string;
   updatedAt: string;
@@ -89,6 +119,16 @@ export const BRAND_CAMPAIGN_TYPE_LABELS: Record<BrandCampaignType, string> = {
   long_form: "Long Form",
 };
 
+export function getCampaignContentTypesLabel(
+  contentTypes: BrandCampaignType[],
+): string {
+  if (contentTypes.length === 0) return "—";
+  return contentTypes
+    .map((type) => BRAND_CAMPAIGN_TYPE_LABELS[type])
+    .filter(Boolean)
+    .join(", ");
+}
+
 export const BRAND_CAMPAIGN_STATUS_LABELS: Record<BrandCampaignStatus, string> = {
   draft: "Draft",
   active: "Active",
@@ -101,6 +141,17 @@ export const BRAND_CAMPAIGN_PAYMENT_LABELS: Record<BrandCampaignPaymentModel, st
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
+};
+
+export const EMPTY_CREATOR_BENEFITS: BrandCampaignCreatorBenefits = {
+  productsKept: false,
+  bonusEligibility: false,
+  creatorPoolEligibility: false,
+  foundingCreatorRecognition: false,
+  portfolioUse: false,
+  priorityFutureCampaigns: false,
+  brandOpportunityAccess: false,
+  customBenefits: [],
 };
 
 export function formatMoney(cents: number): string {

@@ -14,8 +14,10 @@ import {
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
+  EMPTY_CREATOR_BENEFITS,
   formatMoney,
   type BrandCampaign,
+  type BrandCampaignCreatorBenefits,
   type BrandCampaignGoalType,
   type BrandCampaignPaymentModel,
   type BrandCampaignType,
@@ -53,6 +55,24 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Hybrid", value: "hybrid" },
 ];
 
+const PLATFORM_OPTIONS = ["TikTok", "Instagram", "YouTube"] as const;
+
+const BENEFIT_FLAG_OPTIONS: Array<{
+  key: keyof Omit<
+    BrandCampaignCreatorBenefits,
+    "guaranteedPaymentCents" | "customBenefits"
+  >;
+  label: string;
+}> = [
+  { key: "productsKept", label: "Products are theirs to keep" },
+  { key: "foundingCreatorRecognition", label: "Founding Creator campaign participation" },
+  { key: "portfolioUse", label: "Portfolio-ready UGC experience" },
+  { key: "priorityFutureCampaigns", label: "Priority consideration for upcoming campaigns" },
+  { key: "creatorPoolEligibility", label: "Eligibility for future Creator Pool campaigns" },
+  { key: "bonusEligibility", label: "Performance bonus eligibility" },
+  { key: "brandOpportunityAccess", label: "Future brand and boutique opportunities" },
+];
+
 function parseList(raw: string): string[] {
   return raw
     .split(",")
@@ -60,10 +80,23 @@ function parseList(raw: string): string[] {
     .filter(Boolean);
 }
 
+function listToRows(raw: string): string[] {
+  return raw
+    .split(/\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toggleArrayItem<T>(items: T[], item: T): T[] {
+  return items.includes(item)
+    ? items.filter((value) => value !== item)
+    : [...items, item];
+}
+
 export type DraftCampaignFormState = {
   name: string;
   campaignType: BrandCampaignGoalType;
-  type: BrandCampaignType;
+  contentTypes: BrandCampaignType[];
   startDate: string;
   endDate: string;
   brief: string;
@@ -72,7 +105,11 @@ export type DraftCampaignFormState = {
   niches: string;
   minFollowersRange: string;
   location: string;
-  platforms: string;
+  platforms: string[];
+  requiredTasks: string;
+  productsProvided: string;
+  creatorCapacity: string;
+  creatorBenefits: BrandCampaignCreatorBenefits;
   paymentModel: BrandCampaignPaymentModel;
   flatAmount: string;
   milestones: MilestoneFormRow[];
@@ -86,7 +123,7 @@ export function draftFormFromCampaign(
   return {
     name: campaign.name,
     campaignType: campaign.campaignType,
-    type: campaign.type,
+    contentTypes: campaign.contentTypes ?? [],
     startDate: toDateInputValue(campaign.startDate),
     endDate: toDateInputValue(campaign.endDate),
     brief: campaign.brief,
@@ -98,7 +135,11 @@ export function draftFormFromCampaign(
     niches: campaign.requirements.niches.join(", "),
     minFollowersRange: campaign.requirements.minFollowersRange,
     location: campaign.requirements.location,
-    platforms: campaign.requirements.platforms.join(", "),
+    platforms: campaign.requirements.platforms,
+    requiredTasks: (campaign.requiredTasks ?? []).map((task) => task.title).join("\n"),
+    productsProvided: (campaign.productsProvided ?? []).map((product) => product.name).join("\n"),
+    creatorCapacity: campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
+    creatorBenefits: campaign.creatorBenefits ?? { ...EMPTY_CREATOR_BENEFITS },
     paymentModel: campaign.payment.model,
     flatAmount: centsToInput(campaign.payment.flatRateCents),
     milestones: milestonesToFormRows(campaign.payment.milestones),
@@ -111,7 +152,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
   return {
     name: form.name.trim() || "Untitled campaign",
     campaignType: form.campaignType,
-    type: form.type,
+    contentTypes: form.contentTypes,
     status: "draft",
     startDate: form.startDate,
     endDate: form.endDate,
@@ -124,7 +165,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       niches: parseList(form.niches),
       minFollowersRange: form.minFollowersRange,
       location: form.location,
-      platforms: parseList(form.platforms),
+      platforms: form.platforms,
     },
     files: [],
     payment: buildCampaignPayment({
@@ -133,6 +174,23 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       notes: form.paymentNotes,
       milestones: form.milestones,
     }),
+    requiredTasks: listToRows(form.requiredTasks).map((title, index) => ({
+      id: `task-${index + 1}`,
+      title,
+      required: true,
+    })),
+    creatorBenefits: {
+      ...form.creatorBenefits,
+      customBenefits: listToRows(form.creatorBenefits.customBenefits.join("\n")),
+    },
+    productsProvided: listToRows(form.productsProvided).map((name, index) => ({
+      id: `product-${index + 1}`,
+      name,
+      creatorKeeps: form.creatorBenefits.productsKept,
+    })),
+    ...(form.creatorCapacity.trim()
+      ? { creatorCapacity: Number(form.creatorCapacity) }
+      : {}),
     postToMarketplace: form.postToMarketplace,
   };
 }
@@ -202,22 +260,25 @@ export function DraftCampaignEditForm({
               {BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES[form.campaignType]}
             </span>
           </label>
-          <label className="workspace-field">
+          <div className="workspace-field">
             <span>Content type</span>
-            <select
-              id="campaign-content-type"
-              name="campaignContentType"
-              data-testid="campaign-content-type-select"
-              value={form.type}
-              onChange={(e) => set("type", e.target.value as BrandCampaignType)}
-            >
+            <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
               {CONTENT_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+                <label key={opt.value} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    name="campaignContentTypes"
+                    data-testid={`campaign-content-type-${opt.value}`}
+                    type="checkbox"
+                    checked={form.contentTypes.includes(opt.value)}
+                    onChange={() =>
+                      set("contentTypes", toggleArrayItem(form.contentTypes, opt.value))
+                    }
+                  />
+                  <span>{opt.label}</span>
+                </label>
               ))}
-            </select>
-          </label>
+            </div>
+          </div>
           <label className="workspace-field">
             <span>Start date</span>
             <input
@@ -349,15 +410,127 @@ export function DraftCampaignEditForm({
               onChange={(e) => set("location", e.target.value)}
             />
           </label>
+          <div className="workspace-field workspace-field--full">
+            <span>Platforms</span>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
+              {PLATFORM_OPTIONS.map((platform) => (
+                <label key={platform} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    name="campaignPlatforms"
+                    data-testid={`campaign-platform-${platform.toLowerCase()}`}
+                    type="checkbox"
+                    checked={form.platforms.includes(platform)}
+                    onChange={() =>
+                      set("platforms", toggleArrayItem(form.platforms, platform))
+                    }
+                  />
+                  <span>{platform}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="workspace-section">
+        <h3>Creator work</h3>
+        <div className="workspace-grid">
           <label className="workspace-field workspace-field--full">
-            <span>Platforms (comma-separated)</span>
+            <span>Required tasks</span>
+            <textarea
+              id="campaign-required-tasks"
+              name="campaignRequiredTasks"
+              data-testid="campaign-required-tasks-textarea"
+              rows={4}
+              value={form.requiredTasks}
+              onChange={(e) => set("requiredTasks", e.target.value)}
+            />
+          </label>
+          <label className="workspace-field">
+            <span>Creator capacity</span>
             <input
-              id="campaign-platforms"
-              name="campaignPlatforms"
-              data-testid="campaign-platforms-input"
+              id="campaign-creator-capacity"
+              name="campaignCreatorCapacity"
+              data-testid="campaign-creator-capacity-input"
+              type="number"
+              min="1"
+              value={form.creatorCapacity}
+              onChange={(e) => set("creatorCapacity", e.target.value)}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="workspace-section">
+        <h3>Creator benefits</h3>
+        <div className="workspace-grid">
+          <label className="workspace-field">
+            <span>Guaranteed payment</span>
+            <input
+              id="campaign-guaranteed-payment"
+              name="campaignGuaranteedPayment"
+              data-testid="campaign-guaranteed-payment-input"
               type="text"
-              value={form.platforms}
-              onChange={(e) => set("platforms", e.target.value)}
+              value={
+                form.creatorBenefits.guaranteedPaymentCents
+                  ? String(form.creatorBenefits.guaranteedPaymentCents / 100)
+                  : ""
+              }
+              onChange={(e) =>
+                set("creatorBenefits", {
+                  ...form.creatorBenefits,
+                  guaranteedPaymentCents: e.target.value.trim()
+                    ? Math.round(Number(e.target.value.replace(/[^0-9.]/g, "")) * 100)
+                    : undefined,
+                })
+              }
+            />
+          </label>
+          <label className="workspace-field workspace-field--full">
+            <span>Products provided</span>
+            <textarea
+              id="campaign-products-provided"
+              name="campaignProductsProvided"
+              data-testid="campaign-products-provided-textarea"
+              rows={3}
+              value={form.productsProvided}
+              onChange={(e) => set("productsProvided", e.target.value)}
+            />
+          </label>
+          <div className="workspace-field workspace-field--full">
+            <span>Benefit flags</span>
+            <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+              {BENEFIT_FLAG_OPTIONS.map(({ key, label }) => (
+                <label key={key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.creatorBenefits[key]}
+                    onChange={() =>
+                      set("creatorBenefits", {
+                        ...form.creatorBenefits,
+                        [key]: !form.creatorBenefits[key],
+                      })
+                    }
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="workspace-field workspace-field--full">
+            <span>Custom benefits</span>
+            <textarea
+              id="campaign-custom-benefits"
+              name="campaignCustomBenefits"
+              data-testid="campaign-custom-benefits-textarea"
+              rows={3}
+              value={form.creatorBenefits.customBenefits.join("\n")}
+              onChange={(e) =>
+                set("creatorBenefits", {
+                  ...form.creatorBenefits,
+                  customBenefits: listToRows(e.target.value),
+                })
+              }
             />
           </label>
         </div>

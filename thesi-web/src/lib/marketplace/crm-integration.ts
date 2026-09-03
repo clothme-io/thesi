@@ -58,7 +58,7 @@ export function addListingToCrm(
   const valueCents = listingValueCents(listing);
   const dealNotes = [
     `Source: Marketplace — ${listing.name}`,
-    `Type: ${listing.type}`,
+    `Content types: ${listing.contentTypes.join(", ") || "Not specified"}`,
     `Payment: ${formatListingPayment(listing.payment)}`,
     listing.brief.slice(0, 200),
   ].join("\n");

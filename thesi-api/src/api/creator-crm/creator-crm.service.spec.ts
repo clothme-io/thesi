@@ -800,7 +800,7 @@ describe('CreatorCrmService', () => {
       name: 'Summer UGC',
       brandName: 'Nike',
       ownerUserId: 'brand-user',
-      type: 'tiktok',
+      contentTypes: ['tiktok'],
       applicationDeadline: '2026-08-01',
       brief: 'Create TikToks',
       payment: { structure: 'flat_rate', flatAmountCents: 50000 },
