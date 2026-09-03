@@ -83,6 +83,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         payment: input.payment,
         requiredTasks: input.requiredTasks,
         creatorBenefits: input.creatorBenefits,
+        contentRights: normalizeContentRights(input.contentRights),
         productsProvided: input.productsProvided,
         creatorCapacity: input.creatorCapacity,
         postToMarketplace: input.postToMarketplace,
@@ -113,6 +114,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         payment: input.payment,
         requiredTasks: input.requiredTasks,
         creatorBenefits: input.creatorBenefits,
+        contentRights: normalizeContentRights(input.contentRights),
         productsProvided: input.productsProvided,
         creatorCapacity: input.creatorCapacity,
         postToMarketplace: input.postToMarketplace,
@@ -395,6 +397,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
       payment: normalizePayment(row.payment),
       requiredTasks: normalizeRequiredTasks(row.requiredTasks),
       creatorBenefits: normalizeCreatorBenefits(row.creatorBenefits),
+      contentRights: normalizeContentRights(row.contentRights),
       productsProvided: normalizeProductsProvided(row.productsProvided),
       ...(row.creatorCapacity ? { creatorCapacity: row.creatorCapacity } : {}),
       postToMarketplace: row.postToMarketplace,
@@ -469,6 +472,22 @@ function normalizeCreatorBenefits(
     customBenefits: Array.isArray(value?.customBenefits)
       ? value.customBenefits
       : [],
+  };
+}
+
+function normalizeContentRights(value: {
+  organicUsage?: boolean;
+  websiteAppUsage?: boolean;
+  paidAdsUsage?: boolean;
+  duration?: string;
+  rawContentAccess?: boolean;
+} | null | undefined): CampaignRecord['contentRights'] {
+  return {
+    organicUsage: value?.organicUsage ?? true,
+    websiteAppUsage: value?.websiteAppUsage ?? false,
+    paidAdsUsage: value?.paidAdsUsage ?? false,
+    duration: value?.duration ?? '',
+    rawContentAccess: value?.rawContentAccess ?? false,
   };
 }
 

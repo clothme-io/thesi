@@ -33,6 +33,7 @@ export type MarketplaceListingRecord = {
   payment: MarketplacePaymentJson;
   requiredTasks: CampaignRecord['requiredTasks'];
   creatorBenefits: CampaignRecord['creatorBenefits'];
+  contentRights: CampaignRecord['contentRights'];
   productsProvided: CampaignRecord['productsProvided'];
   location: string;
   remoteOk: boolean;

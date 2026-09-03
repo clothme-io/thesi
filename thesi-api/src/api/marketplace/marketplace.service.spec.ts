@@ -15,6 +15,14 @@ import type {
 } from './marketplace.repository';
 import { MarketplaceService } from './marketplace.service';
 
+const DEFAULT_CONTENT_RIGHTS = {
+  organicUsage: true,
+  websiteAppUsage: false,
+  paidAdsUsage: false,
+  duration: '',
+  rawContentAccess: false,
+};
+
 class FakeMarketplaceRepository implements MarketplaceRepository {
   user: MarketplaceUser | null = null;
   brandName: string | null = 'Acme Brand';
@@ -69,6 +77,7 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
       },
       requiredTasks: input.campaign.requiredTasks,
       creatorBenefits: input.campaign.creatorBenefits,
+      contentRights: input.campaign.contentRights,
       productsProvided: input.campaign.productsProvided,
       location: input.campaign.requirements.location || 'Remote',
       remoteOk: true,
@@ -793,6 +802,7 @@ function sampleCampaign(
       brandOpportunityAccess: false,
       customBenefits: [],
     },
+    contentRights: DEFAULT_CONTENT_RIGHTS,
     productsProvided: [],
     postToMarketplace: true,
     createdAt: new Date().toISOString(),

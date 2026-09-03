@@ -1,9 +1,10 @@
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
 import { buildLabeledRequirements } from "./requirements";
-import type {
-  MarketplaceListing,
-  MarketplaceListingStatus,
-  MarketplacePayment,
+import {
+  EMPTY_LISTING_CONTENT_RIGHTS,
+  type MarketplaceListing,
+  type MarketplaceListingStatus,
+  type MarketplacePayment,
 } from "./types";
 
 function buildRequirements(campaign: BrandCampaign): string[] {
@@ -73,6 +74,7 @@ export function campaignToListing(
     payment: campaignPaymentToListingPayment(campaign),
     requiredTasks: campaign.requiredTasks,
     creatorBenefits: campaign.creatorBenefits,
+    contentRights: campaign.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS,
     productsProvided: campaign.productsProvided,
     location: campaign.requirements.location || "Remote",
     remoteOk,

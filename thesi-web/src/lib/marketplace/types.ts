@@ -72,6 +72,13 @@ export interface MarketplaceListing {
     brandOpportunityAccess: boolean;
     customBenefits: string[];
   };
+  contentRights?: {
+    organicUsage: boolean;
+    websiteAppUsage: boolean;
+    paidAdsUsage: boolean;
+    duration: string;
+    rawContentAccess: boolean;
+  };
   productsProvided: Array<{
     id: string;
     name: string;
@@ -145,6 +152,14 @@ export const EMPTY_LISTING_CREATOR_BENEFITS: MarketplaceListing["creatorBenefits
   priorityFutureCampaigns: false,
   brandOpportunityAccess: false,
   customBenefits: [],
+};
+
+export const EMPTY_LISTING_CONTENT_RIGHTS: NonNullable<MarketplaceListing["contentRights"]> = {
+  organicUsage: true,
+  websiteAppUsage: false,
+  paidAdsUsage: false,
+  duration: "",
+  rawContentAccess: false,
 };
 
 export const LISTING_STATUS_LABELS: Record<MarketplaceListingStatus, string> = {
