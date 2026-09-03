@@ -263,6 +263,7 @@ export type MarketplaceListingForCrm = {
   payment: {
     structure: string;
     flatAmountCents?: number;
+    milestoneStructure?: 'cumulative' | 'highest_achieved';
     milestones?: Array<{ amountCents: number }>;
     royaltyMinimumCents?: number;
     hybridFlatCents?: number;

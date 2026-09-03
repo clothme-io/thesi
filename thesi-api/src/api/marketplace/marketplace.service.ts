@@ -11,6 +11,10 @@ import { CreatorCrmService } from 'src/api/creator-crm/creator-crm.service';
 import { InboxService } from 'src/api/inbox/inbox.service';
 import { InvitesService } from 'src/api/invites/invites.service';
 import { NovuService } from 'src/shared/novu/novu.service';
+import {
+  FILE_STORAGE,
+  type FileStoragePort,
+} from 'src/shared/storage/file-storage.port';
 import type { CampaignRecord } from '../campaigns/campaign.repository';
 import {
   MARKETPLACE_REPOSITORY,
@@ -33,6 +37,8 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     private readonly inbox: InboxService,
     private readonly invites: InvitesService,
     private readonly novu: NovuService,
+    @Inject(FILE_STORAGE)
+    private readonly storage: FileStoragePort,
   ) {}
 
   async syncFromCampaign(
@@ -117,6 +123,46 @@ export class MarketplaceService implements MarketplaceCampaignSync {
       throw new NotFoundException('Listing not found');
     }
     return listing;
+  }
+
+  async downloadListingFile(
+    userId: string,
+    listingId: string,
+    fileId: string,
+  ): Promise<{
+    buffer: Buffer;
+    contentType: string;
+    fileName: string;
+  }> {
+    const user = await this.requireUser(userId);
+    if (user.role !== 'creator' && user.role !== 'brand') {
+      throw new ForbiddenException('Only creators and brands can download files');
+    }
+
+    const listing = await this.marketplace.getById(listingId);
+    if (!listing) {
+      throw new NotFoundException('Listing not found');
+    }
+    if (user.role === 'brand' && listing.ownerUserId !== user.id) {
+      throw new ForbiddenException('You do not own this listing');
+    }
+    if (user.role === 'creator' && this.isClosedForApplications(listing)) {
+      throw new NotFoundException('Listing not found');
+    }
+
+    const row = await this.marketplace.getListingFile(listingId, fileId);
+    if (!row) {
+      throw new NotFoundException('File not found');
+    }
+    const buffer = await this.storage.read({
+      provider: row.storageProvider,
+      key: row.storageKey,
+    });
+    return {
+      buffer,
+      contentType: row.contentType,
+      fileName: row.originalName,
+    };
   }
 
   async listListingApplications(

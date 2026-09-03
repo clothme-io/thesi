@@ -12,6 +12,18 @@ export type MarketplaceUser = {
   companyName: string | null;
 };
 
+export type MarketplaceFileRow = {
+  id: string;
+  campaignId: string;
+  ownerUserId: string;
+  originalName: string;
+  sizeBytes: number;
+  contentType: string;
+  storageProvider: 'local' | 'bunny';
+  storageKey: string;
+  createdAt: string;
+};
+
 export type MarketplaceListingRecord = {
   id: string;
   name: string;
@@ -75,6 +87,10 @@ export interface MarketplaceRepository {
   listAll(): Promise<MarketplaceListingRecord[]>;
   listByOwner(ownerUserId: string): Promise<MarketplaceListingRecord[]>;
   getById(listingId: string): Promise<MarketplaceListingRecord | null>;
+  getListingFile(
+    listingId: string,
+    fileId: string,
+  ): Promise<MarketplaceFileRow | null>;
   listApplicationsForCreator(
     creatorUserId: string,
   ): Promise<MarketplaceApplicationRecord[]>;

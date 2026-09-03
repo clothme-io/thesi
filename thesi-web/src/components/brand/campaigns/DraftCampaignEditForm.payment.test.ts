@@ -53,12 +53,14 @@ describe("draft form milestone round-trip", () => {
   it("preserves structured milestones instead of flattening to a base amount", () => {
     const form = draftFormFromCampaign(campaign());
     expect(form.paymentModel).toBe("milestone");
+    expect(form.milestoneStructure).toBe("highest_achieved");
     expect(form.milestones.map((row) => row.label)).toEqual([
       "Script approved",
       "Reel live",
     ]);
     expect(draftFormToInput(form).payment).toEqual({
       model: "milestone",
+      milestoneStructure: "highest_achieved",
       notes: "Paid in 5 days",
       milestones: [
         {

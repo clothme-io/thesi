@@ -20,6 +20,7 @@ function campaignPaymentToListingPayment(campaign: BrandCampaign): MarketplacePa
       return {
         structure: "milestone",
         currency: "USD",
+        milestoneStructure: payment.milestoneStructure ?? "highest_achieved",
         milestones: payment.milestones?.map((m) => ({
           label: m.label,
           amountCents: m.amountCents,

@@ -15,6 +15,9 @@ export type BrandCampaignType =
 
 export type BrandCampaignStatus = "draft" | "active" | "paused" | "completed";
 export type BrandCampaignPaymentModel = "flat_rate" | "milestone" | "royalty" | "hybrid";
+export type BrandCampaignMilestoneStructure =
+  | "cumulative"
+  | "highest_achieved";
 
 export interface BrandCampaignFile {
   id: string;
@@ -84,6 +87,7 @@ export interface BrandCampaign {
   payment: {
     model: BrandCampaignPaymentModel;
     flatRateCents?: number;
+    milestoneStructure?: BrandCampaignMilestoneStructure;
     milestones?: BrandCampaignMilestone[];
     royaltyPercent?: number;
     notes?: string;
@@ -181,7 +185,11 @@ export function getCampaignBudgetLabel(campaign: BrandCampaign): string {
     case "flat_rate":
       return formatMoney(payment.flatRateCents ?? 0);
     case "milestone": {
-      const total = payment.milestones?.reduce((sum, m) => sum + m.amountCents, 0) ?? 0;
+      const amounts = payment.milestones?.map((m) => m.amountCents) ?? [];
+      const total =
+        payment.milestoneStructure === "cumulative"
+          ? amounts.reduce((sum, amount) => sum + amount, 0)
+          : Math.max(0, ...amounts);
       return `${formatMoney(total)} (milestones)`;
     }
     case "royalty":

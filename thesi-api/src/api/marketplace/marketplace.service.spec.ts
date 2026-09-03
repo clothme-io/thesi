@@ -112,6 +112,22 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
     return this.listings.find((listing) => listing.id === listingId) ?? null;
   }
 
+  async getListingFile(listingId: string, fileId: string) {
+    const listing = await this.getById(listingId);
+    if (!listing?.files.some((file) => file.id === fileId)) return null;
+    return {
+      id: fileId,
+      campaignId: listing.campaignId,
+      ownerUserId: listing.ownerUserId,
+      originalName: 'brief.pdf',
+      sizeBytes: 1024,
+      contentType: 'application/pdf',
+      storageProvider: 'local' as const,
+      storageKey: 'campaigns/brief.pdf',
+      createdAt: new Date().toISOString(),
+    };
+  }
+
   async listApplicationsForCreator(creatorUserId: string) {
     return this.applications.filter(
       (app) => app.creatorUserId === creatorUserId,
@@ -229,6 +245,7 @@ describe('MarketplaceService', () => {
   let inbox: { notifySelf: jest.Mock };
   let invites: { acceptMarketplaceApplicant: jest.Mock };
   let novu: { trigger: jest.Mock };
+  let storage: { read: jest.Mock; upload: jest.Mock; delete: jest.Mock };
   let service: MarketplaceService;
 
   beforeEach(() => {
@@ -242,6 +259,11 @@ describe('MarketplaceService', () => {
     novu = {
       trigger: jest.fn().mockResolvedValue('txn-1'),
     };
+    storage = {
+      read: jest.fn().mockResolvedValue(Buffer.from('file')),
+      upload: jest.fn(),
+      delete: jest.fn(),
+    };
     const creatorCrm = {
       addListingToPipeline: jest.fn().mockResolvedValue(undefined),
     };
@@ -251,6 +273,7 @@ describe('MarketplaceService', () => {
       inbox as never,
       invites as never,
       novu as never,
+      storage as never,
     );
   });
 

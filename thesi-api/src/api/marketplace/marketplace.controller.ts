@@ -6,8 +6,10 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from 'src/shared/auth/current-user.decorator';
 import {
@@ -39,6 +41,27 @@ export class MarketplaceController {
   ) {
     const data = await this.marketplace.getListing(user.sub, id);
     return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Get('listings/:id/files/:fileId/download')
+  @ApiOperation({ summary: 'Download a marketplace listing file attachment' })
+  async downloadListingFile(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('fileId', ParseUUIDPipe) fileId: string,
+    @Res() res: Response,
+  ) {
+    const file = await this.marketplace.downloadListingFile(
+      user.sub,
+      id,
+      fileId,
+    );
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.fileName.replace(/"/g, '')}"`,
+    );
+    res.send(file.buffer);
   }
 
   @Get('listings/:id/applications')

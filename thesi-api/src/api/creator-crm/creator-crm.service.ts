@@ -72,6 +72,7 @@ function isAllowedContractMime(mime: string): boolean {
 function listingValueCents(payment: {
   structure: string;
   flatAmountCents?: number;
+  milestoneStructure?: 'cumulative' | 'highest_achieved';
   milestones?: Array<{ amountCents: number }>;
   royaltyMinimumCents?: number;
   hybridFlatCents?: number;
@@ -79,10 +80,12 @@ function listingValueCents(payment: {
   switch (payment.structure) {
     case 'flat_rate':
       return payment.flatAmountCents ?? 0;
-    case 'milestone':
-      return (
-        payment.milestones?.reduce((sum, m) => sum + m.amountCents, 0) ?? 0
-      );
+    case 'milestone': {
+      const amounts = payment.milestones?.map((m) => m.amountCents) ?? [];
+      return payment.milestoneStructure === 'cumulative'
+        ? amounts.reduce((sum, amount) => sum + amount, 0)
+        : Math.max(0, ...amounts);
+    }
     case 'royalty':
       return payment.royaltyMinimumCents ?? 0;
     case 'hybrid':

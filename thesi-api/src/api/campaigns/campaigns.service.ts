@@ -529,6 +529,9 @@ export class CampaignsService {
         ...(payment?.flatRateCents !== undefined
           ? { flatRateCents: payment.flatRateCents }
           : {}),
+        ...(payment?.milestoneStructure !== undefined
+          ? { milestoneStructure: payment.milestoneStructure }
+          : {}),
         ...(payment?.milestones !== undefined
           ? { milestones: payment.milestones }
           : {}),

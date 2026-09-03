@@ -6,6 +6,7 @@ import * as schema from 'src/dbConfig/drizzle/schema';
 import type {
   MarketplaceApplicationRecord,
   MarketplaceBrandApplicationRecord,
+  MarketplaceFileRow,
   MarketplaceListingRecord,
   MarketplaceRepository,
   MarketplaceUser,
@@ -108,6 +109,47 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       .limit(1);
     return row
       ? this.mapListing(row, await this.countApplicants(row.id))
+      : null;
+  }
+
+  async getListingFile(
+    listingId: string,
+    fileId: string,
+  ): Promise<MarketplaceFileRow | null> {
+    const [row] = await this.db
+      .select({
+        id: schema.campaignFile.id,
+        campaignId: schema.campaignFile.campaignId,
+        ownerUserId: schema.campaignFile.ownerUserId,
+        originalName: schema.campaignFile.originalName,
+        sizeBytes: schema.campaignFile.sizeBytes,
+        contentType: schema.campaignFile.contentType,
+        storageProvider: schema.campaignFile.storageProvider,
+        storageKey: schema.campaignFile.storageKey,
+        createdAt: schema.campaignFile.createdAt,
+      })
+      .from(schema.marketplaceListing)
+      .innerJoin(
+        schema.campaignFile,
+        and(
+          eq(
+            schema.campaignFile.campaignId,
+            schema.marketplaceListing.campaignId,
+          ),
+          eq(schema.campaignFile.id, fileId),
+        ),
+      )
+      .where(eq(schema.marketplaceListing.id, listingId))
+      .limit(1);
+
+    return row
+      ? {
+          ...row,
+          sizeBytes: Number(row.sizeBytes),
+          storageProvider:
+            row.storageProvider as MarketplaceFileRow['storageProvider'],
+          createdAt: row.createdAt.toISOString(),
+        }
       : null;
   }
 
