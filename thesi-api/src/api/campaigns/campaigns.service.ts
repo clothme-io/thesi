@@ -504,6 +504,7 @@ export class CampaignsService {
     const requirements = dto.requirements ?? existing?.requirements;
     const payment = dto.payment ?? existing?.payment;
     const benefits = dto.creatorBenefits ?? existing?.creatorBenefits;
+    const contentRights = dto.contentRights ?? existing?.contentRights;
 
     return {
       name: normalizeString(dto.name, existing?.name, 'Untitled campaign'),
@@ -551,6 +552,13 @@ export class CampaignsService {
           benefits?.priorityFutureCampaigns ?? false,
         brandOpportunityAccess: benefits?.brandOpportunityAccess ?? false,
         customBenefits: benefits?.customBenefits ?? [],
+      },
+      contentRights: {
+        organicUsage: contentRights?.organicUsage ?? true,
+        websiteAppUsage: contentRights?.websiteAppUsage ?? false,
+        paidAdsUsage: contentRights?.paidAdsUsage ?? false,
+        duration: contentRights?.duration ?? '',
+        rawContentAccess: contentRights?.rawContentAccess ?? false,
       },
       productsProvided:
         dto.productsProvided ?? existing?.productsProvided ?? [],

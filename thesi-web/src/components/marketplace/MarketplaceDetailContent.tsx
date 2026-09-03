@@ -28,6 +28,7 @@ import {
   PAYMENT_STRUCTURE_LABELS,
   LISTING_STATUS_LABELS,
   APPLICATION_STATUS_LABELS,
+  EMPTY_LISTING_CONTENT_RIGHTS,
   formatListingPayment,
   formatListingContentTypes,
   type MarketplaceBrandApplication,
@@ -113,6 +114,7 @@ export function MarketplaceDetailContent() {
   const requirementRows = requirementRowsFromListing(listing);
   const paymentSummary = formatListingPayment(listing.payment);
   const contentTypesSummary = formatListingContentTypes(listing.contentTypes);
+  const contentRights = listing.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS;
 
   const refreshInvites = () => {
     void reloadInvites(inviteCampaignId);
@@ -361,6 +363,25 @@ export function MarketplaceDetailContent() {
                     {listing.creatorBenefits.customBenefits.map((benefit) => (
                       <li key={benefit}>{benefit}</li>
                     ))}
+                  </ul>
+                </div>
+              )}
+
+              {(contentRights.organicUsage ||
+                contentRights.websiteAppUsage ||
+                contentRights.paidAdsUsage ||
+                contentRights.rawContentAccess ||
+                contentRights.duration.trim()) && (
+                <div className="marketplace-section-block">
+                  <h3>Content rights</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {contentRights.organicUsage && <li>Organic social usage</li>}
+                    {contentRights.websiteAppUsage && <li>Website and app usage</li>}
+                    {contentRights.paidAdsUsage && <li>Paid ads usage</li>}
+                    {contentRights.rawContentAccess && <li>Raw content access</li>}
+                    {contentRights.duration.trim() && (
+                      <li>Duration: {contentRights.duration}</li>
+                    )}
                   </ul>
                 </div>
               )}

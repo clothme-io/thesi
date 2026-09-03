@@ -219,6 +219,34 @@ export class CampaignCreatorBenefitsDto {
   customBenefits: string[];
 }
 
+export class CampaignContentRightsDto {
+  @ApiProperty()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  organicUsage: boolean;
+
+  @ApiProperty()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  websiteAppUsage: boolean;
+
+  @ApiProperty()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  paidAdsUsage: boolean;
+
+  @ApiProperty()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsString()
+  @MaxLength(120)
+  duration: string;
+
+  @ApiProperty()
+  @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  rawContentAccess: boolean;
+}
+
 export class CampaignProductProvidedDto {
   @ApiProperty()
   @IsString()
@@ -357,6 +385,12 @@ export class UpsertCampaignDto {
   @ValidateNested()
   @Type(() => CampaignCreatorBenefitsDto)
   creatorBenefits: CampaignCreatorBenefitsDto;
+
+  @ApiProperty({ type: CampaignContentRightsDto })
+  @ValidateIf((_, value) => value !== undefined)
+  @ValidateNested()
+  @Type(() => CampaignContentRightsDto)
+  contentRights?: CampaignContentRightsDto;
 
   @ApiProperty({ type: [CampaignProductProvidedDto] })
   @ValidateIf((_, value) => value !== undefined)

@@ -14,9 +14,11 @@ import {
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
+  EMPTY_CONTENT_RIGHTS,
   EMPTY_CREATOR_BENEFITS,
   formatMoney,
   type BrandCampaign,
+  type BrandCampaignContentRights,
   type BrandCampaignCreatorBenefits,
   type BrandCampaignGoalType,
   type BrandCampaignPaymentModel,
@@ -73,6 +75,16 @@ const BENEFIT_FLAG_OPTIONS: Array<{
   { key: "brandOpportunityAccess", label: "Future brand and boutique opportunities" },
 ];
 
+const CONTENT_RIGHTS_OPTIONS: Array<{
+  key: keyof Omit<BrandCampaignContentRights, "duration">;
+  label: string;
+}> = [
+  { key: "organicUsage", label: "Organic social usage" },
+  { key: "websiteAppUsage", label: "Website and app usage" },
+  { key: "paidAdsUsage", label: "Paid ads usage" },
+  { key: "rawContentAccess", label: "Raw content access" },
+];
+
 function parseList(raw: string): string[] {
   return raw
     .split(",")
@@ -110,6 +122,7 @@ export type DraftCampaignFormState = {
   productsProvided: string;
   creatorCapacity: string;
   creatorBenefits: BrandCampaignCreatorBenefits;
+  contentRights: BrandCampaignContentRights;
   paymentModel: BrandCampaignPaymentModel;
   flatAmount: string;
   milestones: MilestoneFormRow[];
@@ -140,6 +153,7 @@ export function draftFormFromCampaign(
     productsProvided: (campaign.productsProvided ?? []).map((product) => product.name).join("\n"),
     creatorCapacity: campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
     creatorBenefits: campaign.creatorBenefits ?? { ...EMPTY_CREATOR_BENEFITS },
+    contentRights: campaign.contentRights ?? { ...EMPTY_CONTENT_RIGHTS },
     paymentModel: campaign.payment.model,
     flatAmount: centsToInput(campaign.payment.flatRateCents),
     milestones: milestonesToFormRows(campaign.payment.milestones),
@@ -183,6 +197,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       ...form.creatorBenefits,
       customBenefits: listToRows(form.creatorBenefits.customBenefits.join("\n")),
     },
+    contentRights: form.contentRights,
     productsProvided: listToRows(form.productsProvided).map((name, index) => ({
       id: `product-${index + 1}`,
       name,
@@ -529,6 +544,48 @@ export function DraftCampaignEditForm({
                 set("creatorBenefits", {
                   ...form.creatorBenefits,
                   customBenefits: listToRows(e.target.value),
+                })
+              }
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="workspace-section">
+        <h3>Content rights</h3>
+        <div className="workspace-grid">
+          <div className="workspace-field workspace-field--full">
+            <span>Usage rights</span>
+            <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+              {CONTENT_RIGHTS_OPTIONS.map(({ key, label }) => (
+                <label key={key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.contentRights[key]}
+                    onChange={() =>
+                      set("contentRights", {
+                        ...form.contentRights,
+                        [key]: !form.contentRights[key],
+                      })
+                    }
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="workspace-field">
+            <span>Usage duration</span>
+            <input
+              id="campaign-content-rights-duration"
+              name="campaignContentRightsDuration"
+              data-testid="campaign-content-rights-duration-input"
+              type="text"
+              value={form.contentRights.duration}
+              onChange={(e) =>
+                set("contentRights", {
+                  ...form.contentRights,
+                  duration: e.target.value,
                 })
               }
             />

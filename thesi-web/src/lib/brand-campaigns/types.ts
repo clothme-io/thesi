@@ -48,6 +48,14 @@ export interface BrandCampaignCreatorBenefits {
   customBenefits: string[];
 }
 
+export interface BrandCampaignContentRights {
+  organicUsage: boolean;
+  websiteAppUsage: boolean;
+  paidAdsUsage: boolean;
+  duration: string;
+  rawContentAccess: boolean;
+}
+
 export interface BrandCampaignProductProvided {
   id: string;
   name: string;
@@ -82,6 +90,7 @@ export interface BrandCampaign {
   };
   requiredTasks: BrandCampaignRequiredTask[];
   creatorBenefits: BrandCampaignCreatorBenefits;
+  contentRights?: BrandCampaignContentRights;
   productsProvided: BrandCampaignProductProvided[];
   creatorCapacity?: number;
   postToMarketplace: boolean;
@@ -152,6 +161,14 @@ export const EMPTY_CREATOR_BENEFITS: BrandCampaignCreatorBenefits = {
   priorityFutureCampaigns: false,
   brandOpportunityAccess: false,
   customBenefits: [],
+};
+
+export const EMPTY_CONTENT_RIGHTS: BrandCampaignContentRights = {
+  organicUsage: true,
+  websiteAppUsage: false,
+  paidAdsUsage: false,
+  duration: "",
+  rawContentAccess: false,
 };
 
 export function formatMoney(cents: number): string {

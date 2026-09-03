@@ -16,12 +16,13 @@ import {
 } from "@/lib/brand-campaigns/payment-form";
 import type {
   BrandCampaignCreatorBenefits,
+  BrandCampaignContentRights,
   BrandCampaignGoalType,
   BrandCampaignPaymentModel,
   BrandCampaignStatus,
   BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
-import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
+import { EMPTY_CONTENT_RIGHTS, EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { MilestoneBuilder } from "./MilestoneBuilder";
 import {
@@ -77,6 +78,16 @@ const BENEFIT_FLAG_OPTIONS: Array<{
   { key: "creatorPoolEligibility", label: "Eligibility for future Creator Pool campaigns" },
   { key: "bonusEligibility", label: "Performance bonus eligibility" },
   { key: "brandOpportunityAccess", label: "Future brand and boutique opportunities" },
+];
+
+const CONTENT_RIGHTS_OPTIONS: Array<{
+  key: keyof Omit<BrandCampaignContentRights, "duration">;
+  label: string;
+}> = [
+  { key: "organicUsage", label: "Organic social usage" },
+  { key: "websiteAppUsage", label: "Website and app usage" },
+  { key: "paidAdsUsage", label: "Paid ads usage" },
+  { key: "rawContentAccess", label: "Raw content access" },
 ];
 
 function parseList(raw: string): string[] {
@@ -140,6 +151,7 @@ export function CampaignCreateContent() {
     productsKept: true,
     portfolioUse: true,
   });
+  const [contentRights, setContentRights] = useState(EMPTY_CONTENT_RIGHTS);
   const [paymentModel, setPaymentModel] = useState<BrandCampaignPaymentModel>("flat_rate");
   const [flatAmount, setFlatAmount] = useState("");
   const [milestones, setMilestones] = useState<MilestoneFormRow[]>([]);
@@ -196,6 +208,7 @@ export function CampaignCreateContent() {
     setProductsProvided(source.productsProvided.map((product) => product.name).join("\n"));
     setCreatorCapacity(source.creatorCapacity ? String(source.creatorCapacity) : "");
     setCreatorBenefits(source.creatorBenefits);
+    setContentRights(source.contentRights ?? EMPTY_CONTENT_RIGHTS);
     setPostToMarketplace(source.postToMarketplace);
   }, [ready, duplicateFromId, data]);
 
@@ -238,6 +251,7 @@ export function CampaignCreateContent() {
       ...creatorBenefits,
       customBenefits: listToRows(creatorBenefits.customBenefits.join("\n")),
     },
+    contentRights,
     productsProvided: listToRows(productsProvided).map((product, index) => ({
       id: `product-${index + 1}`,
       name: product,
@@ -734,6 +748,49 @@ export function CampaignCreateContent() {
                     setCreatorBenefits((prev) => ({
                       ...prev,
                       customBenefits: listToRows(e.target.value),
+                    }))
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="workspace-section">
+            <h3>Content rights</h3>
+            <div className="workspace-grid">
+              <div className="workspace-field workspace-field--full">
+                <span>Usage rights</span>
+                <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                  {CONTENT_RIGHTS_OPTIONS.map(({ key, label }) => (
+                    <label key={key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={contentRights[key]}
+                        onChange={() =>
+                          setContentRights((prev) => ({
+                            ...prev,
+                            [key]: !prev[key],
+                          }))
+                        }
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <label className="workspace-field">
+                <span>Usage duration</span>
+                <input
+                  id="campaign-content-rights-duration"
+                  name="campaignContentRightsDuration"
+                  data-testid="campaign-content-rights-duration-input"
+                  type="text"
+                  placeholder="12 months"
+                  value={contentRights.duration}
+                  onChange={(e) =>
+                    setContentRights((prev) => ({
+                      ...prev,
+                      duration: e.target.value,
                     }))
                   }
                 />

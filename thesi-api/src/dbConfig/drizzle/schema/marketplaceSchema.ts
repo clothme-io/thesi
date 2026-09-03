@@ -55,6 +55,14 @@ export type MarketplaceCreatorBenefitsJson = {
   customBenefits: string[];
 };
 
+export type MarketplaceContentRightsJson = {
+  organicUsage: boolean;
+  websiteAppUsage: boolean;
+  paidAdsUsage: boolean;
+  duration: string;
+  rawContentAccess: boolean;
+};
+
 export type MarketplaceProductProvidedJson = {
   id: string;
   name: string;
@@ -107,6 +115,16 @@ export const marketplaceListing = thesiSchema.table('marketplace_listing', {
       priorityFutureCampaigns: false,
       brandOpportunityAccess: false,
       customBenefits: [],
+    }),
+  contentRights: jsonb('content_rights')
+    .$type<MarketplaceContentRightsJson>()
+    .notNull()
+    .default({
+      organicUsage: true,
+      websiteAppUsage: false,
+      paidAdsUsage: false,
+      duration: '',
+      rawContentAccess: false,
     }),
   productsProvided: jsonb('products_provided')
     .$type<MarketplaceProductProvidedJson[]>()

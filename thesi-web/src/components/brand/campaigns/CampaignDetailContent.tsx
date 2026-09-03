@@ -17,6 +17,7 @@ import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_PAYMENT_LABELS,
   BRAND_CAMPAIGN_STATUS_LABELS,
+  EMPTY_CONTENT_RIGHTS,
   EMPTY_CREATOR_BENEFITS,
   formatMoney,
   getCampaignBudgetLabel,
@@ -49,6 +50,7 @@ function toCampaignInput(campaign: BrandCampaign): CampaignInput {
     payment: campaign.payment,
     requiredTasks: campaign.requiredTasks ?? [],
     creatorBenefits: campaign.creatorBenefits ?? EMPTY_CREATOR_BENEFITS,
+    contentRights: campaign.contentRights ?? EMPTY_CONTENT_RIGHTS,
     productsProvided: campaign.productsProvided ?? [],
     ...(campaign.creatorCapacity ? { creatorCapacity: campaign.creatorCapacity } : {}),
     postToMarketplace: campaign.postToMarketplace,
@@ -104,6 +106,7 @@ export function CampaignDetailContent() {
   );
   const requiredTasks = campaign?.requiredTasks ?? [];
   const creatorBenefits = campaign?.creatorBenefits ?? EMPTY_CREATOR_BENEFITS;
+  const contentRights = campaign?.contentRights ?? EMPTY_CONTENT_RIGHTS;
   const productsProvided = campaign?.productsProvided ?? [];
   const { form, setForm } = useDraftForm(
     campaign?.status === "draft" ? campaign : null,
@@ -516,6 +519,24 @@ export function CampaignDetailContent() {
                     {creatorBenefits.customBenefits.map((benefit) => (
                       <li key={benefit}>{benefit}</li>
                     ))}
+                  </ul>
+                </>
+              )}
+              {(contentRights.organicUsage ||
+                contentRights.websiteAppUsage ||
+                contentRights.paidAdsUsage ||
+                contentRights.rawContentAccess ||
+                contentRights.duration.trim()) && (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Content rights</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {contentRights.organicUsage && <li>Organic social usage</li>}
+                    {contentRights.websiteAppUsage && <li>Website and app usage</li>}
+                    {contentRights.paidAdsUsage && <li>Paid ads usage</li>}
+                    {contentRights.rawContentAccess && <li>Raw content access</li>}
+                    {contentRights.duration.trim() && (
+                      <li>Duration: {contentRights.duration}</li>
+                    )}
                   </ul>
                 </>
               )}

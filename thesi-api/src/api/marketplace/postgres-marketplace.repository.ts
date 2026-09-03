@@ -343,6 +343,13 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       payment: row.payment,
       requiredTasks: Array.isArray(row.requiredTasks) ? row.requiredTasks : [],
       creatorBenefits: row.creatorBenefits,
+      contentRights: {
+        organicUsage: row.contentRights?.organicUsage ?? true,
+        websiteAppUsage: row.contentRights?.websiteAppUsage ?? false,
+        paidAdsUsage: row.contentRights?.paidAdsUsage ?? false,
+        duration: row.contentRights?.duration ?? '',
+        rawContentAccess: row.contentRights?.rawContentAccess ?? false,
+      },
       productsProvided: Array.isArray(row.productsProvided)
         ? row.productsProvided
         : [],

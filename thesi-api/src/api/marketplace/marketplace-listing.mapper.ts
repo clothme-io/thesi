@@ -32,10 +32,11 @@ export function buildListingPayload(
     payment: campaignPaymentToListingPayment(campaign),
     requiredTasks: campaign.requiredTasks,
     creatorBenefits: campaign.creatorBenefits,
+    contentRights: campaign.contentRights,
     productsProvided: campaign.productsProvided,
     location,
     remoteOk,
-    slots: 5,
+    slots: campaign.creatorCapacity ?? 5,
   };
 }
 

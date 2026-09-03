@@ -20,6 +20,14 @@ import type {
 } from './campaign.repository';
 import { CampaignsService } from './campaigns.service';
 
+const DEFAULT_CONTENT_RIGHTS = {
+  organicUsage: true,
+  websiteAppUsage: false,
+  paidAdsUsage: false,
+  duration: '',
+  rawContentAccess: false,
+};
+
 class FakeCampaignRepository implements CampaignRepository {
   user: CampaignUser | null = null;
   rows: CampaignRecord[] = [];
@@ -44,6 +52,7 @@ class FakeCampaignRepository implements CampaignRepository {
     const row: CampaignRecord = {
       id: `${ownerUserId}-campaign-${this.rows.length + 1}`,
       ...input,
+      contentRights: input.contentRights ?? DEFAULT_CONTENT_RIGHTS,
       files: [],
       createdAt: now,
       updatedAt: now,
@@ -62,6 +71,7 @@ class FakeCampaignRepository implements CampaignRepository {
     const updated: CampaignRecord = {
       ...this.rows[index],
       ...input,
+      contentRights: input.contentRights ?? this.rows[index].contentRights,
       files: this.rows[index].files,
       updatedAt: new Date().toISOString(),
     };
@@ -593,6 +603,7 @@ function sampleCampaign(
       brandOpportunityAccess: false,
       customBenefits: [],
     },
+    contentRights: DEFAULT_CONTENT_RIGHTS,
     productsProvided: [],
     postToMarketplace: false,
     ...overrides,

@@ -1,4 +1,7 @@
-import type { UpsertCampaignDto } from './dto/campaign.dto';
+import type {
+  CampaignContentRightsDto,
+  UpsertCampaignDto,
+} from './dto/campaign.dto';
 
 export const CAMPAIGN_REPOSITORY = Symbol('CAMPAIGN_REPOSITORY');
 
@@ -41,6 +44,7 @@ export type CampaignRecord = {
   payment: UpsertCampaignDto['payment'];
   requiredTasks: UpsertCampaignDto['requiredTasks'];
   creatorBenefits: UpsertCampaignDto['creatorBenefits'];
+  contentRights: CampaignContentRightsDto;
   productsProvided: UpsertCampaignDto['productsProvided'];
   creatorCapacity?: number;
   postToMarketplace: boolean;

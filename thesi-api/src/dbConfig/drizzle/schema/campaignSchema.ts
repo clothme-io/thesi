@@ -59,6 +59,14 @@ export type CampaignCreatorBenefitsJson = {
   customBenefits: string[];
 };
 
+export type CampaignContentRightsJson = {
+  organicUsage: boolean;
+  websiteAppUsage: boolean;
+  paidAdsUsage: boolean;
+  duration: string;
+  rawContentAccess: boolean;
+};
+
 export type CampaignProductProvidedJson = {
   id: string;
   name: string;
@@ -113,6 +121,16 @@ export const campaign = thesiSchema.table('campaign', {
       priorityFutureCampaigns: false,
       brandOpportunityAccess: false,
       customBenefits: [],
+    }),
+  contentRights: jsonb('content_rights')
+    .$type<CampaignContentRightsJson>()
+    .notNull()
+    .default({
+      organicUsage: true,
+      websiteAppUsage: false,
+      paidAdsUsage: false,
+      duration: '',
+      rawContentAccess: false,
     }),
   productsProvided: jsonb('products_provided')
     .$type<CampaignProductProvidedJson[]>()
