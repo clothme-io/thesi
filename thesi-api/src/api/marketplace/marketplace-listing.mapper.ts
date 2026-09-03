@@ -96,6 +96,7 @@ function campaignPaymentToListingPayment(
       return {
         structure: 'milestone',
         currency: 'USD',
+        milestoneStructure: payment.milestoneStructure ?? 'highest_achieved',
         milestones: payment.milestones?.map((milestone) => ({
           label: milestone.label,
           amountCents: milestone.amountCents,

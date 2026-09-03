@@ -6,6 +6,7 @@ import type { CampaignInput } from "@/lib/brand-campaigns/storage";
 import {
   buildCampaignPayment,
   centsToInput,
+  DEFAULT_MILESTONE_STRUCTURE,
   formPayoutCents,
   milestonesToFormRows,
   seedMilestonesIfNeeded,
@@ -21,6 +22,7 @@ import {
   type BrandCampaignContentRights,
   type BrandCampaignCreatorBenefits,
   type BrandCampaignGoalType,
+  type BrandCampaignMilestoneStructure,
   type BrandCampaignPaymentModel,
   type BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
@@ -58,6 +60,14 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
 ];
 
 const PLATFORM_OPTIONS = ["TikTok", "Instagram", "YouTube"] as const;
+
+const MILESTONE_STRUCTURE_OPTIONS: Array<{
+  label: string;
+  value: BrandCampaignMilestoneStructure;
+}> = [
+  { label: "Cumulative milestones", value: "cumulative" },
+  { label: "Highest milestone achieved", value: "highest_achieved" },
+];
 
 const BENEFIT_FLAG_OPTIONS: Array<{
   key: keyof Omit<
@@ -105,6 +115,19 @@ function toggleArrayItem<T>(items: T[], item: T): T[] {
     : [...items, item];
 }
 
+function paymentInputFromCents(cents?: number): string {
+  if (!cents) return "";
+  const dollars = cents / 100;
+  return `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
+}
+
+function centsFromPaymentInput(value: string): number | undefined {
+  const amount = Number(value.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(amount) && amount > 0
+    ? Math.round(amount * 100)
+    : undefined;
+}
+
 export type DraftCampaignFormState = {
   name: string;
   campaignType: BrandCampaignGoalType;
@@ -124,6 +147,7 @@ export type DraftCampaignFormState = {
   creatorBenefits: BrandCampaignCreatorBenefits;
   contentRights: BrandCampaignContentRights;
   paymentModel: BrandCampaignPaymentModel;
+  milestoneStructure: BrandCampaignMilestoneStructure;
   flatAmount: string;
   milestones: MilestoneFormRow[];
   paymentNotes: string;
@@ -155,6 +179,8 @@ export function draftFormFromCampaign(
     creatorBenefits: campaign.creatorBenefits ?? { ...EMPTY_CREATOR_BENEFITS },
     contentRights: campaign.contentRights ?? { ...EMPTY_CONTENT_RIGHTS },
     paymentModel: campaign.payment.model,
+    milestoneStructure:
+      campaign.payment.milestoneStructure ?? DEFAULT_MILESTONE_STRUCTURE,
     flatAmount: centsToInput(campaign.payment.flatRateCents),
     milestones: milestonesToFormRows(campaign.payment.milestones),
     paymentNotes: campaign.payment.notes ?? "",
@@ -185,6 +211,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
     payment: buildCampaignPayment({
       model: form.paymentModel,
       flatAmount: form.flatAmount,
+      milestoneStructure: form.milestoneStructure,
       notes: form.paymentNotes,
       milestones: form.milestones,
     }),
@@ -216,6 +243,7 @@ type Props = {
   onChange: (next: DraftCampaignFormState) => void;
   pendingFiles: File[];
   onPendingFiles: (files: File[]) => void;
+  onDeleteFile: (fileId: string) => Promise<void>;
 };
 
 export function DraftCampaignEditForm({
@@ -224,11 +252,14 @@ export function DraftCampaignEditForm({
   onChange,
   pendingFiles,
   onPendingFiles,
+  onDeleteFile,
 }: Props) {
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const payoutCents = formPayoutCents(
     form.paymentModel,
     form.flatAmount,
     form.milestones,
+    form.milestoneStructure,
   );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
@@ -486,17 +517,12 @@ export function DraftCampaignEditForm({
               name="campaignGuaranteedPayment"
               data-testid="campaign-guaranteed-payment-input"
               type="text"
-              value={
-                form.creatorBenefits.guaranteedPaymentCents
-                  ? String(form.creatorBenefits.guaranteedPaymentCents / 100)
-                  : ""
-              }
+              inputMode="decimal"
+              value={paymentInputFromCents(form.creatorBenefits.guaranteedPaymentCents)}
               onChange={(e) =>
                 set("creatorBenefits", {
                   ...form.creatorBenefits,
-                  guaranteedPaymentCents: e.target.value.trim()
-                    ? Math.round(Number(e.target.value.replace(/[^0-9.]/g, "")) * 100)
-                    : undefined,
+                  guaranteedPaymentCents: centsFromPaymentInput(e.target.value),
                 })
               }
             />
@@ -609,6 +635,10 @@ export function DraftCampaignEditForm({
                   ...form,
                   paymentModel: next,
                   milestones: seedMilestonesIfNeeded(next, form.milestones),
+                  milestoneStructure:
+                    next === "milestone"
+                      ? form.milestoneStructure
+                      : DEFAULT_MILESTONE_STRUCTURE,
                 });
               }}
             >
@@ -620,10 +650,34 @@ export function DraftCampaignEditForm({
             </select>
           </label>
           {form.paymentModel === "milestone" ? (
-            <MilestoneBuilder
-              rows={form.milestones}
-              onChange={(milestones) => onChange({ ...form, milestones })}
-            />
+            <>
+              <div className="workspace-field workspace-field--full">
+                <span>Milestone structure</span>
+                <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                  {MILESTONE_STRUCTURE_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      style={{ display: "flex", gap: 8, alignItems: "center" }}
+                    >
+                      <input
+                        type="radio"
+                        name="campaignMilestoneStructure"
+                        value={option.value}
+                        checked={form.milestoneStructure === option.value}
+                        onChange={() =>
+                          set("milestoneStructure", option.value)
+                        }
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <MilestoneBuilder
+                rows={form.milestones}
+                onChange={(milestones) => onChange({ ...form, milestones })}
+              />
+            </>
           ) : (
             <label className="workspace-field">
               <span>Base/flat amount</span>
@@ -708,7 +762,24 @@ export function DraftCampaignEditForm({
                         · {file.sizeLabel}
                       </span>
                     </div>
-                    <span className="crm-tag">Uploaded</span>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <span className="crm-tag">Uploaded</span>
+                      <button
+                        type="button"
+                        className="inbox-btn-text"
+                        disabled={deletingFileId === file.id}
+                        onClick={async () => {
+                          setDeletingFileId(file.id);
+                          try {
+                            await onDeleteFile(file.id);
+                          } finally {
+                            setDeletingFileId(null);
+                          }
+                        }}
+                      >
+                        {deletingFileId === file.id ? "Removing..." : "Remove"}
+                      </button>
+                    </div>
                   </li>
                 ))}
                 {pendingFiles.map((file, index) => (

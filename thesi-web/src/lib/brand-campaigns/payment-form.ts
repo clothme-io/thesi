@@ -1,10 +1,13 @@
 import type {
   BrandCampaign,
   BrandCampaignMilestone,
+  BrandCampaignMilestoneStructure,
   BrandCampaignPaymentModel,
 } from "./types";
 
-export const MAX_MILESTONES = 5;
+export const MAX_MILESTONES = 10;
+export const DEFAULT_MILESTONE_STRUCTURE: BrandCampaignMilestoneStructure =
+  "highest_achieved";
 
 export type MilestoneFormRow = {
   id: string;
@@ -27,7 +30,7 @@ export function parseMoneyToCents(raw: string): number {
 export function centsToInput(cents?: number): string {
   if (!cents) return "";
   const dollars = cents / 100;
-  return Number.isInteger(dollars) ? String(dollars) : dollars.toFixed(2);
+  return `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
 }
 
 export function emptyMilestoneRow(): MilestoneFormRow {
@@ -121,12 +124,16 @@ export function formPayoutCents(
   model: BrandCampaignPaymentModel,
   flatAmount: string,
   milestones: MilestoneFormRow[],
+  milestoneStructure: BrandCampaignMilestoneStructure = DEFAULT_MILESTONE_STRUCTURE,
 ): number {
   if (model === "milestone") {
-    return completeMilestoneRows(milestones).reduce(
-      (sum, milestone) => sum + milestone.amountCents,
-      0,
+    const amounts = completeMilestoneRows(milestones).map(
+      (milestone) => milestone.amountCents,
     );
+    if (milestoneStructure === "cumulative") {
+      return amounts.reduce((sum, amount) => sum + amount, 0);
+    }
+    return Math.max(0, ...amounts);
   }
   return parseMoneyToCents(flatAmount);
 }
@@ -134,6 +141,7 @@ export function formPayoutCents(
 export function buildCampaignPayment(input: {
   model: BrandCampaignPaymentModel;
   flatAmount: string;
+  milestoneStructure: BrandCampaignMilestoneStructure;
   notes: string;
   milestones: MilestoneFormRow[];
 }): BrandCampaign["payment"] {
@@ -141,6 +149,7 @@ export function buildCampaignPayment(input: {
   if (input.model === "milestone") {
     return {
       model: "milestone",
+      milestoneStructure: input.milestoneStructure,
       milestones: completeMilestoneRows(input.milestones),
       ...(notes ? { notes } : {}),
     };

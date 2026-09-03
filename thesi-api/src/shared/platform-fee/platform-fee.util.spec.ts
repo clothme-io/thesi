@@ -37,13 +37,23 @@ describe('campaignPayoutCents', () => {
     ).toBe(50_000);
   });
 
-  it('sums milestones', () => {
+  it('sums cumulative milestones', () => {
+    expect(
+      campaignPayoutCents({
+        model: 'milestone',
+        milestoneStructure: 'cumulative',
+        milestones: [{ amountCents: 10_000 }, { amountCents: 15_000 }],
+      }),
+    ).toBe(25_000);
+  });
+
+  it('uses highest milestone achieved by default', () => {
     expect(
       campaignPayoutCents({
         model: 'milestone',
         milestones: [{ amountCents: 10_000 }, { amountCents: 15_000 }],
       }),
-    ).toBe(25_000);
+    ).toBe(15_000);
   });
 });
 

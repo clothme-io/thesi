@@ -10,6 +10,7 @@ import {
   getListingById,
   hasApplied,
   isInCrm,
+  downloadMarketplaceFile,
   fetchListingApplications,
   respondToListingApplication,
 } from "@/lib/marketplace/storage";
@@ -37,7 +38,7 @@ import {
 export function MarketplaceDetailContent() {
   const params = useParams();
   const listingId = params.id as string;
-  const { session, authenticatedRequest } = useAuth();
+  const { session, authenticatedRequest, authenticatedBinaryRequest } = useAuth();
   const isBrand = session?.user.role === "brand";
   const { data, ready, error, applyToListing, linkListingToCrm } =
     useMarketplace(authenticatedRequest);
@@ -434,7 +435,26 @@ export function MarketplaceDetailContent() {
                           <strong>{file.name}</strong>
                           <small>{file.sizeLabel}</small>
                         </span>
-                        <button type="button" className="inbox-btn-text" disabled>
+                        <button
+                          type="button"
+                          className="inbox-btn-text"
+                          onClick={async () => {
+                            setActionError("");
+                            try {
+                              await downloadMarketplaceFile(
+                                authenticatedBinaryRequest,
+                                listing.id,
+                                file,
+                              );
+                            } catch (requestError) {
+                              setActionError(
+                                requestError instanceof Error
+                                  ? requestError.message
+                                  : "Could not download file",
+                              );
+                            }
+                          }}
+                        >
                           Download
                         </button>
                       </li>

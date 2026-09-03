@@ -9,6 +9,7 @@ export type MarketplaceListingType =
   | "long_form";
 
 export type PaymentStructure = "flat_rate" | "milestone" | "royalty" | "hybrid";
+export type MilestoneStructure = "cumulative" | "highest_achieved";
 
 export type MarketplaceListingStatus = "open" | "closing_soon" | "closed";
 
@@ -28,6 +29,7 @@ export interface MarketplacePayment {
   structure: PaymentStructure;
   currency: "USD";
   flatAmountCents?: number;
+  milestoneStructure?: MilestoneStructure;
   milestones?: MilestonePayment[];
   royaltyPercent?: number;
   royaltyMinimumCents?: number;
@@ -179,7 +181,11 @@ export function formatListingPayment(payment: MarketplacePayment): string {
     case "flat_rate":
       return formatCents(payment.flatAmountCents ?? 0);
     case "milestone": {
-      const total = payment.milestones?.reduce((s, m) => s + m.amountCents, 0) ?? 0;
+      const amounts = payment.milestones?.map((m) => m.amountCents) ?? [];
+      const total =
+        payment.milestoneStructure === "cumulative"
+          ? amounts.reduce((s, amount) => s + amount, 0)
+          : Math.max(0, ...amounts);
       return `${formatCents(total)} (milestone)`;
     }
     case "royalty":

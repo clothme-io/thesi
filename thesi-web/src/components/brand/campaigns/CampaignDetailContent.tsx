@@ -83,6 +83,7 @@ export function CampaignDetailContent() {
     error,
     updateCampaign,
     uploadCampaignFile,
+    deleteCampaignFile,
   } = useBrandCampaigns(authenticatedRequest);
   const {
     data: inviteData,
@@ -99,6 +100,7 @@ export function CampaignDetailContent() {
   const [payouts, setPayouts] = useState<CreatorPayout[]>([]);
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
 
   const campaign = useMemo(
     () => (ready && id ? getCampaignById(data, id) : null),
@@ -388,6 +390,7 @@ export function CampaignDetailContent() {
               onChange={setForm}
               pendingFiles={pendingFiles}
               onPendingFiles={setPendingFiles}
+              onDeleteFile={(fileId) => deleteCampaignFile(campaign.id, fileId)}
             />
             <div>
               <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
@@ -707,28 +710,52 @@ export function CampaignDetailContent() {
                           {file.sizeLabel}
                         </span>
                       </span>
-                      <button
-                        type="button"
-                        className="inbox-btn-text"
-                        onClick={async () => {
-                          setDownloadError("");
-                          try {
-                            await downloadCampaignFile(
-                              authenticatedBinaryRequest,
-                              campaign.id,
-                              file,
-                            );
-                          } catch (requestError) {
-                            setDownloadError(
-                              requestError instanceof Error
-                                ? requestError.message
-                                : "Could not download file",
-                            );
-                          }
-                        }}
-                      >
-                        Download
-                      </button>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="inbox-btn-text"
+                          onClick={async () => {
+                            setDownloadError("");
+                            try {
+                              await downloadCampaignFile(
+                                authenticatedBinaryRequest,
+                                campaign.id,
+                                file,
+                              );
+                            } catch (requestError) {
+                              setDownloadError(
+                                requestError instanceof Error
+                                  ? requestError.message
+                                  : "Could not download file",
+                              );
+                            }
+                          }}
+                        >
+                          Download
+                        </button>
+                        <button
+                          type="button"
+                          className="inbox-btn-text"
+                          disabled={deletingFileId === file.id}
+                          onClick={async () => {
+                            setDownloadError("");
+                            setDeletingFileId(file.id);
+                            try {
+                              await deleteCampaignFile(campaign.id, file.id);
+                            } catch (requestError) {
+                              setDownloadError(
+                                requestError instanceof Error
+                                  ? requestError.message
+                                  : "Could not remove file",
+                              );
+                            } finally {
+                              setDeletingFileId(null);
+                            }
+                          }}
+                        >
+                          {deletingFileId === file.id ? "Removing..." : "Remove"}
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}

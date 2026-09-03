@@ -5,6 +5,7 @@ import type {
   MarketplaceApplication,
   MarketplaceBrandApplication,
   MarketplaceData,
+  MarketplaceFile,
   MarketplaceListing,
 } from "./types";
 
@@ -15,6 +16,13 @@ type AuthenticatedRequest = <T>(
     body?: unknown;
   },
 ) => Promise<T>;
+
+type AuthenticatedBinaryRequest = (
+  path: string,
+  options?: {
+    method?: "GET" | "DELETE";
+  },
+) => Promise<{ blob: Blob; fileName: string | null }>;
 
 type MarketplaceApiData = {
   listings: MarketplaceListing[];
@@ -144,6 +152,24 @@ export function hasApplied(data: MarketplaceData, listingId: string) {
 
 export function isInCrm(data: MarketplaceData, listingId: string) {
   return data.crmLinkedListingIds.includes(listingId);
+}
+
+export async function downloadMarketplaceFile(
+  authenticatedBinaryRequest: AuthenticatedBinaryRequest,
+  listingId: string,
+  file: MarketplaceFile,
+) {
+  const result = await authenticatedBinaryRequest(
+    `/api/marketplace/listings/${listingId}/files/${file.id}/download`,
+  );
+  const url = URL.createObjectURL(result.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = result.fileName || file.name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function fetchListingApplications(

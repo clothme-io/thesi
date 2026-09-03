@@ -7,6 +7,8 @@ import { useAuth } from "@/context/AuthProvider";
 import { getCampaignById, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import {
   buildCampaignPayment,
+  centsToInput,
+  DEFAULT_MILESTONE_STRUCTURE,
   formPayoutCents,
   milestonesToFormRows,
   newMilestoneId,
@@ -18,6 +20,7 @@ import type {
   BrandCampaignCreatorBenefits,
   BrandCampaignContentRights,
   BrandCampaignGoalType,
+  BrandCampaignMilestoneStructure,
   BrandCampaignPaymentModel,
   BrandCampaignStatus,
   BrandCampaignType,
@@ -63,6 +66,14 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
 ];
 
 const PLATFORM_OPTIONS = ["TikTok", "Instagram", "YouTube"] as const;
+
+const MILESTONE_STRUCTURE_OPTIONS: Array<{
+  label: string;
+  value: BrandCampaignMilestoneStructure;
+}> = [
+  { label: "Cumulative milestones", value: "cumulative" },
+  { label: "Highest milestone achieved", value: "highest_achieved" },
+];
 
 const BENEFIT_FLAG_OPTIONS: Array<{
   key: keyof Omit<
@@ -110,6 +121,19 @@ function toggleArrayItem<T>(items: T[], item: T): T[] {
     : [...items, item];
 }
 
+function paymentInputFromCents(cents?: number): string {
+  if (!cents) return "";
+  const dollars = cents / 100;
+  return `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
+}
+
+function centsFromPaymentInput(value: string): number | undefined {
+  const amount = Number(value.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(amount) && amount > 0
+    ? Math.round(amount * 100)
+    : undefined;
+}
+
 const defaultDates = () => {
   const start = new Date();
   const end = new Date();
@@ -125,7 +149,7 @@ export function CampaignCreateContent() {
   const searchParams = useSearchParams();
   const duplicateFromId = searchParams.get("from");
   const { session, authenticatedRequest } = useAuth();
-  const { data, ready, createCampaign, updateCampaign, uploadCampaignFile, error: loadError } =
+  const { data, ready, createCampaign, updateCampaign, uploadCampaignFile, deleteCampaignFile, error: loadError } =
     useBrandCampaigns(authenticatedRequest);
   const dates = defaultDates();
   const hydratedRef = useRef(false);
@@ -153,6 +177,8 @@ export function CampaignCreateContent() {
   });
   const [contentRights, setContentRights] = useState(EMPTY_CONTENT_RIGHTS);
   const [paymentModel, setPaymentModel] = useState<BrandCampaignPaymentModel>("flat_rate");
+  const [milestoneStructure, setMilestoneStructure] =
+    useState<BrandCampaignMilestoneStructure>(DEFAULT_MILESTONE_STRUCTURE);
   const [flatAmount, setFlatAmount] = useState("");
   const [milestones, setMilestones] = useState<MilestoneFormRow[]>([]);
   const [paymentNotes, setPaymentNotes] = useState("");
@@ -192,10 +218,11 @@ export function CampaignCreateContent() {
     setLocation(source.requirements.location);
     setPlatforms(source.requirements.platforms);
     setPaymentModel(source.payment.model);
+    setMilestoneStructure(
+      source.payment.milestoneStructure ?? DEFAULT_MILESTONE_STRUCTURE,
+    );
     setFlatAmount(
-      source.payment.flatRateCents
-        ? String(source.payment.flatRateCents / 100)
-        : "",
+      centsToInput(source.payment.flatRateCents),
     );
     setMilestones(
       milestonesToFormRows(source.payment.milestones).map((row) => ({
@@ -215,7 +242,12 @@ export function CampaignCreateContent() {
   if (!ready) return null;
 
   const brandName = session?.user.fullName ?? "Your Brand";
-  const payoutCents = formPayoutCents(paymentModel, flatAmount, milestones);
+  const payoutCents = formPayoutCents(
+    paymentModel,
+    flatAmount,
+    milestones,
+    milestoneStructure,
+  );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
 
@@ -239,6 +271,7 @@ export function CampaignCreateContent() {
     payment: buildCampaignPayment({
       model: paymentModel,
       flatAmount,
+      milestoneStructure,
       notes: paymentNotes,
       milestones,
     }),
@@ -688,17 +721,12 @@ export function CampaignCreateContent() {
                   data-testid="campaign-guaranteed-payment-input"
                   type="text"
                   placeholder="$300"
-                  value={
-                    creatorBenefits.guaranteedPaymentCents
-                      ? String(creatorBenefits.guaranteedPaymentCents / 100)
-                      : ""
-                  }
+                  inputMode="decimal"
+                  value={paymentInputFromCents(creatorBenefits.guaranteedPaymentCents)}
                   onChange={(e) =>
                     setCreatorBenefits((prev) => ({
                       ...prev,
-                      guaranteedPaymentCents: e.target.value.trim()
-                        ? Math.round(Number(e.target.value.replace(/[^0-9.]/g, "")) * 100)
-                        : undefined,
+                      guaranteedPaymentCents: centsFromPaymentInput(e.target.value),
                     }))
                   }
                 />
@@ -822,7 +850,29 @@ export function CampaignCreateContent() {
                 </select>
               </label>
               {paymentModel === "milestone" ? (
-                <MilestoneBuilder rows={milestones} onChange={setMilestones} />
+                <>
+                  <div className="workspace-field workspace-field--full">
+                    <span>Milestone structure</span>
+                    <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                      {MILESTONE_STRUCTURE_OPTIONS.map((option) => (
+                        <label
+                          key={option.value}
+                          style={{ display: "flex", gap: 8, alignItems: "center" }}
+                        >
+                          <input
+                            type="radio"
+                            name="campaignMilestoneStructure"
+                            value={option.value}
+                            checked={milestoneStructure === option.value}
+                            onChange={() => setMilestoneStructure(option.value)}
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <MilestoneBuilder rows={milestones} onChange={setMilestones} />
+                </>
               ) : (
                 <label className="workspace-field">
                   <span>Base/flat amount</span>
@@ -927,7 +977,32 @@ export function CampaignCreateContent() {
                             · {file.sizeLabel}
                           </span>
                         </div>
-                        <span className="crm-tag">Uploaded</span>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <span className="crm-tag">Uploaded</span>
+                          <button
+                            type="button"
+                            className="inbox-btn-text"
+                            onClick={async () => {
+                              const campaignId = draftRef.current?.id;
+                              if (!campaignId) return;
+                              try {
+                                await deleteCampaignFile(campaignId, file.id);
+                                setAttachedFiles((prev) =>
+                                  prev.filter((item) => item.id !== file.id),
+                                );
+                                setSaveMessage(`Removed ${file.name}`);
+                              } catch (requestError) {
+                                setError(
+                                  requestError instanceof Error
+                                    ? requestError.message
+                                    : "Could not remove file",
+                                );
+                              }
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </li>
                     ))}
                     {pendingFiles.map((file, index) => (

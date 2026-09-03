@@ -18,6 +18,7 @@ export type MarketplacePaymentJson = {
   structure: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid';
   currency: 'USD';
   flatAmountCents?: number;
+  milestoneStructure?: 'cumulative' | 'highest_achieved';
   milestones?: Array<{
     label: string;
     amountCents: number;

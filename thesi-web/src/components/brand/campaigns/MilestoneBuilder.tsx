@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  centsToInput,
   emptyMilestoneRow,
   MAX_MILESTONES,
+  parseMoneyToCents,
   type MilestoneFormRow,
 } from "@/lib/brand-campaigns/payment-form";
 
@@ -51,6 +53,10 @@ export function MilestoneBuilder({ rows, onChange }: Props) {
                 placeholder="$0.00"
                 value={row.amount}
                 onChange={(e) => updateRow(index, { amount: e.target.value })}
+                onBlur={() => {
+                  const cents = parseMoneyToCents(row.amount);
+                  updateRow(index, { amount: cents > 0 ? centsToInput(cents) : "" });
+                }}
               />
             </label>
             <button

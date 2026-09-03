@@ -7,6 +7,7 @@ import type {
 } from "@/lib/marketplace/types";
 
 const authenticatedRequest = vi.fn();
+const authenticatedBinaryRequest = vi.fn();
 const fetchListingApplicationsMock = vi.fn();
 const respondToListingApplicationMock = vi.fn();
 
@@ -79,6 +80,7 @@ vi.mock("@/context/AuthProvider", () => ({
       user: { fullName: "Northwind Apparel", role: "brand" },
     },
     authenticatedRequest,
+    authenticatedBinaryRequest,
   }),
 }));
 

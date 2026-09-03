@@ -7,6 +7,7 @@ export const PLATFORM_FEE_RATE = 0.02;
 export type CampaignPaymentForFee = {
   model: string;
   flatRateCents?: number;
+  milestoneStructure?: 'cumulative' | 'highest_achieved';
   milestones?: Array<{ amountCents: number }>;
 };
 
@@ -22,7 +23,7 @@ export function calculatePlatformFeeCents(totalPayoutCents: number): number {
 
 /**
  * Payout base used for fee calculation.
- * flat_rate → flatRateCents; milestone → sum milestones; royalty/hybrid → flat portion only.
+ * flat_rate → flatRateCents; milestone → selected milestone calculation; royalty/hybrid → flat portion only.
  */
 export function campaignPayoutCents(payment: CampaignPaymentForFee): number {
   switch (payment.model) {
@@ -31,12 +32,18 @@ export function campaignPayoutCents(payment: CampaignPaymentForFee): number {
     case 'royalty':
       return Math.max(0, payment.flatRateCents ?? 0);
     case 'milestone':
+      if (payment.milestoneStructure === 'cumulative') {
+        return Math.max(
+          0,
+          (payment.milestones ?? []).reduce(
+            (sum, item) => sum + (item.amountCents ?? 0),
+            0,
+          ),
+        );
+      }
       return Math.max(
         0,
-        (payment.milestones ?? []).reduce(
-          (sum, item) => sum + (item.amountCents ?? 0),
-          0,
-        ),
+        ...(payment.milestones ?? []).map((item) => item.amountCents ?? 0),
       );
     default:
       return Math.max(0, payment.flatRateCents ?? 0);

@@ -3,6 +3,7 @@ import {
   buildCampaignPayment,
   completeMilestoneRows,
   formPayoutCents,
+  MAX_MILESTONES,
   milestonesToFormRows,
   paymentFormError,
   seedMilestonesIfNeeded,
@@ -23,6 +24,10 @@ function row(
 }
 
 describe("milestone payment form", () => {
+  it("allows up to ten milestones", () => {
+    expect(MAX_MILESTONES).toBe(10);
+  });
+
   it("keeps a comma-free dollar amount as cents", () => {
     expect(
       completeMilestoneRows([row({ amount: "$150.50" })]),
@@ -52,11 +57,13 @@ describe("milestone payment form", () => {
       buildCampaignPayment({
         model: "milestone",
         flatAmount: "999",
+        milestoneStructure: "cumulative",
         notes: "Net 15",
         milestones: [row(), row({ id: "m2", label: "Final", trigger: "Done", amount: "250" })],
       }),
     ).toEqual({
       model: "milestone",
+      milestoneStructure: "cumulative",
       notes: "Net 15",
       milestones: [
         {
@@ -80,6 +87,7 @@ describe("milestone payment form", () => {
       buildCampaignPayment({
         model: "flat_rate",
         flatAmount: "450",
+        milestoneStructure: "highest_achieved",
         notes: "",
         milestones: [row()],
       }),
@@ -89,11 +97,22 @@ describe("milestone payment form", () => {
     });
   });
 
-  it("sums complete milestone amounts for the fee preview", () => {
-    expect(formPayoutCents("milestone", "999", [row(), row({ amount: "50" })])).toBe(
+  it("sums complete milestone amounts for cumulative fee preview", () => {
+    expect(formPayoutCents("milestone", "999", [row(), row({ amount: "50" })], "cumulative")).toBe(
       20000,
     );
     expect(formPayoutCents("flat_rate", "450", [row()])).toBe(45000);
+  });
+
+  it("uses the highest milestone amount for highest-achieved fee preview", () => {
+    expect(
+      formPayoutCents(
+        "milestone",
+        "999",
+        [row(), row({ amount: "50" })],
+        "highest_achieved",
+      ),
+    ).toBe(15000);
   });
 
   it("hydrates saved milestones and seeds blanks when switching to milestone", () => {
@@ -110,7 +129,7 @@ describe("milestone payment form", () => {
         id: "saved",
         label: "Concept",
         trigger: "Approved",
-        amount: "750",
+        amount: "$750",
       },
     ]);
     const seeded = seedMilestonesIfNeeded("milestone", []);

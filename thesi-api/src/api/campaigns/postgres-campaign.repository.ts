@@ -513,6 +513,9 @@ function normalizePayment(
     ...(value?.flatRateCents !== undefined
       ? { flatRateCents: value.flatRateCents }
       : {}),
+    ...(value?.milestoneStructure !== undefined
+      ? { milestoneStructure: value.milestoneStructure }
+      : {}),
     ...(value?.milestones ? { milestones: value.milestones } : {}),
     ...(value?.royaltyPercent !== undefined
       ? { royaltyPercent: value.royaltyPercent }

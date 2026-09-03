@@ -46,6 +46,11 @@ export const CAMPAIGN_PAYMENT_MODELS = [
   'hybrid',
 ] as const;
 
+export const CAMPAIGN_MILESTONE_STRUCTURES = [
+  'cumulative',
+  'highest_achieved',
+] as const;
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export class CampaignRequirementsDto {
@@ -126,6 +131,14 @@ export class CampaignPaymentDto {
   @IsInt()
   @Min(0)
   flatRateCents?: number;
+
+  @ApiPropertyOptional({
+    enum: CAMPAIGN_MILESTONE_STRUCTURES,
+    description: 'How milestone amounts are calculated for payout/fee preview',
+  })
+  @IsOptional()
+  @IsIn(CAMPAIGN_MILESTONE_STRUCTURES)
+  milestoneStructure?: (typeof CAMPAIGN_MILESTONE_STRUCTURES)[number];
 
   @ApiPropertyOptional({ type: [CampaignMilestoneDto] })
   @IsOptional()
