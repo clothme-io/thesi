@@ -38,6 +38,27 @@ export function saveCreatorProfile(profile: CreatorProfile) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
 }
 
+function normalizeProfile(profile: Partial<CreatorProfile>, fallbackName = ""): CreatorProfile {
+  return {
+    ...DEFAULT_CREATOR_PROFILE,
+    ...profile,
+    displayName: profile.displayName?.trim() || fallbackName,
+    profileImageUrl: normalizeProfileImageUrl(profile.profileImageUrl),
+    ugcPosts: Array.isArray(profile.ugcPosts) ? profile.ugcPosts : [],
+  };
+}
+
+function normalizeProfileImageUrl(url: string | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("/v1/profile-images/")) {
+    return url.replace(/^\/v1\//, "/api/");
+  }
+  if (url.startsWith("/profile-images/")) {
+    return `/api${url}`;
+  }
+  return url;
+}
+
 export function useCreatorProfile(
   authenticatedRequest: AuthenticatedRequest,
   fallbackName = "",
@@ -58,12 +79,7 @@ export function useCreatorProfile(
     authenticatedRequest<CreatorProfile>("/api/profile")
       .then((data) => {
         if (active) {
-          setProfile({
-            ...DEFAULT_CREATOR_PROFILE,
-            ...data,
-            displayName: data.displayName?.trim() || fallbackName,
-            ugcPosts: Array.isArray(data.ugcPosts) ? data.ugcPosts : [],
-          });
+          setProfile(normalizeProfile(data, fallbackName));
         }
       })
       .catch((requestError) => {
@@ -113,13 +129,7 @@ export function useCreatorProfile(
             },
           },
         );
-        setProfile({
-          ...DEFAULT_CREATOR_PROFILE,
-          ...savedProfile,
-          ugcPosts: Array.isArray(savedProfile.ugcPosts)
-            ? savedProfile.ugcPosts
-            : [],
-        });
+        setProfile(normalizeProfile(savedProfile, fallbackName));
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       } catch (requestError) {
@@ -133,7 +143,38 @@ export function useCreatorProfile(
         setSaving(false);
       }
     },
-    [authenticatedRequest],
+    [authenticatedRequest, fallbackName],
+  );
+
+  const uploadProfileImage = useCallback(
+    async (file: File) => {
+      setSaving(true);
+      setError("");
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const savedProfile = await authenticatedRequest<CreatorProfile>(
+          "/api/profile/creator/image",
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+        setProfile(normalizeProfile(savedProfile, fallbackName));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Could not upload your profile image",
+        );
+        throw requestError;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [authenticatedRequest, fallbackName],
   );
 
   return {
@@ -144,5 +185,6 @@ export function useCreatorProfile(
     error,
     updateProfile,
     persistProfile,
+    uploadProfileImage,
   };
 }

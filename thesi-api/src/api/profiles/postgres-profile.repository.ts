@@ -18,6 +18,8 @@ import {
 } from './follower-range.util';
 import type {
   BrandProfileData,
+  CreatorProfileImageData,
+  CreatorProfileImageRef,
   CreatorProfileData,
   ProfileRepository,
   ProfileUser,
@@ -71,6 +73,34 @@ export class PostgresProfileRepository implements ProfileRepository {
     return mapCreatorProfile(profile, statsRow ?? null, ugcRows);
   }
 
+  async getCreatorProfileImage(
+    userId: string,
+  ): Promise<CreatorProfileImageRef | null> {
+    const [profile] = await this.db
+      .select({
+        storageProvider: schema.creatorProfile.profileImageStorageProvider,
+        storageKey: schema.creatorProfile.profileImageStorageKey,
+        contentType: schema.creatorProfile.profileImageContentType,
+      })
+      .from(schema.creatorProfile)
+      .where(eq(schema.creatorProfile.userId, userId))
+      .limit(1);
+
+    if (
+      !profile?.storageProvider ||
+      !profile.storageKey ||
+      !profile.contentType
+    ) {
+      return null;
+    }
+
+    return {
+      storageProvider: profile.storageProvider as CreatorProfileImageRef['storageProvider'],
+      storageKey: profile.storageKey,
+      contentType: profile.contentType,
+    };
+  }
+
   async getBrandProfile(userId: string): Promise<BrandProfileData | null> {
     const [profile] = await this.db
       .select()
@@ -113,6 +143,7 @@ export class PostgresProfileRepository implements ProfileRepository {
           rateRange: profile.rateRange,
           turnaround: profile.turnaround,
           portfolioUrl: profile.portfolioUrl,
+          profileImageUrl: profile.profileImageUrl ?? '',
           platforms,
           followerRange,
         })
@@ -131,6 +162,7 @@ export class PostgresProfileRepository implements ProfileRepository {
             rateRange: profile.rateRange,
             turnaround: profile.turnaround,
             portfolioUrl: profile.portfolioUrl,
+            profileImageUrl: profile.profileImageUrl ?? '',
             platforms,
             followerRange,
             updatedAt: new Date(),
@@ -223,6 +255,39 @@ export class PostgresProfileRepository implements ProfileRepository {
     });
   }
 
+  async setCreatorProfileImage(
+    userId: string,
+    image: CreatorProfileImageData,
+  ): Promise<CreatorProfileData | null> {
+    const [saved] = await this.db
+      .update(schema.creatorProfile)
+      .set({
+        profileImageUrl: image.profileImageUrl,
+        profileImageStorageProvider: image.storageProvider,
+        profileImageStorageKey: image.storageKey,
+        profileImageContentType: image.contentType,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.creatorProfile.userId, userId))
+      .returning();
+
+    if (!saved) return null;
+
+    const [statsRow] = await this.db
+      .select()
+      .from(schema.creatorDirectoryStats)
+      .where(eq(schema.creatorDirectoryStats.creatorUserId, userId))
+      .limit(1);
+
+    const ugcRows = await this.db
+      .select()
+      .from(schema.creatorUgcPost)
+      .where(eq(schema.creatorUgcPost.creatorUserId, userId))
+      .orderBy(desc(schema.creatorUgcPost.postedAt));
+
+    return mapCreatorProfile(saved, statsRow ?? null, ugcRows);
+  }
+
   async upsertBrandProfile(
     userId: string,
     profile: BrandProfileData,
@@ -286,6 +351,7 @@ function mapCreatorProfile(
     rateRange: row.rateRange,
     turnaround: row.turnaround,
     portfolioUrl: row.portfolioUrl,
+    profileImageUrl: row.profileImageUrl,
     followerRange: row.followerRange || '',
     tiktokFollowers: followersFor(platforms, 'TikTok'),
     instagramFollowers: followersFor(platforms, 'Instagram'),

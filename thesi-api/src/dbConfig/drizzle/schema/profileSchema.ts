@@ -25,6 +25,10 @@ export const creatorProfile = thesiSchema.table('creator_profile', {
     .notNull()
     .default('3–5 business days'),
   portfolioUrl: text('portfolio_url').notNull().default(''),
+  profileImageUrl: text('profile_image_url').notNull().default(''),
+  profileImageStorageProvider: text('profile_image_storage_provider'),
+  profileImageStorageKey: text('profile_image_storage_key'),
+  profileImageContentType: text('profile_image_content_type'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
