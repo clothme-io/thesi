@@ -568,6 +568,10 @@ export class CampaignsService {
       ...(dto.creatorCapacity ?? existing?.creatorCapacity
         ? { creatorCapacity: dto.creatorCapacity ?? existing?.creatorCapacity }
         : {}),
+      creatorDisclosureEnabled:
+        dto.creatorDisclosureEnabled ??
+        existing?.creatorDisclosureEnabled ??
+        false,
       postToMarketplace:
         dto.postToMarketplace ?? existing?.postToMarketplace ?? false,
     };

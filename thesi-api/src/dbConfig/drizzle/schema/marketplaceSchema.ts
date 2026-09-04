@@ -131,6 +131,9 @@ export const marketplaceListing = thesiSchema.table('marketplace_listing', {
     .$type<MarketplaceProductProvidedJson[]>()
     .notNull()
     .default([]),
+  creatorDisclosureEnabled: boolean('creator_disclosure_enabled')
+    .notNull()
+    .default(false),
   location: text('location').notNull().default('Remote'),
   remoteOk: boolean('remote_ok').notNull().default(true),
   slots: integer('slots').notNull().default(5),

@@ -97,6 +97,7 @@ export interface BrandCampaign {
   contentRights?: BrandCampaignContentRights;
   productsProvided: BrandCampaignProductProvided[];
   creatorCapacity?: number;
+  creatorDisclosureEnabled?: boolean;
   postToMarketplace: boolean;
   createdAt: string;
   updatedAt: string;

@@ -395,6 +395,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       productsProvided: Array.isArray(row.productsProvided)
         ? row.productsProvided
         : [],
+      creatorDisclosureEnabled: row.creatorDisclosureEnabled,
       location: row.location,
       remoteOk: row.remoteOk,
       slots: row.slots,

@@ -79,6 +79,7 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
       creatorBenefits: input.campaign.creatorBenefits,
       contentRights: input.campaign.contentRights,
       productsProvided: input.campaign.productsProvided,
+      creatorDisclosureEnabled: input.campaign.creatorDisclosureEnabled,
       location: input.campaign.requirements.location || 'Remote',
       remoteOk: true,
       slots: 5,
@@ -355,6 +356,24 @@ describe('MarketplaceService', () => {
     inbox.notifySelf.mockClear();
     await service.syncFromCampaign('brand-1', campaign);
     expect(inbox.notifySelf).not.toHaveBeenCalled();
+  });
+
+  it('copies campaign creator disclosure visibility to the listing', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand',
+      companyName: 'Acme',
+    };
+    const campaign = sampleCampaign({
+      postToMarketplace: true,
+      status: 'active',
+      creatorDisclosureEnabled: true,
+    });
+
+    await service.syncFromCampaign('brand-1', campaign);
+
+    expect(repository.listings[0]?.creatorDisclosureEnabled).toBe(true);
   });
 
   it('hides closed listings from creator marketplace browse', async () => {
@@ -827,6 +846,7 @@ function sampleCampaign(
     },
     contentRights: DEFAULT_CONTENT_RIGHTS,
     productsProvided: [],
+    creatorDisclosureEnabled: false,
     postToMarketplace: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

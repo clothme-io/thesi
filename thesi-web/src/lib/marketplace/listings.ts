@@ -77,6 +77,7 @@ export function campaignToListing(
     creatorBenefits: campaign.creatorBenefits,
     contentRights: campaign.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS,
     productsProvided: campaign.productsProvided,
+    creatorDisclosureEnabled: campaign.creatorDisclosureEnabled ?? false,
     location: campaign.requirements.location || "Remote",
     remoteOk,
     slots: campaign.creatorCapacity ?? 5,

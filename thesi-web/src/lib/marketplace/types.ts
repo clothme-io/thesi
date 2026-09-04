@@ -87,6 +87,7 @@ export interface MarketplaceListing {
     quantity?: number;
     creatorKeeps: boolean;
   }>;
+  creatorDisclosureEnabled?: boolean;
   location: string;
   remoteOk: boolean;
   slots: number;
@@ -195,6 +196,7 @@ export function normalizeMarketplaceListing(listing: MarketplaceListing): Market
     productsProvided: Array.isArray(listing.productsProvided)
       ? listing.productsProvided
       : [],
+    creatorDisclosureEnabled: listing.creatorDisclosureEnabled ?? false,
   };
 }
 

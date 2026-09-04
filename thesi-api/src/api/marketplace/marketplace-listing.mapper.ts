@@ -34,6 +34,7 @@ export function buildListingPayload(
     creatorBenefits: campaign.creatorBenefits,
     contentRights: campaign.contentRights,
     productsProvided: campaign.productsProvided,
+    creatorDisclosureEnabled: campaign.creatorDisclosureEnabled,
     location,
     remoteOk,
     slots: campaign.creatorCapacity ?? 5,
