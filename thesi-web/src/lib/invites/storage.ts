@@ -13,13 +13,21 @@ type AuthenticatedRequest = <T>(
 
 const EMPTY: InviteData = { invites: [] };
 
-export function useInvites(authenticatedRequest: AuthenticatedRequest) {
+export function useInvites(
+  authenticatedRequest: AuthenticatedRequest,
+  enabled = true,
+) {
   const [data, setData] = useState<InviteData>(EMPTY);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
 
   const reload = useCallback(
     async (campaignId?: string) => {
+      if (!enabled) {
+        setData(EMPTY);
+        setError("");
+        return EMPTY;
+      }
       setError("");
       const path = campaignId
         ? `/api/invites/campaign?campaignId=${encodeURIComponent(campaignId)}`
@@ -28,11 +36,19 @@ export function useInvites(authenticatedRequest: AuthenticatedRequest) {
       setData(next);
       return next;
     },
-    [authenticatedRequest],
+    [authenticatedRequest, enabled],
   );
 
   useEffect(() => {
     let active = true;
+    if (!enabled) {
+      setData(EMPTY);
+      setError("");
+      setReady(true);
+      return () => {
+        active = false;
+      };
+    }
     setReady(false);
     setError("");
     authenticatedRequest<InviteData>("/api/invites/campaign")
@@ -55,7 +71,7 @@ export function useInvites(authenticatedRequest: AuthenticatedRequest) {
     return () => {
       active = false;
     };
-  }, [authenticatedRequest]);
+  }, [authenticatedRequest, enabled]);
 
   return { data, ready, error, reload, setData };
 }

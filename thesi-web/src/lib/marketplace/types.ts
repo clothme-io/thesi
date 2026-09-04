@@ -129,9 +129,9 @@ export const LISTING_TYPE_LABELS: Record<MarketplaceListingType, string> = {
 };
 
 export function formatListingContentTypes(
-  contentTypes: MarketplaceListingType[],
+  contentTypes: MarketplaceListingType[] = [],
 ): string {
-  if (contentTypes.length === 0) return "—";
+  if (!Array.isArray(contentTypes) || contentTypes.length === 0) return "—";
   return contentTypes
     .map((type) => LISTING_TYPE_LABELS[type])
     .filter(Boolean)
@@ -164,6 +164,40 @@ export const EMPTY_LISTING_CONTENT_RIGHTS: NonNullable<MarketplaceListing["conte
   rawContentAccess: false,
 };
 
+export function normalizeMarketplaceListing(listing: MarketplaceListing): MarketplaceListing {
+  const creatorBenefits = listing.creatorBenefits ?? EMPTY_LISTING_CREATOR_BENEFITS;
+
+  return {
+    ...listing,
+    contentTypes: Array.isArray(listing.contentTypes) ? listing.contentTypes : [],
+    exampleVideoLinks: Array.isArray(listing.exampleVideoLinks)
+      ? listing.exampleVideoLinks
+      : [],
+    requirements: Array.isArray(listing.requirements) ? listing.requirements : [],
+    files: Array.isArray(listing.files) ? listing.files : [],
+    payment: listing.payment ?? {
+      structure: "flat_rate",
+      currency: "USD",
+      flatAmountCents: 0,
+    },
+    requiredTasks: Array.isArray(listing.requiredTasks) ? listing.requiredTasks : [],
+    creatorBenefits: {
+      ...EMPTY_LISTING_CREATOR_BENEFITS,
+      ...creatorBenefits,
+      customBenefits: Array.isArray(creatorBenefits.customBenefits)
+        ? creatorBenefits.customBenefits
+        : [],
+    },
+    contentRights: {
+      ...EMPTY_LISTING_CONTENT_RIGHTS,
+      ...(listing.contentRights ?? {}),
+    },
+    productsProvided: Array.isArray(listing.productsProvided)
+      ? listing.productsProvided
+      : [],
+  };
+}
+
 export const LISTING_STATUS_LABELS: Record<MarketplaceListingStatus, string> = {
   open: "Open",
   closing_soon: "Closing Soon",
@@ -177,6 +211,8 @@ export const APPLICATION_STATUS_LABELS: Record<MarketplaceApplicationStatus, str
 };
 
 export function formatListingPayment(payment: MarketplacePayment): string {
+  if (!payment) return "—";
+
   switch (payment.structure) {
     case "flat_rate":
       return formatCents(payment.flatAmountCents ?? 0);
