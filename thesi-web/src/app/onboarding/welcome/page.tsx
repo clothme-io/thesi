@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { OnboardingGuard } from "@/components/auth/OnboardingGuard";
@@ -44,9 +45,14 @@ export default function WelcomePage() {
           )}
 
           <div className="onboarding-founder">
-            <div className="onboarding-founder-avatar" aria-hidden="true">
-              CM
-            </div>
+            <Image
+              src="/clothme-founder.png"
+              alt="ClothME founder"
+              width={56}
+              height={56}
+              className="onboarding-founder-avatar"
+              priority
+            />
             <div>
               <strong>From the ClothME founder</strong>
               <p style={{ marginTop: 8 }}>
