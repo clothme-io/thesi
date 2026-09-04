@@ -43,7 +43,7 @@ export function MarketplaceDetailContent() {
   const { data, ready, error, applyToListing, linkListingToCrm } =
     useMarketplace(authenticatedRequest);
   const { data: inviteData, ready: invitesReady, reload: reloadInvites } =
-    useInvites(authenticatedRequest);
+    useInvites(authenticatedRequest, isBrand);
   const [showApply, setShowApply] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [pitch, setPitch] = useState("");

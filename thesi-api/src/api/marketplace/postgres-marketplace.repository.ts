@@ -384,7 +384,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       files: Array.isArray(row.files) ? row.files : [],
       payment: row.payment,
       requiredTasks: Array.isArray(row.requiredTasks) ? row.requiredTasks : [],
-      creatorBenefits: row.creatorBenefits,
+      creatorBenefits: normalizeCreatorBenefits(row.creatorBenefits),
       contentRights: {
         organicUsage: row.contentRights?.organicUsage ?? true,
         websiteAppUsage: row.contentRights?.websiteAppUsage ?? false,
@@ -402,4 +402,24 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       postedAt: row.postedAt.toISOString(),
     };
   }
+}
+
+function normalizeCreatorBenefits(
+  value: typeof schema.marketplaceListing.$inferSelect['creatorBenefits'],
+): MarketplaceListingRecord['creatorBenefits'] {
+  return {
+    ...(value?.guaranteedPaymentCents !== undefined
+      ? { guaranteedPaymentCents: value.guaranteedPaymentCents }
+      : {}),
+    productsKept: value?.productsKept ?? false,
+    bonusEligibility: value?.bonusEligibility ?? false,
+    creatorPoolEligibility: value?.creatorPoolEligibility ?? false,
+    foundingCreatorRecognition: value?.foundingCreatorRecognition ?? false,
+    portfolioUse: value?.portfolioUse ?? false,
+    priorityFutureCampaigns: value?.priorityFutureCampaigns ?? false,
+    brandOpportunityAccess: value?.brandOpportunityAccess ?? false,
+    customBenefits: Array.isArray(value?.customBenefits)
+      ? value.customBenefits
+      : [],
+  };
 }

@@ -8,6 +8,7 @@ import type {
   MarketplaceFile,
   MarketplaceListing,
 } from "./types";
+import { normalizeMarketplaceListing } from "./types";
 
 type AuthenticatedRequest = <T>(
   path: string,
@@ -45,9 +46,10 @@ export function useMarketplace(authenticatedRequest: AuthenticatedRequest) {
   const reload = useCallback(async () => {
     setError("");
     const next = await authenticatedRequest<MarketplaceApiData>("/api/marketplace");
+    const listings = next.listings.map(normalizeMarketplaceListing);
     const normalized: MarketplaceData = {
-      customListings: next.listings,
-      listings: next.listings,
+      customListings: listings,
+      listings,
       applications: next.applications,
       crmLinkedListingIds: next.crmLinkedListingIds,
     };
@@ -62,9 +64,10 @@ export function useMarketplace(authenticatedRequest: AuthenticatedRequest) {
     authenticatedRequest<MarketplaceApiData>("/api/marketplace")
       .then((next) => {
         if (!active) return;
+        const listings = next.listings.map(normalizeMarketplaceListing);
         setData({
-          customListings: next.listings,
-          listings: next.listings,
+          customListings: listings,
+          listings,
           applications: next.applications,
           crmLinkedListingIds: next.crmLinkedListingIds,
         });
@@ -143,7 +146,8 @@ export function useMarketplace(authenticatedRequest: AuthenticatedRequest) {
 }
 
 export function getListingById(data: MarketplaceData, id: string) {
-  return data.listings.find((l) => l.id === id);
+  const listing = data.listings.find((l) => l.id === id);
+  return listing ? normalizeMarketplaceListing(listing) : undefined;
 }
 
 export function hasApplied(data: MarketplaceData, listingId: string) {
