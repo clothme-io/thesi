@@ -26,6 +26,7 @@ export interface CreatorProfile {
   rateRange: string;
   turnaround: string;
   portfolioUrl: string;
+  profileImageUrl: string;
   followerRange: string;
   tiktokFollowers: number;
   instagramFollowers: number;
@@ -48,6 +49,7 @@ export const DEFAULT_CREATOR_PROFILE: CreatorProfile = {
   rateRange: "",
   turnaround: "3–5 business days",
   portfolioUrl: "",
+  profileImageUrl: "",
   followerRange: "",
   tiktokFollowers: 0,
   instagramFollowers: 0,

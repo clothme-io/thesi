@@ -177,6 +177,12 @@ export class UpdateCreatorProfileDto {
   @MaxLength(500)
   portfolioUrl: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  profileImageUrl?: string;
+
   @ApiProperty({ enum: ['', ...CREATOR_FOLLOWER_RANGES] })
   @IsIn(['', ...CREATOR_FOLLOWER_RANGES])
   followerRange: string;

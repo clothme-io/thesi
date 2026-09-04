@@ -21,6 +21,7 @@ export function CreatorProfilePageContent() {
     error,
     updateProfile,
     persistProfile,
+    uploadProfileImage,
   } = useCreatorProfile(authenticatedRequest, fallbackName);
 
   if (!ready) return null;
@@ -41,6 +42,20 @@ export function CreatorProfilePageContent() {
     }
   };
 
+  const handleProfileImageChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await uploadProfileImage(file);
+    } catch {
+      // The hook exposes the user-facing error state.
+    } finally {
+      e.target.value = "";
+    }
+  };
+
   return (
     <>
       <header className="app-topbar">
@@ -58,11 +73,33 @@ export function CreatorProfilePageContent() {
           </p>
         )}
         <div className="profile-hero">
-          <div className="profile-avatar">{getInitials(profile.displayName || fallbackName)}</div>
+          {profile.profileImageUrl ? (
+            <div
+              className="profile-avatar profile-avatar--image"
+              style={{ backgroundImage: `url("${profile.profileImageUrl}")` }}
+              aria-label={`${profile.displayName || fallbackName} profile image`}
+              role="img"
+            />
+          ) : (
+            <div className="profile-avatar">
+              {getInitials(profile.displayName || fallbackName)}
+            </div>
+          )}
           <div>
             <h2>{profile.displayName || fallbackName}</h2>
             <p>{profile.headline || "UGC Creator"}</p>
-            <span className="profile-role-badge">creator</span>
+            <div className="profile-hero-actions">
+              <span className="profile-role-badge">creator</span>
+              <label className="profile-image-upload">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleProfileImageChange}
+                  disabled={saving}
+                />
+                {profile.profileImageUrl ? "Change photo" : "Add photo"}
+              </label>
+            </div>
           </div>
         </div>
 

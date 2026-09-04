@@ -1,6 +1,13 @@
 import { ForbiddenException } from '@nestjs/common';
 import type {
+  FileStoragePort,
+  StoredFileRef,
+  UploadableFile,
+} from 'src/shared/storage/file-storage.port';
+import type {
   BrandProfileData,
+  CreatorProfileImageData,
+  CreatorProfileImageRef,
   CreatorProfileData,
   ProfileRepository,
   ProfileUser,
@@ -20,6 +27,10 @@ class FakeProfileRepository implements ProfileRepository {
     return this.creator;
   }
 
+  async getCreatorProfileImage(): Promise<CreatorProfileImageRef | null> {
+    return null;
+  }
+
   async getBrandProfile() {
     return this.brand;
   }
@@ -29,9 +40,39 @@ class FakeProfileRepository implements ProfileRepository {
     return profile;
   }
 
+  async setCreatorProfileImage(
+    _userId: string,
+    image: CreatorProfileImageData,
+  ) {
+    if (!this.creator) return null;
+    this.creator = {
+      ...this.creator,
+      profileImageUrl: image.profileImageUrl,
+    };
+    return this.creator;
+  }
+
   async upsertBrandProfile(_userId: string, profile: BrandProfileData) {
     this.brand = profile;
     return profile;
+  }
+}
+
+class FakeFileStorage implements FileStoragePort {
+  async upload(_file: UploadableFile, key: string): Promise<StoredFileRef> {
+    return {
+      provider: 'bunny',
+      key,
+      publicUrl: `https://cdn.example.com/${key}`,
+    };
+  }
+
+  async read(): Promise<Buffer> {
+    return Buffer.from('');
+  }
+
+  async delete(): Promise<void> {
+    return undefined;
   }
 }
 
@@ -41,7 +82,7 @@ describe('ProfilesService', () => {
 
   beforeEach(() => {
     repository = new FakeProfileRepository();
-    service = new ProfilesService(repository);
+    service = new ProfilesService(repository, new FakeFileStorage());
   });
 
   it('returns creator defaults from the authenticated user before first save', async () => {
@@ -168,5 +209,24 @@ describe('ProfilesService', () => {
       profile,
     );
     expect(repository.creator).toEqual(profile);
+  });
+
+  it('uploads and stores a creator profile image', async () => {
+    repository.user = {
+      id: 'creator-1',
+      role: 'creator',
+      fullName: 'Avery Creator',
+      companyName: null,
+    };
+
+    const saved = await service.uploadCreatorProfileImage('creator-1', {
+      buffer: Buffer.from('image'),
+      originalname: 'avatar.png',
+      mimetype: 'image/png',
+      size: 5,
+    });
+
+    expect(saved.profileImageUrl).toContain('https://cdn.example.com/');
+    expect(repository.creator?.profileImageUrl).toBe(saved.profileImageUrl);
   });
 });

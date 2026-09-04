@@ -448,6 +448,12 @@
   flex-shrink: 0;
 }
 
+.profile-avatar--image {
+  background-position: center;
+  background-size: cover;
+  border: 1px solid var(--line);
+}
+
 .profile-hero h2 {
   margin: 0 0 4px;
   font-size: 24px;
@@ -467,6 +473,32 @@
   font-size: 12px;
   font-weight: 700;
   text-transform: capitalize;
+}
+
+.profile-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profile-image-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profile-image-upload input {
+  display: none;
 }
 
 .workspace-form {
