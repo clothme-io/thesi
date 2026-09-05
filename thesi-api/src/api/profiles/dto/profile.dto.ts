@@ -309,4 +309,10 @@ export class UpdateBrandProfileDto {
   @IsString({ each: true })
   @IsIn(BRAND_PLATFORMS, { each: true })
   preferredPlatforms: string[];
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  logoUrl?: string;
 }

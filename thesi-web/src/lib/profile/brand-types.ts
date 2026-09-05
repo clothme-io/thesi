@@ -14,6 +14,7 @@ export interface BrandProfile {
   primaryGoal: string;
   preferredCreatorNiches: string[];
   preferredPlatforms: string[];
+  logoUrl: string;
 }
 
 export const DEFAULT_BRAND_PROFILE: BrandProfile = {
@@ -32,6 +33,7 @@ export const DEFAULT_BRAND_PROFILE: BrandProfile = {
   primaryGoal: "",
   preferredCreatorNiches: [],
   preferredPlatforms: [],
+  logoUrl: "",
 };
 
 export const BRAND_INDUSTRY_OPTIONS = [

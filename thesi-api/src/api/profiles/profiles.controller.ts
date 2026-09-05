@@ -90,6 +90,40 @@ export class ProfilesController {
     return { status: HttpStatus.OK, error: null, data };
   }
 
+  @Post('brand/logo')
+  @ApiOperation({ summary: 'Upload the authenticated brand logo' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+      required: ['file'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  async uploadBrandLogo(
+    @CurrentUser() user: AuthJwtPayload,
+    @UploadedFile()
+    file:
+      | {
+          buffer: Buffer;
+          originalname: string;
+          mimetype: string;
+          size: number;
+        }
+      | undefined,
+  ) {
+    const data = await this.profiles.uploadBrandLogo(user.sub, file);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
   @Put('brand')
   @ApiOperation({ summary: 'Replace the authenticated brand profile' })
   async updateBrand(
@@ -113,6 +147,18 @@ export class ProfileImagesController {
     @Res() res: Response,
   ) {
     const image = await this.profiles.getCreatorProfileImage(userId);
+    res.setHeader('Content-Type', image.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(image.buffer);
+  }
+
+  @Get('brands/:userId')
+  @ApiOperation({ summary: 'Render a brand logo' })
+  async renderBrandLogo(
+    @Param('userId') userId: string,
+    @Res() res: Response,
+  ) {
+    const image = await this.profiles.getBrandLogo(userId);
     res.setHeader('Content-Type', image.contentType);
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.send(image.buffer);
