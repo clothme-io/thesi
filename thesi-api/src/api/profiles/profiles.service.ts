@@ -20,6 +20,7 @@ import type {
 import {
   PROFILE_REPOSITORY,
   type BrandProfileData,
+  type BrandLogoRef,
   type CreatorProfileImageRef,
   type CreatorProfileData,
   type ProfileRepository,
@@ -120,6 +121,52 @@ export class ProfilesService {
     };
   }
 
+  async uploadBrandLogo(
+    userId: string,
+    file:
+      | {
+          buffer: Buffer;
+          originalname: string;
+          mimetype: string;
+          size: number;
+        }
+      | undefined,
+  ): Promise<BrandProfileData> {
+    const user = await this.requireUser(userId);
+    this.requireRole(user, 'brand');
+    this.assertProfileImage(file);
+
+    const current =
+      (await this.profiles.getBrandProfile(userId)) ??
+      (await this.profiles.upsertBrandProfile(userId, defaultBrandProfile(user)));
+    const key = `profiles/brands/${userId}/${randomUUID()}-${sanitizeFileName(
+      file.originalname,
+    )}`;
+    const stored = await this.storage.upload(file as UploadableFile, key);
+    const logoUrl = this.brandLogoUrl(userId, stored);
+    const saved = await this.profiles.setBrandLogo(userId, {
+      storageProvider: stored.provider,
+      storageKey: stored.key,
+      contentType: file.mimetype,
+      logoUrl,
+    });
+
+    return saved ?? { ...current, logoUrl };
+  }
+
+  async getBrandLogo(
+    userId: string,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const image = await this.profiles.getBrandLogo(userId);
+    if (!image) {
+      throw new NotFoundException('Brand logo not found');
+    }
+    return {
+      buffer: await this.storage.read(toStoredFileRef(image)),
+      contentType: image.contentType,
+    };
+  }
+
   async updateBrand(
     userId: string,
     dto: UpdateBrandProfileDto,
@@ -177,9 +224,18 @@ export class ProfilesService {
       `/v1/profile-images/creators/${encodeURIComponent(userId)}?v=${Date.now()}`
     );
   }
+
+  private brandLogoUrl(userId: string, stored: StoredFileRef): string {
+    return (
+      stored.publicUrl ??
+      `/v1/profile-images/brands/${encodeURIComponent(userId)}?v=${Date.now()}`
+    );
+  }
 }
 
-function toStoredFileRef(image: CreatorProfileImageRef): StoredFileRef {
+function toStoredFileRef(
+  image: CreatorProfileImageRef | BrandLogoRef,
+): StoredFileRef {
   return {
     provider: image.storageProvider,
     key: image.storageKey,
@@ -228,5 +284,6 @@ function defaultBrandProfile(user: ProfileUser): BrandProfileData {
     primaryGoal: '',
     preferredCreatorNiches: [],
     preferredPlatforms: [],
+    logoUrl: '',
   };
 }

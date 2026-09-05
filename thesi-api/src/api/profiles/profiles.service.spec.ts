@@ -5,6 +5,8 @@ import type {
   UploadableFile,
 } from 'src/shared/storage/file-storage.port';
 import type {
+  BrandLogoData,
+  BrandLogoRef,
   BrandProfileData,
   CreatorProfileImageData,
   CreatorProfileImageRef,
@@ -35,6 +37,10 @@ class FakeProfileRepository implements ProfileRepository {
     return this.brand;
   }
 
+  async getBrandLogo(): Promise<BrandLogoRef | null> {
+    return null;
+  }
+
   async upsertCreatorProfile(_userId: string, profile: CreatorProfileData) {
     this.creator = profile;
     return profile;
@@ -55,6 +61,15 @@ class FakeProfileRepository implements ProfileRepository {
   async upsertBrandProfile(_userId: string, profile: BrandProfileData) {
     this.brand = profile;
     return profile;
+  }
+
+  async setBrandLogo(_userId: string, image: BrandLogoData) {
+    if (!this.brand) return null;
+    this.brand = {
+      ...this.brand,
+      logoUrl: image.logoUrl,
+    };
+    return this.brand;
   }
 }
 
@@ -228,5 +243,24 @@ describe('ProfilesService', () => {
 
     expect(saved.profileImageUrl).toContain('https://cdn.example.com/');
     expect(repository.creator?.profileImageUrl).toBe(saved.profileImageUrl);
+  });
+
+  it('uploads and stores a brand logo', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand Owner',
+      companyName: 'Acme',
+    };
+
+    const saved = await service.uploadBrandLogo('brand-1', {
+      buffer: Buffer.from('image'),
+      originalname: 'logo.png',
+      mimetype: 'image/png',
+      size: 5,
+    });
+
+    expect(saved.logoUrl).toContain('https://cdn.example.com/');
+    expect(repository.brand?.logoUrl).toBe(saved.logoUrl);
   });
 });

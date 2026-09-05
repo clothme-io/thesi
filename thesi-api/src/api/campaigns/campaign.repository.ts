@@ -47,6 +47,7 @@ export type CampaignRecord = {
   contentRights: CampaignContentRightsDto;
   productsProvided: UpsertCampaignDto['productsProvided'];
   creatorCapacity?: number;
+  creatorDisclosureEnabled: boolean;
   postToMarketplace: boolean;
   createdAt: string;
   updatedAt: string;

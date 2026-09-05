@@ -17,6 +17,8 @@ import {
   mapApplicationFollowerRange,
 } from './follower-range.util';
 import type {
+  BrandLogoData,
+  BrandLogoRef,
   BrandProfileData,
   CreatorProfileImageData,
   CreatorProfileImageRef,
@@ -108,6 +110,32 @@ export class PostgresProfileRepository implements ProfileRepository {
       .where(eq(schema.brandProfile.userId, userId))
       .limit(1);
     return profile ? mapBrandProfile(profile) : null;
+  }
+
+  async getBrandLogo(userId: string): Promise<BrandLogoRef | null> {
+    const [profile] = await this.db
+      .select({
+        storageProvider: schema.brandProfile.logoStorageProvider,
+        storageKey: schema.brandProfile.logoStorageKey,
+        contentType: schema.brandProfile.logoContentType,
+      })
+      .from(schema.brandProfile)
+      .where(eq(schema.brandProfile.userId, userId))
+      .limit(1);
+
+    if (
+      !profile?.storageProvider ||
+      !profile.storageKey ||
+      !profile.contentType
+    ) {
+      return null;
+    }
+
+    return {
+      storageProvider: profile.storageProvider as BrandLogoRef['storageProvider'],
+      storageKey: profile.storageKey,
+      contentType: profile.contentType,
+    };
   }
 
   async upsertCreatorProfile(
@@ -302,6 +330,25 @@ export class PostgresProfileRepository implements ProfileRepository {
       .returning();
     return mapBrandProfile(saved);
   }
+
+  async setBrandLogo(
+    userId: string,
+    image: BrandLogoData,
+  ): Promise<BrandProfileData | null> {
+    const [saved] = await this.db
+      .update(schema.brandProfile)
+      .set({
+        logoUrl: image.logoUrl,
+        logoStorageProvider: image.storageProvider,
+        logoStorageKey: image.storageKey,
+        logoContentType: image.contentType,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.brandProfile.userId, userId))
+      .returning();
+
+    return saved ? mapBrandProfile(saved) : null;
+  }
 }
 
 function completeUgcPosts(
@@ -396,5 +443,6 @@ function mapBrandProfile(
     primaryGoal: row.primaryGoal,
     preferredCreatorNiches: row.preferredCreatorNiches,
     preferredPlatforms: row.preferredPlatforms,
+    logoUrl: row.logoUrl,
   };
 }

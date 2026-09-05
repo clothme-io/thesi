@@ -25,7 +25,7 @@ export function loadBrandProfile(fallbackCompanyName = ""): BrandProfile {
     return initial;
   }
   try {
-    return { ...DEFAULT_BRAND_PROFILE, ...JSON.parse(raw) } as BrandProfile;
+    return normalizeBrandProfile(JSON.parse(raw), fallbackCompanyName);
   } catch {
     const initial = { ...DEFAULT_BRAND_PROFILE, companyName: fallbackCompanyName };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
@@ -36,6 +36,29 @@ export function loadBrandProfile(fallbackCompanyName = ""): BrandProfile {
 export function saveBrandProfile(profile: BrandProfile) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+}
+
+function normalizeBrandProfile(
+  profile: Partial<BrandProfile>,
+  fallbackCompanyName = "",
+): BrandProfile {
+  return {
+    ...DEFAULT_BRAND_PROFILE,
+    ...profile,
+    companyName: profile.companyName?.trim() || fallbackCompanyName,
+    logoUrl: normalizeBrandLogoUrl(profile.logoUrl),
+  };
+}
+
+function normalizeBrandLogoUrl(url: string | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("/v1/profile-images/")) {
+    return url.replace(/^\/v1\//, "/api/");
+  }
+  if (url.startsWith("/profile-images/")) {
+    return `/api${url}`;
+  }
+  return url;
 }
 
 export function useBrandProfile(
@@ -57,7 +80,7 @@ export function useBrandProfile(
     setError("");
     authenticatedRequest<BrandProfile>("/api/profile")
       .then((data) => {
-        if (active) setProfile(data);
+        if (active) setProfile(normalizeBrandProfile(data, fallbackCompanyName));
       })
       .catch((requestError) => {
         if (active) {
@@ -90,7 +113,7 @@ export function useBrandProfile(
           "/api/profile/brand",
           { method: "PUT", body: next },
         );
-        setProfile(savedProfile);
+        setProfile(normalizeBrandProfile(savedProfile, fallbackCompanyName));
         setSaved(true);
         setTimeout(() => setSaved(false), 2500);
       } catch (requestError) {
@@ -104,7 +127,38 @@ export function useBrandProfile(
         setSaving(false);
       }
     },
-    [authenticatedRequest],
+    [authenticatedRequest, fallbackCompanyName],
+  );
+
+  const uploadLogo = useCallback(
+    async (file: File) => {
+      setSaving(true);
+      setError("");
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const savedProfile = await authenticatedRequest<BrandProfile>(
+          "/api/profile/brand/logo",
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+        setProfile(normalizeBrandProfile(savedProfile, fallbackCompanyName));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Could not upload your brand logo",
+        );
+        throw requestError;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [authenticatedRequest, fallbackCompanyName],
   );
 
   return {
@@ -115,5 +169,6 @@ export function useBrandProfile(
     error,
     updateProfile,
     persistProfile,
+    uploadLogo,
   };
 }

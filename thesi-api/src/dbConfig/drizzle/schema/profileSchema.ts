@@ -66,6 +66,10 @@ export const brandProfile = thesiSchema.table('brand_profile', {
     .array()
     .notNull()
     .default([]),
+  logoUrl: text('logo_url').notNull().default(''),
+  logoStorageProvider: text('logo_storage_provider'),
+  logoStorageKey: text('logo_storage_key'),
+  logoContentType: text('logo_content_type'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

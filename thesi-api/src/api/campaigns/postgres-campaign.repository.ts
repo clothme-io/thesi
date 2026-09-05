@@ -86,6 +86,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         contentRights: normalizeContentRights(input.contentRights),
         productsProvided: input.productsProvided,
         creatorCapacity: input.creatorCapacity,
+        creatorDisclosureEnabled: input.creatorDisclosureEnabled ?? false,
         postToMarketplace: input.postToMarketplace,
       })
       .returning();
@@ -117,6 +118,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         contentRights: normalizeContentRights(input.contentRights),
         productsProvided: input.productsProvided,
         creatorCapacity: input.creatorCapacity,
+        creatorDisclosureEnabled: input.creatorDisclosureEnabled ?? false,
         postToMarketplace: input.postToMarketplace,
         updatedAt: new Date(),
       })
@@ -400,6 +402,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
       contentRights: normalizeContentRights(row.contentRights),
       productsProvided: normalizeProductsProvided(row.productsProvided),
       ...(row.creatorCapacity ? { creatorCapacity: row.creatorCapacity } : {}),
+      creatorDisclosureEnabled: row.creatorDisclosureEnabled,
       postToMarketplace: row.postToMarketplace,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

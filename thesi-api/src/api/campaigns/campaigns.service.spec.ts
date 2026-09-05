@@ -53,6 +53,7 @@ class FakeCampaignRepository implements CampaignRepository {
       id: `${ownerUserId}-campaign-${this.rows.length + 1}`,
       ...input,
       contentRights: input.contentRights ?? DEFAULT_CONTENT_RIGHTS,
+      creatorDisclosureEnabled: input.creatorDisclosureEnabled ?? false,
       files: [],
       createdAt: now,
       updatedAt: now,
@@ -72,6 +73,9 @@ class FakeCampaignRepository implements CampaignRepository {
       ...this.rows[index],
       ...input,
       contentRights: input.contentRights ?? this.rows[index].contentRights,
+      creatorDisclosureEnabled:
+        input.creatorDisclosureEnabled ??
+        this.rows[index].creatorDisclosureEnabled,
       files: this.rows[index].files,
       updatedAt: new Date().toISOString(),
     };
@@ -473,6 +477,17 @@ describe('CampaignsService', () => {
     expect(repository.fees.has(campaign.id)).toBe(false);
   });
 
+  it('preserves creator disclosure visibility on campaign save', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({ creatorDisclosureEnabled: true }),
+    );
+
+    expect(campaign.creatorDisclosureEnabled).toBe(true);
+  });
+
   it('allows activate without a default card while platform fee is disabled', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     billing.resolveChargeContext.mockResolvedValue(null);
@@ -605,6 +620,7 @@ function sampleCampaign(
     },
     contentRights: DEFAULT_CONTENT_RIGHTS,
     productsProvided: [],
+    creatorDisclosureEnabled: false,
     postToMarketplace: false,
     ...overrides,
   };

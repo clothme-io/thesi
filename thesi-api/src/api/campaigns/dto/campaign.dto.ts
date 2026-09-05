@@ -418,6 +418,11 @@ export class UpsertCampaignDto {
   @Min(1)
   creatorCapacity?: number;
 
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  creatorDisclosureEnabled?: boolean;
+
   @ApiProperty()
   @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()

@@ -183,6 +183,7 @@ export function CampaignCreateContent() {
   const [milestones, setMilestones] = useState<MilestoneFormRow[]>([]);
   const [paymentNotes, setPaymentNotes] = useState("");
   const [postToMarketplace, setPostToMarketplace] = useState(true);
+  const [creatorDisclosureEnabled, setCreatorDisclosureEnabled] = useState(false);
   const [inviteContext, setInviteContext] = useState<{ id: string; name: string } | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -237,6 +238,7 @@ export function CampaignCreateContent() {
     setCreatorBenefits(source.creatorBenefits);
     setContentRights(source.contentRights ?? EMPTY_CONTENT_RIGHTS);
     setPostToMarketplace(source.postToMarketplace);
+    setCreatorDisclosureEnabled(source.creatorDisclosureEnabled ?? false);
   }, [ready, duplicateFromId, data]);
 
   if (!ready) return null;
@@ -293,6 +295,7 @@ export function CampaignCreateContent() {
     ...(creatorCapacity.trim()
       ? { creatorCapacity: Number(creatorCapacity) }
       : {}),
+    creatorDisclosureEnabled,
     postToMarketplace,
   });
 
@@ -960,6 +963,17 @@ export function CampaignCreateContent() {
                     );
                     e.target.value = "";
                   }}
+                />
+              </label>
+              <label className="settings-toggle">
+                <span className="settings-toggle-copy">
+                  <strong>Show non-binding disclosure to creators</strong>
+                  <span>Creators will see that this campaign brief is not a contract until both sides confirm final terms.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={creatorDisclosureEnabled}
+                  onChange={(e) => setCreatorDisclosureEnabled(e.target.checked)}
                 />
               </label>
               {(pendingFiles.length > 0 || attachedFiles.length > 0) && (

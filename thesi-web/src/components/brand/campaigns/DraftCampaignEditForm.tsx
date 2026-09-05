@@ -151,6 +151,7 @@ export type DraftCampaignFormState = {
   flatAmount: string;
   milestones: MilestoneFormRow[];
   paymentNotes: string;
+  creatorDisclosureEnabled: boolean;
   postToMarketplace: boolean;
 };
 
@@ -184,6 +185,7 @@ export function draftFormFromCampaign(
     flatAmount: centsToInput(campaign.payment.flatRateCents),
     milestones: milestonesToFormRows(campaign.payment.milestones),
     paymentNotes: campaign.payment.notes ?? "",
+    creatorDisclosureEnabled: campaign.creatorDisclosureEnabled ?? false,
     postToMarketplace: campaign.postToMarketplace,
   };
 }
@@ -233,6 +235,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
     ...(form.creatorCapacity.trim()
       ? { creatorCapacity: Number(form.creatorCapacity) }
       : {}),
+    creatorDisclosureEnabled: form.creatorDisclosureEnabled,
     postToMarketplace: form.postToMarketplace,
   };
 }
@@ -745,6 +748,19 @@ export function DraftCampaignEditForm({
                 onPendingFiles([...pendingFiles, ...selected]);
                 e.target.value = "";
               }}
+            />
+          </label>
+          <label className="settings-toggle">
+            <span className="settings-toggle-copy">
+              <strong>Show non-binding disclosure to creators</strong>
+              <span>Creators will see that this campaign brief is not a contract until both sides confirm final terms.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={form.creatorDisclosureEnabled}
+              onChange={(e) =>
+                set("creatorDisclosureEnabled", e.target.checked)
+              }
             />
           </label>
           {(pendingFiles.length > 0 || campaign.files.length > 0) && (

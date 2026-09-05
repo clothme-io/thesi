@@ -138,6 +138,9 @@ export const campaign = thesiSchema.table('campaign', {
     .notNull()
     .default([]),
   creatorCapacity: integer('creator_capacity'),
+  creatorDisclosureEnabled: boolean('creator_disclosure_enabled')
+    .notNull()
+    .default(false),
   postToMarketplace: boolean('post_to_marketplace').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

@@ -23,6 +23,7 @@ export function BrandProfilePageContent() {
     error,
     updateProfile,
     persistProfile,
+    uploadLogo,
   } = useBrandProfile(authenticatedRequest, fallbackCompanyName);
 
   if (!ready) return null;
@@ -37,6 +38,17 @@ export function BrandProfilePageContent() {
     e.preventDefault();
     try {
       await persistProfile(profile);
+    } catch {
+      // The hook exposes the user-facing error state.
+    }
+  };
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      await uploadLogo(file);
     } catch {
       // The hook exposes the user-facing error state.
     }
@@ -61,11 +73,31 @@ export function BrandProfilePageContent() {
           </p>
         )}
         <div className="profile-hero">
-          <div className="profile-avatar">{getInitials(displayName)}</div>
+          {profile.logoUrl ? (
+            <div
+              className="profile-avatar profile-avatar--image"
+              style={{ backgroundImage: `url("${profile.logoUrl}")` }}
+              aria-label={`${displayName} logo`}
+              role="img"
+            />
+          ) : (
+            <div className="profile-avatar">{getInitials(displayName)}</div>
+          )}
           <div>
             <h2>{displayName}</h2>
             <p>{profile.tagline || "Fashion & lifestyle brand"}</p>
-            <span className="profile-role-badge">brand</span>
+            <div className="profile-hero-actions">
+              <span className="profile-role-badge">brand</span>
+              <label className="profile-image-upload">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleLogoChange}
+                  disabled={saving}
+                />
+                {profile.logoUrl ? "Change logo" : "Add logo"}
+              </label>
+            </div>
           </div>
         </div>
 

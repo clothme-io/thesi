@@ -47,6 +47,7 @@ export type MarketplaceListingRecord = {
   creatorBenefits: CampaignRecord['creatorBenefits'];
   contentRights: CampaignRecord['contentRights'];
   productsProvided: CampaignRecord['productsProvided'];
+  creatorDisclosureEnabled: boolean;
   location: string;
   remoteOk: boolean;
   slots: number;

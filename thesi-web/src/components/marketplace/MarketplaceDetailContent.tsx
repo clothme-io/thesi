@@ -116,6 +116,7 @@ export function MarketplaceDetailContent() {
   const paymentSummary = formatListingPayment(listing.payment);
   const contentTypesSummary = formatListingContentTypes(listing.contentTypes);
   const contentRights = listing.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS;
+  const showCreatorDisclosure = !isBrand && (listing.creatorDisclosureEnabled ?? false);
 
   const refreshInvites = () => {
     void reloadInvites(inviteCampaignId);
@@ -292,6 +293,15 @@ export function MarketplaceDetailContent() {
                   </p>
                 </div>
               </div>
+
+              {showCreatorDisclosure && (
+                <div className="marketplace-disclosure">
+                  <strong>Campaign disclosure</strong>
+                  <p>
+                    This campaign brief is not a contract and is non-binding until the brand and creator confirm final terms. Payment, deliverables, timelines, content rights, and usage terms may be finalized separately.
+                  </p>
+                </div>
+              )}
 
               <div className="marketplace-section-block">
                 <h3>Campaign brief</h3>
@@ -675,6 +685,14 @@ export function MarketplaceDetailContent() {
             <p className="crm-contact-sub">
               Send a short pitch to {listing.brandName}. You can optionally add this opportunity to your CRM pipeline.
             </p>
+            {showCreatorDisclosure && (
+              <div className="marketplace-disclosure marketplace-disclosure--modal">
+                <strong>Campaign disclosure</strong>
+                <p>
+                  This campaign brief is not a contract and is non-binding until the brand and creator confirm final terms.
+                </p>
+              </div>
+            )}
             <form onSubmit={handleApply}>
               <label className="workspace-field workspace-field--full">
                 <span>Your pitch</span>
