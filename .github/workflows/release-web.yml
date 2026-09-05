@@ -267,7 +267,16 @@ jobs:
             exit 0
           fi
           git commit -m "deploy(${{ env.APP_NAME }}): $TAG -> dev"
-          git push origin "${{ env.INFRA_BRANCH }}"
+          for attempt in 1 2 3; do
+            if git push origin "${{ env.INFRA_BRANCH }}"; then
+              exit 0
+            fi
+            echo "::warning::Infra push failed on attempt $attempt; rebasing onto latest ${{ env.INFRA_BRANCH }}"
+            git fetch origin "${{ env.INFRA_BRANCH }}"
+            git rebase "origin/${{ env.INFRA_BRANCH }}"
+          done
+          echo "::error::Failed to push infra changes after 3 attempts"
+          exit 1
 
   dev-wait-healthy:
     needs: [bump-dev]
@@ -475,7 +484,16 @@ jobs:
             exit 0
           fi
           git commit -m "deploy(${{ env.APP_NAME }}): $TAG -> prod"
-          git push origin "${{ env.INFRA_BRANCH }}"
+          for attempt in 1 2 3; do
+            if git push origin "${{ env.INFRA_BRANCH }}"; then
+              exit 0
+            fi
+            echo "::warning::Infra push failed on attempt $attempt; rebasing onto latest ${{ env.INFRA_BRANCH }}"
+            git fetch origin "${{ env.INFRA_BRANCH }}"
+            git rebase "origin/${{ env.INFRA_BRANCH }}"
+          done
+          echo "::error::Failed to push infra changes after 3 attempts"
+          exit 1
 
   prod-wait-preview:
     needs: [bump-prod]
@@ -667,7 +685,16 @@ jobs:
             exit 0
           fi
           git commit -m "rollback(${{ env.APP_NAME }}): $TAG -> prod"
-          git push origin "${{ env.INFRA_BRANCH }}"
+          for attempt in 1 2 3; do
+            if git push origin "${{ env.INFRA_BRANCH }}"; then
+              exit 0
+            fi
+            echo "::warning::Infra push failed on attempt $attempt; rebasing onto latest ${{ env.INFRA_BRANCH }}"
+            git fetch origin "${{ env.INFRA_BRANCH }}"
+            git rebase "origin/${{ env.INFRA_BRANCH }}"
+          done
+          echo "::error::Failed to push infra changes after 3 attempts"
+          exit 1
 
   rollback-fast-undo:
     needs: [parse-approval-comment]
@@ -747,7 +774,16 @@ jobs:
             exit 0
           fi
           git commit -m "rollback(${{ env.APP_NAME }}): $TAG -> prod (after fast undo)"
-          git push origin "${{ env.INFRA_BRANCH }}"
+          for attempt in 1 2 3; do
+            if git push origin "${{ env.INFRA_BRANCH }}"; then
+              exit 0
+            fi
+            echo "::warning::Infra push failed on attempt $attempt; rebasing onto latest ${{ env.INFRA_BRANCH }}"
+            git fetch origin "${{ env.INFRA_BRANCH }}"
+            git rebase "origin/${{ env.INFRA_BRANCH }}"
+          done
+          echo "::error::Failed to push infra changes after 3 attempts"
+          exit 1
 
   prod-wait-healthy:
     needs: [bump-infra-rollback]
