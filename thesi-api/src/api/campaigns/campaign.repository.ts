@@ -101,6 +101,7 @@ export interface CampaignRepository {
     ownerUserId: string,
     campaignId: string,
   ): Promise<CampaignRecord | null>;
+  hasAcceptedCreator(campaignId: string): Promise<boolean>;
   create(
     ownerUserId: string,
     input: UpsertCampaignDto,

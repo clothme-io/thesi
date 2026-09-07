@@ -61,6 +61,40 @@ export class PostgresCampaignRepository implements CampaignRepository {
     return row ? this.mapCampaignWithFiles(row) : null;
   }
 
+  async hasAcceptedCreator(campaignId: string): Promise<boolean> {
+    const [acceptedInvite] = await this.db
+      .select({ id: schema.campaignInvite.id })
+      .from(schema.campaignInvite)
+      .where(
+        and(
+          eq(schema.campaignInvite.campaignId, campaignId),
+          eq(schema.campaignInvite.status, 'accepted'),
+        ),
+      )
+      .limit(1);
+    if (acceptedInvite) return true;
+
+    const [acceptedApplication] = await this.db
+      .select({ id: schema.marketplaceApplication.id })
+      .from(schema.marketplaceApplication)
+      .innerJoin(
+        schema.marketplaceListing,
+        eq(
+          schema.marketplaceApplication.listingId,
+          schema.marketplaceListing.id,
+        ),
+      )
+      .where(
+        and(
+          eq(schema.marketplaceListing.campaignId, campaignId),
+          eq(schema.marketplaceApplication.status, 'accepted'),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(acceptedApplication);
+  }
+
   async create(
     ownerUserId: string,
     input: UpsertCampaignDto,

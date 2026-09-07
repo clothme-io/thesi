@@ -184,6 +184,55 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     });
   });
 
+  it("shows limited updates after a creator accepts", async () => {
+    activeCampaign = buildCampaign({
+      status: "active",
+      endDate: "2026-08-01",
+      exampleVideoLinks: ["https://example.com/original"],
+    });
+    campaignInvites = [
+      {
+        id: "invite-1",
+        campaignId: "campaign-1",
+        creatorId: "creator-1",
+        creatorName: "Alex Creator",
+        external: false,
+        status: "accepted",
+      },
+    ];
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    const user = userEvent.setup();
+    render(<CampaignDetailContent />);
+
+    expect(screen.getByText("Limited campaign updates")).toBeInTheDocument();
+    expect(screen.getByText("Other fields read-only")).toBeInTheDocument();
+    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pause" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mark complete" }),
+    ).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("Closing date"));
+    await user.type(screen.getByLabelText("Closing date"), "2026-08-15");
+    await user.type(screen.getByPlaceholderText("https://"), "https://example.com/new");
+    await user.click(screen.getByRole("button", { name: "Save updates" }));
+
+    await waitFor(() => {
+      expect(updateCampaign).toHaveBeenCalledWith(
+        "campaign-1",
+        expect.objectContaining({
+          endDate: "2026-08-15",
+          exampleVideoLinks: [
+            "https://example.com/original",
+            "https://example.com/new",
+          ],
+        }),
+      );
+    });
+  });
+
   it("publishes a draft campaign to the marketplace", async () => {
     activeCampaign = buildCampaign({
       status: "draft",

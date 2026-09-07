@@ -143,6 +143,12 @@ export class CampaignsService {
     this.assertPublishReady(dto, existing);
     const input = this.normalizeCampaignInput(dto, existing);
     this.assertDateRange(input);
+    if (
+      existing.status === 'active' &&
+      (await this.campaigns.hasAcceptedCreator(campaignId))
+    ) {
+      this.assertAcceptedCampaignUpdate(existing, input);
+    }
 
     if (this.requiresPlatformFee(input)) {
       await this.collectPlatformFee(userId, {
@@ -408,6 +414,18 @@ export class CampaignsService {
     fileId: string,
   ): Promise<{ deleted: true }> {
     await this.requireBrand(userId);
+    const campaign = await this.campaigns.getByIdForOwner(userId, campaignId);
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+    if (
+      campaign.status === 'active' &&
+      (await this.campaigns.hasAcceptedCreator(campaignId))
+    ) {
+      throw new BadRequestException(
+        'Published campaigns with accepted creators can only add files, add example video links, or extend the closing date.',
+      );
+    }
     const row = await this.campaigns.deleteFile(userId, campaignId, fileId);
     if (!row) {
       throw new NotFoundException('File not found');
@@ -489,6 +507,48 @@ export class CampaignsService {
     if (missing.length > 0) {
       throw new BadRequestException(
         `Active campaigns require: ${missing.join(', ')}`,
+      );
+    }
+  }
+
+  private assertAcceptedCampaignUpdate(
+    existing: CampaignRecord,
+    input: UpsertCampaignDto,
+  ): void {
+    const lockedFields: Array<keyof UpsertCampaignDto> = [
+      'name',
+      'campaignType',
+      'contentTypes',
+      'status',
+      'startDate',
+      'brief',
+      'deliverables',
+      'requirements',
+      'payment',
+      'requiredTasks',
+      'creatorBenefits',
+      'contentRights',
+      'productsProvided',
+      'creatorCapacity',
+      'creatorDisclosureEnabled',
+      'postToMarketplace',
+    ];
+    const changedLockedField = lockedFields.some(
+      (field) => !sameValue(existing[field], input[field]),
+    );
+    if (changedLockedField) {
+      throw new BadRequestException(
+        'Published campaigns with accepted creators can only add files, add example video links, or extend the closing date.',
+      );
+    }
+    if (input.endDate < existing.endDate) {
+      throw new BadRequestException(
+        'Closing date can only be extended after a creator has been accepted.',
+      );
+    }
+    if (!keepsExistingLinks(existing.exampleVideoLinks, input.exampleVideoLinks)) {
+      throw new BadRequestException(
+        'Example video links can only be added after a creator has been accepted.',
       );
     }
   }
@@ -689,6 +749,18 @@ function normalizeString(
   defaultValue: string,
 ): string {
   return value?.trim() || fallback?.trim() || defaultValue;
+}
+
+function sameValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+function keepsExistingLinks(existing: string[], next: string[] = []): boolean {
+  const nextLinks = new Set(next.map((link) => link.trim()).filter(Boolean));
+  return existing
+    .map((link) => link.trim())
+    .filter(Boolean)
+    .every((link) => nextLinks.has(link));
 }
 
 function hasValue<T>(value: T | undefined, fallback: T | undefined): boolean {
