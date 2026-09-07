@@ -302,10 +302,53 @@
   color: var(--muted);
 }
 
-.marketplace-brief {
-  margin: 0;
-  line-height: 1.7;
+.marketplace-readable-text {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   color: var(--ink);
+  line-height: 1.65;
+}
+
+.marketplace-readable-text p {
+  margin: 0;
+  max-width: 82ch;
+}
+
+.marketplace-readable-text ul,
+.marketplace-readable-text ol {
+  margin: 2px 0 0;
+  padding-left: 22px;
+}
+
+.marketplace-readable-text li {
+  margin: 5px 0;
+  padding-left: 2px;
+}
+
+.marketplace-pay-callout-note {
+  margin-top: 6px;
+}
+
+.marketplace-pay-callout-note .marketplace-readable-text {
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.marketplace-pay-callout-note .marketplace-readable-text p {
+  max-width: 96ch;
+}
+
+.marketplace-section-note {
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.marketplace-section-note .marketplace-readable-text {
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .marketplace-requirements {

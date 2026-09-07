@@ -35,6 +35,87 @@ import {
   type MarketplaceBrandApplication,
 } from "@/lib/marketplace/types";
 
+function splitReadableSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"$])/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function sentenceChunks(text: string): string[] {
+  const sentences = splitReadableSentences(text);
+  if (sentences.length <= 1) return text.trim() ? [text.trim()] : [];
+  const chunks: string[] = [];
+  for (let i = 0; i < sentences.length; i += 2) {
+    chunks.push(sentences.slice(i, i + 2).join(" "));
+  }
+  return chunks;
+}
+
+function FormattedCampaignText({
+  text,
+  fallback,
+}: {
+  text?: string;
+  fallback: string;
+}) {
+  const source = text?.trim() || fallback;
+  const blocks = source
+    .replace(/\r\n/g, "\n")
+    .replace(/\s+(Supporting Content|Important:|Please Note:)\s*/g, "\n\n$1 ")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="marketplace-readable-text">
+      {blocks.map((block, blockIndex) => {
+        const numberedLines = block
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+        if (
+          numberedLines.length > 1 &&
+          numberedLines.every((line) => /^\d+\.\s+/.test(line))
+        ) {
+          return (
+            <ol key={`numbered-${blockIndex}`}>
+              {numberedLines.map((line) => (
+                <li key={line}>{line.replace(/^\d+\.\s+/, "")}</li>
+              ))}
+            </ol>
+          );
+        }
+
+        if (block.includes("•")) {
+          const [intro, ...items] = block
+            .split(/\s*•\s*/)
+            .map((part) => part.trim())
+            .filter(Boolean);
+          return (
+            <div key={`bullets-${blockIndex}`}>
+              {sentenceChunks(intro).map((chunk) => (
+                <p key={chunk}>{chunk}</p>
+              ))}
+              {items.length > 0 && (
+                <ul>
+                  {items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        }
+
+        return sentenceChunks(block).map((chunk) => (
+          <p key={`${blockIndex}-${chunk}`}>{chunk}</p>
+        ));
+      })}
+    </div>
+  );
+}
+
 export function MarketplaceDetailContent() {
   const params = useParams();
   const listingId = params.id as string;
@@ -117,6 +198,9 @@ export function MarketplaceDetailContent() {
   const contentTypesSummary = formatListingContentTypes(listing.contentTypes);
   const contentRights = listing.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS;
   const showCreatorDisclosure = !isBrand && (listing.creatorDisclosureEnabled ?? false);
+  const paymentCalloutText = listing.payment.notes
+    ? `${PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}\n\n${listing.payment.notes}`
+    : PAYMENT_STRUCTURE_LABELS[listing.payment.structure];
 
   const refreshInvites = () => {
     void reloadInvites(inviteCampaignId);
@@ -287,10 +371,12 @@ export function MarketplaceDetailContent() {
                   <strong className="marketplace-pay-callout-value">
                     {paymentSummary}
                   </strong>
-                  <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
-                    {PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}
-                    {listing.payment.notes ? ` · ${listing.payment.notes}` : ""}
-                  </p>
+                  <div className="marketplace-pay-callout-note">
+                    <FormattedCampaignText
+                      text={paymentCalloutText}
+                      fallback={PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -305,12 +391,18 @@ export function MarketplaceDetailContent() {
 
               <div className="marketplace-section-block">
                 <h3>Campaign brief</h3>
-                <p className="marketplace-brief">{listing.brief || "No brief provided."}</p>
+                <FormattedCampaignText
+                  text={listing.brief}
+                  fallback="No brief provided."
+                />
               </div>
 
               <div className="marketplace-section-block">
                 <h3>What you’ll create</h3>
-                <p>{listing.deliverables || "See brief for deliverables."}</p>
+                <FormattedCampaignText
+                  text={listing.deliverables}
+                  fallback="See brief for deliverables."
+                />
               </div>
 
               {listing.requiredTasks.length > 0 && (
@@ -602,9 +694,12 @@ export function MarketplaceDetailContent() {
                 </>
               )}
               {listing.payment.notes && (
-                <p className="crm-contact-sub" style={{ marginTop: 12 }}>
-                  {listing.payment.notes}
-                </p>
+                <div className="marketplace-section-note">
+                  <FormattedCampaignText
+                    text={listing.payment.notes}
+                    fallback=""
+                  />
+                </div>
               )}
             </section>
           </div>
