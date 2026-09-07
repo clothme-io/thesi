@@ -34,6 +34,7 @@ class FakeCampaignRepository implements CampaignRepository {
   files: CampaignFileRow[] = [];
   fees = new Map<string, CampaignPlatformFeeRecord>();
   payouts = new Map<string, CreatorPayoutRecord>();
+  acceptedCreatorCampaignIds = new Set<string>();
 
   async getUser() {
     return this.user;
@@ -45,6 +46,10 @@ class FakeCampaignRepository implements CampaignRepository {
 
   async getByIdForOwner(_ownerUserId: string, campaignId: string) {
     return this.rows.find((row) => row.id === campaignId) ?? null;
+  }
+
+  async hasAcceptedCreator(campaignId: string) {
+    return this.acceptedCreatorCampaignIds.has(campaignId);
   }
 
   async create(ownerUserId: string, input: UpsertCampaignDto) {
@@ -377,6 +382,95 @@ describe('CampaignsService', () => {
     );
   });
 
+  it('only allows closing date extensions and added example links after a creator is accepted', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        endDate: '2026-08-01',
+        exampleVideoLinks: ['https://example.com/original'],
+      }),
+    );
+    repository.acceptedCreatorCampaignIds.add(campaign.id);
+
+    await expect(
+      service.update('brand-1', campaign.id, {
+        ...sampleCampaign({
+          status: 'active',
+          postToMarketplace: true,
+          endDate: '2026-08-15',
+          exampleVideoLinks: [
+            'https://example.com/original',
+            'https://example.com/new',
+          ],
+        }),
+        brief: 'Changed brief',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const updated = await service.update(
+      'brand-1',
+      campaign.id,
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        endDate: '2026-08-15',
+        exampleVideoLinks: [
+          'https://example.com/original',
+          'https://example.com/new',
+        ],
+      }),
+    );
+
+    expect(updated.endDate).toBe('2026-08-15');
+    expect(updated.exampleVideoLinks).toEqual([
+      'https://example.com/original',
+      'https://example.com/new',
+    ]);
+  });
+
+  it('rejects shortening closing date or removing example links after a creator is accepted', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        endDate: '2026-08-15',
+        exampleVideoLinks: ['https://example.com/original'],
+      }),
+    );
+    repository.acceptedCreatorCampaignIds.add(campaign.id);
+
+    await expect(
+      service.update(
+        'brand-1',
+        campaign.id,
+        sampleCampaign({
+          status: 'active',
+          postToMarketplace: true,
+          endDate: '2026-08-01',
+          exampleVideoLinks: ['https://example.com/original'],
+        }),
+      ),
+    ).rejects.toThrow('Closing date can only be extended');
+
+    await expect(
+      service.update(
+        'brand-1',
+        campaign.id,
+        sampleCampaign({
+          status: 'active',
+          postToMarketplace: true,
+          endDate: '2026-08-15',
+          exampleVideoLinks: [],
+        }),
+      ),
+    ).rejects.toThrow('Example video links can only be added');
+  });
+
   it('rejects sparse active campaign creation', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
@@ -425,6 +519,27 @@ describe('CampaignsService', () => {
         files: [expect.objectContaining({ name: 'brief.pdf' })],
       }),
     );
+  });
+
+  it('allows file upload but blocks file deletion after a creator is accepted', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({ status: 'active', postToMarketplace: true }),
+    );
+    repository.acceptedCreatorCampaignIds.add(campaign.id);
+
+    const meta = await service.uploadFile('brand-1', campaign.id, {
+      buffer: Buffer.from('hello'),
+      originalname: 'brief.pdf',
+      mimetype: 'application/pdf',
+      size: 5,
+    });
+
+    expect(meta.name).toBe('brief.pdf');
+    await expect(
+      service.deleteFile('brand-1', campaign.id, meta.id),
+    ).rejects.toThrow('Published campaigns with accepted creators');
   });
 
   it('rejects oversized uploads', async () => {
