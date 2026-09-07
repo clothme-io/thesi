@@ -131,6 +131,12 @@ describe("MarketplaceDetailContent applicant actions", () => {
   });
 
   beforeEach(() => {
+    Object.assign(listing, {
+      brief: "Brief",
+      deliverables: "1 video",
+      exampleVideoLinks: [],
+      payment: { structure: "flat_rate", currency: "USD", flatAmountCents: 50000 },
+    });
     applicants = [{ ...pendingApplicant, status: "pending" }];
     fetchListingApplicationsMock.mockReset();
     respondToListingApplicationMock.mockReset();
@@ -206,6 +212,44 @@ describe("MarketplaceDetailContent applicant actions", () => {
         screen.queryByRole("button", { name: "Reject" }),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("formats long creator-facing campaign copy into readable sections", async () => {
+    Object.assign(listing, {
+      brief:
+        "Experience ClothME for yourself and tell the real story. Before recording, complete your Fit Profile. Your feedback helps improve the experience for future users.",
+      deliverables:
+        "1 Primary UGC Video Create one authentic vertical video. Your video should include: • Your experience creating your Fit Profile • Receiving your clothing package Supporting Content • 1-3 short raw clips • Unboxing footage Important: Please do not publish until approved.",
+      payment: {
+        structure: "milestone",
+        currency: "USD",
+        flatAmountCents: 4000,
+        milestones: [
+          {
+            label: "Views",
+            trigger: "25,000 verified views",
+            amountCents: 26000,
+          },
+        ],
+        notes:
+          "Campaign Compensation Creators receive a guaranteed payment once deliverables are accepted. Performance milestones are not cumulative.",
+      },
+    });
+
+    const { MarketplaceDetailContent } = await import(
+      "./MarketplaceDetailContent"
+    );
+    render(<MarketplaceDetailContent />);
+
+    expect(await screen.findByText("Campaign brief")).toBeInTheDocument();
+    expect(
+      screen.getByText("Your experience creating your Fit Profile"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Supporting Content")).toBeInTheDocument();
+    expect(screen.getByText("1-3 short raw clips")).toBeInTheDocument();
+    expect(
+      screen.getByText("Important: Please do not publish until approved."),
+    ).toBeInTheDocument();
   });
 
 });
