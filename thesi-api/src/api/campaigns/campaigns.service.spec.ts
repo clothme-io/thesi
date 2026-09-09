@@ -35,6 +35,7 @@ class FakeCampaignRepository implements CampaignRepository {
   fees = new Map<string, CampaignPlatformFeeRecord>();
   payouts = new Map<string, CreatorPayoutRecord>();
   acceptedCreatorCampaignIds = new Set<string>();
+  acceptedCreatorCounts = new Map<string, number>();
 
   async getUser() {
     return this.user;
@@ -50,6 +51,13 @@ class FakeCampaignRepository implements CampaignRepository {
 
   async hasAcceptedCreator(campaignId: string) {
     return this.acceptedCreatorCampaignIds.has(campaignId);
+  }
+
+  async countAcceptedCreators(campaignId: string) {
+    return (
+      this.acceptedCreatorCounts.get(campaignId) ??
+      (this.acceptedCreatorCampaignIds.has(campaignId) ? 1 : 0)
+    );
   }
 
   async create(ownerUserId: string, input: UpsertCampaignDto) {
@@ -469,6 +477,66 @@ describe('CampaignsService', () => {
         }),
       ),
     ).rejects.toThrow('Example video links can only be added');
+  });
+
+  it('allows creator capacity changes after acceptance when capacity covers accepted creators', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        creatorCapacity: 5,
+      }),
+    );
+    repository.acceptedCreatorCounts.set(campaign.id, 3);
+
+    const increased = await service.update(
+      'brand-1',
+      campaign.id,
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        creatorCapacity: 10,
+      }),
+    );
+    expect(increased.creatorCapacity).toBe(10);
+
+    const reduced = await service.update(
+      'brand-1',
+      campaign.id,
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        creatorCapacity: 3,
+      }),
+    );
+    expect(reduced.creatorCapacity).toBe(3);
+  });
+
+  it('rejects reducing creator capacity below accepted creators', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        creatorCapacity: 5,
+      }),
+    );
+    repository.acceptedCreatorCounts.set(campaign.id, 3);
+
+    await expect(
+      service.update(
+        'brand-1',
+        campaign.id,
+        sampleCampaign({
+          status: 'active',
+          postToMarketplace: true,
+          creatorCapacity: 2,
+        }),
+      ),
+    ).rejects.toThrow('Creator capacity cannot be lower than accepted creators');
   });
 
   it('rejects sparse active campaign creation', async () => {

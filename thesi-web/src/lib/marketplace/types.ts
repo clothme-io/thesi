@@ -1,4 +1,5 @@
 import type { BrandCampaignGoalType } from "@/lib/brand-campaigns/types";
+import type { BrandCampaignHybridPayment } from "@/lib/brand-campaigns/types";
 
 export type MarketplaceListingType =
   | "tiktok"
@@ -35,6 +36,7 @@ export interface MarketplacePayment {
   royaltyMinimumCents?: number;
   hybridFlatCents?: number;
   hybridRoyaltyPercent?: number;
+  hybrid?: BrandCampaignHybridPayment;
   notes?: string;
 }
 
@@ -229,7 +231,7 @@ export function formatListingPayment(payment: MarketplacePayment): string {
     case "royalty":
       return `${payment.royaltyPercent}% royalty${payment.royaltyMinimumCents ? ` · min ${formatCents(payment.royaltyMinimumCents)}` : ""}`;
     case "hybrid":
-      return `${formatCents(payment.hybridFlatCents ?? 0)} + ${payment.hybridRoyaltyPercent}%`;
+      return formatHybridPaymentSummary(payment);
     default:
       return "—";
   }
@@ -237,4 +239,28 @@ export function formatListingPayment(payment: MarketplacePayment): string {
 
 function formatCents(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+}
+
+function formatHybridPaymentSummary(payment: MarketplacePayment): string {
+  const hybrid = payment.hybrid;
+  if (!hybrid) {
+    return `${formatCents(payment.hybridFlatCents ?? 0)} + ${payment.hybridRoyaltyPercent ?? 0}%`;
+  }
+  const parts: string[] = [];
+  if (hybrid.base?.enabled) {
+    parts.push(formatCents(hybrid.base.amountCents ?? 0));
+  }
+  if (hybrid.milestones?.enabled && hybrid.milestones.tiers.length > 0) {
+    const amounts = hybrid.milestones.tiers.map((tier) => tier.amountCents);
+    const total =
+      hybrid.milestones.payoutMethod === "cumulative"
+        ? amounts.reduce((sum, amount) => sum + amount, 0)
+        : Math.max(0, ...amounts);
+    parts.push(`${formatCents(total)} performance`);
+  }
+  if (hybrid.affiliate?.enabled) parts.push("affiliate");
+  if (hybrid.creatorPool?.enabled && (hybrid.creatorPool.poolAmountCents ?? 0) > 0) {
+    parts.push(`${formatCents(hybrid.creatorPool.poolAmountCents ?? 0)} pool`);
+  }
+  return parts.length > 0 ? parts.join(" + ") : "Hybrid";
 }

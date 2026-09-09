@@ -5,7 +5,9 @@ import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import type {
   CampaignInviteRecord,
+  CampaignAcceptanceSnapshotRecord,
   CreateCampaignInviteInput,
+  CreateAcceptanceSnapshotInput,
   CreatePlatformBrandInviteInput,
   InviteStatus,
   InviteUser,
@@ -201,6 +203,70 @@ export class PostgresInvitesRepository implements InvitesRepository {
     return row ? this.toCampaignInvite(row) : null;
   }
 
+  async createAcceptanceSnapshot(
+    input: CreateAcceptanceSnapshotInput,
+  ): Promise<void> {
+    const [campaign] = await this.db
+      .select()
+      .from(schema.campaign)
+      .where(
+        and(
+          eq(schema.campaign.id, input.campaignId),
+          eq(schema.campaign.ownerUserId, input.brandUserId),
+        ),
+      )
+      .limit(1);
+    if (!campaign) return;
+
+    await this.db
+      .insert(schema.campaignAcceptanceSnapshot)
+      .values({
+        campaignId: campaign.id,
+        brandUserId: campaign.ownerUserId,
+        creatorUserId: input.creatorUserId ?? null,
+        creatorEmail: input.creatorEmail.trim().toLowerCase(),
+        creatorName: input.creatorName.trim(),
+        source: input.source,
+        sourceId: input.sourceId,
+        campaignName: campaign.name,
+        campaignType: campaign.campaignType,
+        contentTypes: campaign.contentTypes,
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+        brief: campaign.brief,
+        deliverables: campaign.deliverables,
+        paymentSnapshot: campaign.payment,
+        creatorBenefitsSnapshot: campaign.creatorBenefits,
+        productsProvidedSnapshot: campaign.productsProvided,
+        contentRightsSnapshot: campaign.contentRights,
+        requiredTasksSnapshot: campaign.requiredTasks,
+        creatorCapacitySnapshot: campaign.creatorCapacity,
+        acceptedAt: input.acceptedAt ?? new Date(),
+      })
+      .onConflictDoNothing();
+  }
+
+  async getAcceptanceSnapshotForCreator(
+    campaignId: string,
+    creatorUserId: string,
+    creatorEmail: string,
+  ): Promise<CampaignAcceptanceSnapshotRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(schema.campaignAcceptanceSnapshot)
+      .where(
+        and(
+          eq(schema.campaignAcceptanceSnapshot.campaignId, campaignId),
+          or(
+            eq(schema.campaignAcceptanceSnapshot.creatorUserId, creatorUserId),
+            sql`lower(${schema.campaignAcceptanceSnapshot.creatorEmail}) = ${creatorEmail.toLowerCase()}`,
+          ),
+        ),
+      )
+      .limit(1);
+    return row ? this.toAcceptanceSnapshot(row) : null;
+  }
+
   async setCampaignInviteNovuTransactionId(
     inviteId: string,
     transactionId: string,
@@ -294,5 +360,37 @@ export class PostgresInvitesRepository implements InvitesRepository {
       status: row.status as InviteStatus,
       sentAt: row.sentAt.toISOString(),
     } satisfies PlatformBrandInviteRecord;
+  }
+
+  private toAcceptanceSnapshot(
+    row: typeof schema.campaignAcceptanceSnapshot.$inferSelect,
+  ) {
+    return {
+      id: row.id,
+      campaignId: row.campaignId,
+      brandUserId: row.brandUserId,
+      ...(row.creatorUserId ? { creatorUserId: row.creatorUserId } : {}),
+      creatorEmail: row.creatorEmail,
+      creatorName: row.creatorName,
+      source: row.source as CampaignAcceptanceSnapshotRecord['source'],
+      sourceId: row.sourceId,
+      campaignName: row.campaignName,
+      campaignType: row.campaignType,
+      contentTypes: row.contentTypes,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      brief: row.brief,
+      deliverables: row.deliverables,
+      paymentSnapshot: row.paymentSnapshot,
+      creatorBenefitsSnapshot: row.creatorBenefitsSnapshot,
+      productsProvidedSnapshot: row.productsProvidedSnapshot,
+      contentRightsSnapshot: row.contentRightsSnapshot,
+      requiredTasksSnapshot: row.requiredTasksSnapshot,
+      ...(row.creatorCapacitySnapshot
+        ? { creatorCapacitySnapshot: row.creatorCapacitySnapshot }
+        : {}),
+      acceptedAt: row.acceptedAt.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+    } satisfies CampaignAcceptanceSnapshotRecord;
   }
 }

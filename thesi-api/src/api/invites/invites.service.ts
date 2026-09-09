@@ -58,6 +58,22 @@ export class InvitesService {
     return { invite };
   }
 
+  async getAcceptanceSnapshot(
+    userId: string,
+    campaignId: string,
+  ) {
+    const user = await this.requireUser(userId);
+    if (user.role !== 'creator') {
+      throw new ForbiddenException('Creator account required');
+    }
+    const snapshot = await this.invites.getAcceptanceSnapshotForCreator(
+      campaignId.trim(),
+      userId,
+      user.email,
+    );
+    return { snapshot };
+  }
+
   async respondToCampaignInvite(
     userId: string,
     input: {
@@ -96,6 +112,18 @@ export class InvitesService {
     );
     if (!updated) {
       throw new ConflictException('Invite already responded to');
+    }
+
+    if (input.decision === 'accepted') {
+      await this.invites.createAcceptanceSnapshot({
+        campaignId: updated.campaignId,
+        brandUserId: updated.brandUserId,
+        creatorUserId: updated.creatorId ?? userId,
+        creatorEmail: updated.creatorEmail || user.email,
+        creatorName: updated.creatorName || user.fullName,
+        source: 'campaign_invite',
+        sourceId: updated.id,
+      });
     }
 
     await this.inbox.notifyCampaignInviteResponse(userId, {
@@ -238,8 +266,9 @@ export class InvitesService {
     creatorUserId: string;
     creatorEmail: string;
     creatorName: string;
+    applicationId?: string;
   }): Promise<CampaignInviteRecord> {
-    return this.invites.upsertAcceptedCampaignInvite({
+    const invite = await this.invites.upsertAcceptedCampaignInvite({
       campaignId: input.campaignId,
       brandUserId: input.brandUserId,
       campaignName: input.campaignName,
@@ -249,6 +278,16 @@ export class InvitesService {
       creatorName: input.creatorName.trim(),
       external: false,
     });
+    await this.invites.createAcceptanceSnapshot({
+      campaignId: invite.campaignId,
+      brandUserId: invite.brandUserId,
+      creatorUserId: invite.creatorId ?? input.creatorUserId,
+      creatorEmail: invite.creatorEmail,
+      creatorName: invite.creatorName,
+      source: 'marketplace_application',
+      sourceId: input.applicationId ?? invite.id,
+    });
+    return invite;
   }
 
   async listPlatformBrandInvites(

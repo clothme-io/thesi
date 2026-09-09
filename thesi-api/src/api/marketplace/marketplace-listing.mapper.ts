@@ -116,8 +116,15 @@ function campaignPaymentToListingPayment(
       return {
         structure: 'hybrid',
         currency: 'USD',
-        hybridFlatCents: payment.flatRateCents ?? 0,
-        hybridRoyaltyPercent: payment.royaltyPercent ?? 0,
+        hybridFlatCents:
+          payment.hybrid?.base?.enabled
+            ? payment.hybrid.base.amountCents ?? 0
+            : payment.flatRateCents ?? 0,
+        hybridRoyaltyPercent:
+          payment.hybrid?.affiliate?.enabled
+            ? payment.hybrid.affiliate.commissionPercent ?? 0
+            : payment.royaltyPercent ?? 0,
+        ...(payment.hybrid ? { hybrid: payment.hybrid } : {}),
         ...(payment.notes ? { notes: payment.notes } : {}),
       };
     default:

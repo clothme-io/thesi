@@ -188,6 +188,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     activeCampaign = buildCampaign({
       status: "active",
       endDate: "2026-08-01",
+      creatorCapacity: 5,
       exampleVideoLinks: ["https://example.com/original"],
     });
     campaignInvites = [
@@ -216,6 +217,8 @@ describe("CampaignDetailContent lifecycle buttons", () => {
 
     await user.clear(screen.getByLabelText("Closing date"));
     await user.type(screen.getByLabelText("Closing date"), "2026-08-15");
+    await user.clear(screen.getByLabelText("Creator capacity"));
+    await user.type(screen.getByLabelText("Creator capacity"), "8");
     await user.type(screen.getByPlaceholderText("https://"), "https://example.com/new");
     await user.click(screen.getByRole("button", { name: "Save updates" }));
 
@@ -224,6 +227,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         "campaign-1",
         expect.objectContaining({
           endDate: "2026-08-15",
+          creatorCapacity: 8,
           exampleVideoLinks: [
             "https://example.com/original",
             "https://example.com/new",

@@ -95,6 +95,50 @@ export class PostgresCampaignRepository implements CampaignRepository {
     return Boolean(acceptedApplication);
   }
 
+  async countAcceptedCreators(campaignId: string): Promise<number> {
+    const acceptedInvites = await this.db
+      .select({
+        creatorUserId: schema.campaignInvite.creatorUserId,
+        creatorEmail: schema.campaignInvite.creatorEmail,
+      })
+      .from(schema.campaignInvite)
+      .where(
+        and(
+          eq(schema.campaignInvite.campaignId, campaignId),
+          eq(schema.campaignInvite.status, 'accepted'),
+        ),
+      );
+    const acceptedApplications = await this.db
+      .select({
+        creatorUserId: schema.marketplaceApplication.creatorUserId,
+      })
+      .from(schema.marketplaceApplication)
+      .innerJoin(
+        schema.marketplaceListing,
+        eq(
+          schema.marketplaceApplication.listingId,
+          schema.marketplaceListing.id,
+        ),
+      )
+      .where(
+        and(
+          eq(schema.marketplaceListing.campaignId, campaignId),
+          eq(schema.marketplaceApplication.status, 'accepted'),
+        ),
+      );
+
+    const creators = new Set<string>();
+    for (const invite of acceptedInvites) {
+      creators.add(
+        invite.creatorUserId ?? `email:${invite.creatorEmail.toLowerCase()}`,
+      );
+    }
+    for (const application of acceptedApplications) {
+      creators.add(application.creatorUserId);
+    }
+    return creators.size;
+  }
+
   async create(
     ownerUserId: string,
     input: UpsertCampaignDto,
@@ -557,6 +601,7 @@ function normalizePayment(
     ...(value?.royaltyPercent !== undefined
       ? { royaltyPercent: value.royaltyPercent }
       : {}),
+    ...(value?.hybrid !== undefined ? { hybrid: value.hybrid } : {}),
     ...(value?.notes ? { notes: value.notes } : {}),
   };
 }

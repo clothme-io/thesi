@@ -9,6 +9,14 @@ export type CampaignPaymentForFee = {
   flatRateCents?: number;
   milestoneStructure?: 'cumulative' | 'highest_achieved';
   milestones?: Array<{ amountCents: number }>;
+  hybrid?: {
+    base?: { enabled: boolean; amountCents?: number };
+    milestones?: {
+      enabled: boolean;
+      payoutMethod: 'cumulative' | 'highest_achieved';
+      tiers: Array<{ amountCents: number }>;
+    };
+  };
 };
 
 /**
@@ -23,14 +31,27 @@ export function calculatePlatformFeeCents(totalPayoutCents: number): number {
 
 /**
  * Payout base used for fee calculation.
- * flat_rate → flatRateCents; milestone → selected milestone calculation; royalty/hybrid → flat portion only.
+ * flat_rate → flatRateCents; milestone → selected milestone calculation;
+ * hybrid → base plus configured performance milestone potential; royalty → flat portion only.
  */
 export function campaignPayoutCents(payment: CampaignPaymentForFee): number {
   switch (payment.model) {
     case 'flat_rate':
-    case 'hybrid':
     case 'royalty':
       return Math.max(0, payment.flatRateCents ?? 0);
+    case 'hybrid': {
+      const base = payment.hybrid?.base?.enabled
+        ? payment.hybrid.base.amountCents ?? 0
+        : payment.flatRateCents ?? 0;
+      const tiers = payment.hybrid?.milestones?.enabled
+        ? payment.hybrid.milestones.tiers
+        : [];
+      const milestoneTotal =
+        payment.hybrid?.milestones?.payoutMethod === 'cumulative'
+          ? tiers.reduce((sum, item) => sum + (item.amountCents ?? 0), 0)
+          : Math.max(0, ...tiers.map((item) => item.amountCents ?? 0));
+      return Math.max(0, base + milestoneTotal);
+    }
     case 'milestone':
       if (payment.milestoneStructure === 'cumulative') {
         return Math.max(

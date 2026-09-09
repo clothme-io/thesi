@@ -10,6 +10,7 @@ import {
   primaryKey,
 } from 'drizzle-orm/pg-core';
 import { campaign } from './campaignSchema';
+import type { CampaignPaymentJson } from './campaignSchema';
 import { thesiUser } from './userSchema';
 
 const thesiSchema = pgSchema('thesi');
@@ -28,6 +29,7 @@ export type MarketplacePaymentJson = {
   royaltyMinimumCents?: number;
   hybridFlatCents?: number;
   hybridRoyaltyPercent?: number;
+  hybrid?: CampaignPaymentJson['hybrid'];
   notes?: string;
 };
 

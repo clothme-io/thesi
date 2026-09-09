@@ -1,3 +1,11 @@
+import type {
+  CampaignContentRightsJson,
+  CampaignCreatorBenefitsJson,
+  CampaignPaymentJson,
+  CampaignProductProvidedJson,
+  CampaignRequiredTaskJson,
+} from 'src/dbConfig/drizzle/schema';
+
 export const INVITES_REPOSITORY = Symbol('INVITES_REPOSITORY');
 
 export type InviteStatus = 'sent' | 'accepted' | 'declined';
@@ -58,6 +66,43 @@ export type CreatePlatformBrandInviteInput = {
   crmBrandId?: string | null;
 };
 
+export type CreateAcceptanceSnapshotInput = {
+  campaignId: string;
+  brandUserId: string;
+  creatorUserId?: string | null;
+  creatorEmail: string;
+  creatorName: string;
+  source: 'campaign_invite' | 'marketplace_application';
+  sourceId: string;
+  acceptedAt?: Date;
+};
+
+export type CampaignAcceptanceSnapshotRecord = {
+  id: string;
+  campaignId: string;
+  brandUserId: string;
+  creatorUserId?: string;
+  creatorEmail: string;
+  creatorName: string;
+  source: 'campaign_invite' | 'marketplace_application';
+  sourceId: string;
+  campaignName: string;
+  campaignType: string;
+  contentTypes: string[];
+  startDate: string;
+  endDate: string;
+  brief: string;
+  deliverables: string;
+  paymentSnapshot: CampaignPaymentJson;
+  creatorBenefitsSnapshot: CampaignCreatorBenefitsJson;
+  productsProvidedSnapshot: CampaignProductProvidedJson[];
+  contentRightsSnapshot: CampaignContentRightsJson;
+  requiredTasksSnapshot: CampaignRequiredTaskJson[];
+  creatorCapacitySnapshot?: number;
+  acceptedAt: string;
+  createdAt: string;
+};
+
 export interface InvitesRepository {
   getUser(userId: string): Promise<InviteUser | null>;
   findUserByEmail(email: string): Promise<InviteUser | null>;
@@ -88,6 +133,14 @@ export interface InvitesRepository {
     inviteId: string,
     status: Exclude<InviteStatus, 'sent'>,
   ): Promise<CampaignInviteRecord | null>;
+  createAcceptanceSnapshot(
+    input: CreateAcceptanceSnapshotInput,
+  ): Promise<void>;
+  getAcceptanceSnapshotForCreator(
+    campaignId: string,
+    creatorUserId: string,
+    creatorEmail: string,
+  ): Promise<CampaignAcceptanceSnapshotRecord | null>;
   setCampaignInviteNovuTransactionId(
     inviteId: string,
     transactionId: string,

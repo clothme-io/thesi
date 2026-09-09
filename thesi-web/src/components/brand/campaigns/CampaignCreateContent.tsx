@@ -9,11 +9,14 @@ import {
   buildCampaignPayment,
   centsToInput,
   DEFAULT_MILESTONE_STRUCTURE,
+  defaultHybridPaymentForm,
   formPayoutCents,
+  hybridPaymentToForm,
   milestonesToFormRows,
   newMilestoneId,
   seedMilestonesIfNeeded,
   paymentFormError,
+  type HybridPaymentFormState,
   type MilestoneFormRow,
 } from "@/lib/brand-campaigns/payment-form";
 import type {
@@ -28,6 +31,7 @@ import type {
 import { EMPTY_CONTENT_RIGHTS, EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { MilestoneBuilder } from "./MilestoneBuilder";
+import { HybridPaymentBuilder } from "./HybridPaymentBuilder";
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
@@ -110,8 +114,9 @@ function parseList(raw: string): string[] {
 
 function listToRows(raw: string): string[] {
   return raw
-    .split(/\n|,/)
+    .split(/\n/)
     .map((item) => item.trim())
+    .map((item) => item.replace(/^(\d+\.\s+|[-*•]\s+)/, ""))
     .filter(Boolean);
 }
 
@@ -181,6 +186,9 @@ export function CampaignCreateContent() {
     useState<BrandCampaignMilestoneStructure>(DEFAULT_MILESTONE_STRUCTURE);
   const [flatAmount, setFlatAmount] = useState("");
   const [milestones, setMilestones] = useState<MilestoneFormRow[]>([]);
+  const [hybridPayment, setHybridPayment] = useState<HybridPaymentFormState>(
+    defaultHybridPaymentForm,
+  );
   const [paymentNotes, setPaymentNotes] = useState("");
   const [postToMarketplace, setPostToMarketplace] = useState(true);
   const [creatorDisclosureEnabled, setCreatorDisclosureEnabled] = useState(false);
@@ -231,6 +239,7 @@ export function CampaignCreateContent() {
         id: newMilestoneId(),
       })),
     );
+    setHybridPayment(hybridPaymentToForm(source.payment));
     setPaymentNotes(source.payment.notes ?? "");
     setRequiredTasks(source.requiredTasks.map((task) => task.title).join("\n"));
     setProductsProvided(source.productsProvided.map((product) => product.name).join("\n"));
@@ -249,6 +258,7 @@ export function CampaignCreateContent() {
     flatAmount,
     milestones,
     milestoneStructure,
+    hybridPayment,
   );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
@@ -276,6 +286,7 @@ export function CampaignCreateContent() {
       milestoneStructure,
       notes: paymentNotes,
       milestones,
+      hybrid: hybridPayment,
     }),
     requiredTasks: listToRows(requiredTasks).map((title, index) => ({
       id: `task-${index + 1}`,
@@ -300,7 +311,7 @@ export function CampaignCreateContent() {
   });
 
   const requireMilestonePayment = (): string | null =>
-    paymentFormError(paymentModel, milestones);
+    paymentFormError(paymentModel, milestones, hybridPayment);
 
   const flushPendingUploads = async (campaignId: string) => {
     if (pendingFiles.length === 0) return [] as Array<{ id: string; name: string; sizeLabel: string }>;
@@ -843,6 +854,9 @@ export function CampaignCreateContent() {
                     const next = e.target.value as BrandCampaignPaymentModel;
                     setPaymentModel(next);
                     setMilestones((prev) => seedMilestonesIfNeeded(next, prev));
+                    if (next === "hybrid") {
+                      setHybridPayment((prev) => prev ?? defaultHybridPaymentForm());
+                    }
                   }}
                 >
                   {PAYMENT_OPTIONS.map((opt) => (
@@ -876,6 +890,11 @@ export function CampaignCreateContent() {
                   </div>
                   <MilestoneBuilder rows={milestones} onChange={setMilestones} />
                 </>
+              ) : paymentModel === "hybrid" ? (
+                <HybridPaymentBuilder
+                  value={hybridPayment}
+                  onChange={setHybridPayment}
+                />
               ) : (
                 <label className="workspace-field">
                   <span>Base/flat amount</span>

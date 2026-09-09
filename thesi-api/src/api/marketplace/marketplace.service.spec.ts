@@ -682,6 +682,7 @@ describe('MarketplaceService', () => {
       creatorUserId: 'creator-1',
       creatorEmail: 'alex@example.com',
       creatorName: 'Alex',
+      applicationId: 'app-1',
     });
     expect(novu.trigger).toHaveBeenCalledWith(
       expect.objectContaining({

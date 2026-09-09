@@ -7,9 +7,12 @@ import {
   buildCampaignPayment,
   centsToInput,
   DEFAULT_MILESTONE_STRUCTURE,
+  defaultHybridPaymentForm,
   formPayoutCents,
+  hybridPaymentToForm,
   milestonesToFormRows,
   seedMilestonesIfNeeded,
+  type HybridPaymentFormState,
   type MilestoneFormRow,
 } from "@/lib/brand-campaigns/payment-form";
 import {
@@ -27,6 +30,7 @@ import {
   type BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
 import { MilestoneBuilder } from "./MilestoneBuilder";
+import { HybridPaymentBuilder } from "./HybridPaymentBuilder";
 import {
   calculatePlatformFeeCents,
   formatCents,
@@ -104,8 +108,9 @@ function parseList(raw: string): string[] {
 
 function listToRows(raw: string): string[] {
   return raw
-    .split(/\n|,/)
+    .split(/\n/)
     .map((item) => item.trim())
+    .map((item) => item.replace(/^(\d+\.\s+|[-*•]\s+)/, ""))
     .filter(Boolean);
 }
 
@@ -150,6 +155,7 @@ export type DraftCampaignFormState = {
   milestoneStructure: BrandCampaignMilestoneStructure;
   flatAmount: string;
   milestones: MilestoneFormRow[];
+  hybridPayment: HybridPaymentFormState;
   paymentNotes: string;
   creatorDisclosureEnabled: boolean;
   postToMarketplace: boolean;
@@ -184,6 +190,7 @@ export function draftFormFromCampaign(
       campaign.payment.milestoneStructure ?? DEFAULT_MILESTONE_STRUCTURE,
     flatAmount: centsToInput(campaign.payment.flatRateCents),
     milestones: milestonesToFormRows(campaign.payment.milestones),
+    hybridPayment: hybridPaymentToForm(campaign.payment),
     paymentNotes: campaign.payment.notes ?? "",
     creatorDisclosureEnabled: campaign.creatorDisclosureEnabled ?? false,
     postToMarketplace: campaign.postToMarketplace,
@@ -216,6 +223,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       milestoneStructure: form.milestoneStructure,
       notes: form.paymentNotes,
       milestones: form.milestones,
+      hybrid: form.hybridPayment,
     }),
     requiredTasks: listToRows(form.requiredTasks).map((title, index) => ({
       id: `task-${index + 1}`,
@@ -263,6 +271,7 @@ export function DraftCampaignEditForm({
     form.flatAmount,
     form.milestones,
     form.milestoneStructure,
+    form.hybridPayment,
   );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
@@ -360,6 +369,9 @@ export function DraftCampaignEditForm({
               value={form.brief}
               onChange={(e) => set("brief", e.target.value)}
             />
+            <span className="workspace-hint" style={{ marginTop: 6 }}>
+              Supports paragraphs, numbered lines, bullet lines, and **bold** text on the creator view.
+            </span>
           </label>
           <label className="workspace-field workspace-field--full">
             <span>Deliverables</span>
@@ -371,6 +383,9 @@ export function DraftCampaignEditForm({
               value={form.deliverables}
               onChange={(e) => set("deliverables", e.target.value)}
             />
+            <span className="workspace-hint" style={{ marginTop: 6 }}>
+              Use each bullet or numbered item on its own line for easier creator reading.
+            </span>
           </label>
           <div className="workspace-field workspace-field--full">
             <span>Example video links</span>
@@ -494,6 +509,9 @@ export function DraftCampaignEditForm({
               value={form.requiredTasks}
               onChange={(e) => set("requiredTasks", e.target.value)}
             />
+            <span className="workspace-hint" style={{ marginTop: 6 }}>
+              One task per line. Commas stay in the task text.
+            </span>
           </label>
           <label className="workspace-field">
             <span>Creator capacity</span>
@@ -540,6 +558,9 @@ export function DraftCampaignEditForm({
               value={form.productsProvided}
               onChange={(e) => set("productsProvided", e.target.value)}
             />
+            <span className="workspace-hint" style={{ marginTop: 6 }}>
+              One product per line. Commas stay in the product name.
+            </span>
           </label>
           <div className="workspace-field workspace-field--full">
             <span>Benefit flags</span>
@@ -576,6 +597,9 @@ export function DraftCampaignEditForm({
                 })
               }
             />
+            <span className="workspace-hint" style={{ marginTop: 6 }}>
+              One benefit per line. Commas stay in the benefit text.
+            </span>
           </label>
         </div>
       </section>
@@ -638,6 +662,7 @@ export function DraftCampaignEditForm({
                   ...form,
                   paymentModel: next,
                   milestones: seedMilestonesIfNeeded(next, form.milestones),
+                  hybridPayment: form.hybridPayment ?? defaultHybridPaymentForm(),
                   milestoneStructure:
                     next === "milestone"
                       ? form.milestoneStructure
@@ -681,6 +706,11 @@ export function DraftCampaignEditForm({
                 onChange={(milestones) => onChange({ ...form, milestones })}
               />
             </>
+          ) : form.paymentModel === "hybrid" ? (
+            <HybridPaymentBuilder
+              value={form.hybridPayment}
+              onChange={(hybridPayment) => onChange({ ...form, hybridPayment })}
+            />
           ) : (
             <label className="workspace-field">
               <span>Base/flat amount</span>
@@ -705,6 +735,9 @@ export function DraftCampaignEditForm({
               value={form.paymentNotes}
               onChange={(e) => set("paymentNotes", e.target.value)}
             />
+            <span className="workspace-hint" style={{ marginTop: 6 }}>
+              Supports paragraphs, bullets, numbered lines, and **bold** text on the creator view.
+            </span>
           </label>
         </div>
         <p className="workspace-hint" style={{ marginTop: 8 }}>

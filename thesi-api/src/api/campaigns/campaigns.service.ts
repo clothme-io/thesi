@@ -143,11 +143,12 @@ export class CampaignsService {
     this.assertPublishReady(dto, existing);
     const input = this.normalizeCampaignInput(dto, existing);
     this.assertDateRange(input);
-    if (
-      existing.status === 'active' &&
-      (await this.campaigns.hasAcceptedCreator(campaignId))
-    ) {
-      this.assertAcceptedCampaignUpdate(existing, input);
+    const acceptedCreatorCount =
+      existing.status === 'active'
+        ? await this.campaigns.countAcceptedCreators(campaignId)
+        : 0;
+    if (acceptedCreatorCount > 0) {
+      this.assertAcceptedCampaignUpdate(existing, input, acceptedCreatorCount);
     }
 
     if (this.requiresPlatformFee(input)) {
@@ -514,6 +515,7 @@ export class CampaignsService {
   private assertAcceptedCampaignUpdate(
     existing: CampaignRecord,
     input: UpsertCampaignDto,
+    acceptedCreatorCount: number,
   ): void {
     const lockedFields: Array<keyof UpsertCampaignDto> = [
       'name',
@@ -529,7 +531,6 @@ export class CampaignsService {
       'creatorBenefits',
       'contentRights',
       'productsProvided',
-      'creatorCapacity',
       'creatorDisclosureEnabled',
       'postToMarketplace',
     ];
@@ -544,6 +545,14 @@ export class CampaignsService {
     if (input.endDate < existing.endDate) {
       throw new BadRequestException(
         'Closing date can only be extended after a creator has been accepted.',
+      );
+    }
+    if (
+      input.creatorCapacity !== undefined &&
+      input.creatorCapacity < acceptedCreatorCount
+    ) {
+      throw new BadRequestException(
+        `Creator capacity cannot be lower than accepted creators (${acceptedCreatorCount}).`,
       );
     }
     if (!keepsExistingLinks(existing.exampleVideoLinks, input.exampleVideoLinks)) {
@@ -598,6 +607,7 @@ export class CampaignsService {
         ...(payment?.royaltyPercent !== undefined
           ? { royaltyPercent: payment.royaltyPercent }
           : {}),
+        ...(payment?.hybrid !== undefined ? { hybrid: payment.hybrid } : {}),
         ...(payment?.notes !== undefined ? { notes: payment.notes } : {}),
       },
       requiredTasks: dto.requiredTasks ?? existing?.requiredTasks ?? [],
