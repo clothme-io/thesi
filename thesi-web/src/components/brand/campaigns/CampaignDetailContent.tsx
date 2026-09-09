@@ -219,6 +219,7 @@ export function CampaignDetailContent() {
         const milestoneError = paymentFormError(
           form.paymentModel,
           form.milestones,
+          form.hybridPayment,
         );
         if (milestoneError) {
           setLifecycleError(milestoneError);

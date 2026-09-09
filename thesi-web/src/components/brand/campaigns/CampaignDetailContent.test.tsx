@@ -259,6 +259,76 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     });
   });
 
+  it("publishes a draft campaign with hybrid payment components", async () => {
+    activeCampaign = buildCampaign({
+      status: "draft",
+      postToMarketplace: false,
+      payment: {
+        model: "hybrid",
+        flatRateCents: 4000,
+        royaltyPercent: 0,
+        hybrid: {
+          base: {
+            enabled: true,
+            amountCents: 4000,
+            currency: "USD",
+            trigger: "content_published",
+          },
+          milestones: {
+            enabled: false,
+            metric: "views",
+            payoutMethod: "highest_achieved",
+            amountType: "bonus_in_addition_to_base",
+            tiers: [],
+          },
+          affiliate: {
+            enabled: false,
+            commissionType: "percentage_of_sale",
+            currency: "USD",
+          },
+          creatorPool: {
+            enabled: true,
+            poolAmountCents: 1000000,
+            currency: "USD",
+            campaignGoal: "Help ClothME welcome its first 10,000 qualified members.",
+            distributionMethod: "impact_score",
+            metrics: [
+              { id: "metric-1", name: "Qualified ClothME members generated", weightPercent: 40 },
+              { id: "metric-2", name: "Fit Profiles completed", weightPercent: 30 },
+            ],
+            settlementType: "campaign_end",
+          },
+        },
+      },
+    });
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    const user = userEvent.setup();
+    render(<CampaignDetailContent />);
+
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => {
+      expect(updateCampaign).toHaveBeenCalledWith(
+        "campaign-1",
+        expect.objectContaining({
+          status: "active",
+          postToMarketplace: true,
+          payment: expect.objectContaining({
+            model: "hybrid",
+            hybrid: expect.objectContaining({
+              base: expect.objectContaining({ enabled: true, amountCents: 4000 }),
+              creatorPool: expect.objectContaining({
+                enabled: true,
+                poolAmountCents: 1000000,
+              }),
+            }),
+          }),
+        }),
+      );
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("saves edited draft fields", async () => {
     activeCampaign = buildCampaign({
       status: "draft",
