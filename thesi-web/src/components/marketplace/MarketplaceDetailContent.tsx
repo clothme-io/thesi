@@ -24,7 +24,10 @@ import { MARKETPLACE_ROUTES } from "@/lib/marketplace/routes";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 import { getInvitesForCampaign, useInvites } from "@/lib/invites/storage";
 import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
-import { BRAND_CAMPAIGN_GOAL_TYPE_LABELS } from "@/lib/brand-campaigns/types";
+import {
+  BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
+  type BrandCampaignHybridPayment,
+} from "@/lib/brand-campaigns/types";
 import {
   PAYMENT_STRUCTURE_LABELS,
   LISTING_STATUS_LABELS,
@@ -33,7 +36,219 @@ import {
   formatListingPayment,
   formatListingContentTypes,
   type MarketplaceBrandApplication,
+  type MarketplacePayment,
 } from "@/lib/marketplace/types";
+
+type AcceptanceSnapshot = {
+  id: string;
+  campaignId: string;
+  campaignName: string;
+  paymentSnapshot: {
+    model: "flat_rate" | "milestone" | "royalty" | "hybrid";
+    flatRateCents?: number;
+    milestoneStructure?: "cumulative" | "highest_achieved";
+    milestones?: Array<{
+      id: string;
+      label: string;
+      trigger: string;
+      amountCents: number;
+    }>;
+    royaltyPercent?: number;
+    hybrid?: BrandCampaignHybridPayment;
+    notes?: string;
+  };
+  acceptedAt: string;
+};
+
+const CAMPAIGN_PAYMENT_LABELS: Record<AcceptanceSnapshot["paymentSnapshot"]["model"], string> = {
+  flat_rate: "Flat rate",
+  milestone: "Milestone",
+  royalty: "Royalty",
+  hybrid: "Hybrid",
+};
+
+function formatCents(cents = 0): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(cents / 100);
+}
+
+function formatAcceptedPayment(
+  payment: AcceptanceSnapshot["paymentSnapshot"],
+): string {
+  switch (payment.model) {
+    case "flat_rate":
+      return formatCents(payment.flatRateCents);
+    case "milestone": {
+      const total = (payment.milestones ?? []).reduce(
+        (sum, milestone) => sum + milestone.amountCents,
+        0,
+      );
+      return `${formatCents(total)} (milestone)`;
+    }
+    case "royalty":
+      return `${payment.royaltyPercent ?? 0}% royalty`;
+    case "hybrid":
+      return formatHybridPaymentSummary({
+        structure: "hybrid",
+        currency: "USD",
+        hybridFlatCents: payment.flatRateCents,
+        hybridRoyaltyPercent: payment.royaltyPercent,
+        hybrid: payment.hybrid,
+      });
+  }
+}
+
+const BASE_TRIGGER_LABELS: Record<string, string> = {
+  campaign_accepted: "campaign accepted",
+  contract_signed: "contract signed",
+  content_submitted: "content submitted",
+  content_accepted: "content accepted",
+  content_published: "content published",
+  campaign_completed: "campaign completed",
+};
+
+const HYBRID_METRIC_LABELS: Record<string, string> = {
+  views: "views",
+  qualified_signups: "qualified signups",
+  account_creations: "account creations",
+  fit_profiles_completed: "fit profiles completed",
+  purchases: "purchases",
+  sales_revenue: "sales revenue",
+  engagement: "engagement",
+  clicks: "clicks",
+};
+
+const AFFILIATE_TYPE_LABELS: Record<string, string> = {
+  percentage_of_sale: "of each sale",
+  percentage_of_platform_commission: "of platform commission",
+  fixed_amount_per_sale: "per sale",
+};
+
+const POOL_DISTRIBUTION_LABELS: Record<string, string> = {
+  impact_score: "Impact Score",
+  proportional_performance: "proportional performance",
+  equal_distribution: "equal distribution",
+  manual: "manual review",
+};
+
+function formatHybridPaymentSummary(payment: MarketplacePayment): string {
+  const hybrid = payment.hybrid;
+  if (!hybrid) {
+    return `${formatCents(payment.hybridFlatCents)} + ${payment.hybridRoyaltyPercent ?? 0}%`;
+  }
+  const parts: string[] = [];
+  if (hybrid.base?.enabled) parts.push(formatCents(hybrid.base.amountCents));
+  if (hybrid.milestones?.enabled && hybrid.milestones.tiers.length > 0) {
+    const amounts = hybrid.milestones.tiers.map((tier) => tier.amountCents);
+    const total =
+      hybrid.milestones.payoutMethod === "cumulative"
+        ? amounts.reduce((sum, amount) => sum + amount, 0)
+        : Math.max(0, ...amounts);
+    parts.push(`${formatCents(total)} performance`);
+  }
+  if (hybrid.affiliate?.enabled) parts.push("affiliate");
+  if (hybrid.creatorPool?.enabled && (hybrid.creatorPool.poolAmountCents ?? 0) > 0) {
+    parts.push(`${formatCents(hybrid.creatorPool.poolAmountCents)} pool`);
+  }
+  return parts.length > 0 ? parts.join(" + ") : "Hybrid";
+}
+
+function HybridPaymentDetails({ payment }: { payment: MarketplacePayment }) {
+  const hybrid = payment.hybrid;
+  if (!hybrid) {
+    return (
+      <>
+        <div className="crm-meta-row">
+          <span>Flat fee</span>
+          <span>{formatCents(payment.hybridFlatCents)}</span>
+        </div>
+        <div className="crm-meta-row">
+          <span>Royalty</span>
+          <span>{payment.hybridRoyaltyPercent ?? 0}%</span>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="marketplace-milestones">
+      {hybrid.base?.enabled && (
+        <div className="crm-meta-row">
+          <span>
+            Base payment
+            <small className="crm-contact-sub" style={{ display: "block" }}>
+              Paid when {hybrid.base.customTrigger || BASE_TRIGGER_LABELS[hybrid.base.trigger] || "earned"}
+            </small>
+          </span>
+          <span className="crm-money">{formatCents(hybrid.base.amountCents)}</span>
+        </div>
+      )}
+      {hybrid.milestones?.enabled && hybrid.milestones.tiers.length > 0 && (
+        <>
+          <div className="crm-meta-row">
+            <span>Performance metric</span>
+            <span>
+              {hybrid.milestones.customMetric ||
+                HYBRID_METRIC_LABELS[hybrid.milestones.metric] ||
+                "Performance"}
+            </span>
+          </div>
+          <div className="crm-meta-row">
+            <span>Milestone structure</span>
+            <span>
+              {hybrid.milestones.payoutMethod === "cumulative"
+                ? "Cumulative"
+                : "Highest achieved"}
+            </span>
+          </div>
+          {hybrid.milestones.tiers.map((tier) => (
+            <div key={tier.id || tier.label} className="crm-meta-row">
+              <span>
+                {tier.label}
+                <small className="crm-contact-sub" style={{ display: "block" }}>
+                  {tier.trigger}
+                </small>
+              </span>
+              <span className="crm-money">{formatCents(tier.amountCents)}</span>
+            </div>
+          ))}
+        </>
+      )}
+      {hybrid.affiliate?.enabled && (
+        <div className="crm-meta-row">
+          <span>
+            Affiliate commission
+            <small className="crm-contact-sub" style={{ display: "block" }}>
+              {hybrid.affiliate.attributionWindowDays
+                ? `${hybrid.affiliate.attributionWindowDays}-day attribution`
+                : "Attribution terms apply"}
+            </small>
+          </span>
+          <span>
+            {hybrid.affiliate.commissionType === "fixed_amount_per_sale"
+              ? `${formatCents(hybrid.affiliate.fixedAmountCents)} per sale`
+              : `${hybrid.affiliate.commissionPercent ?? 0}% ${AFFILIATE_TYPE_LABELS[hybrid.affiliate.commissionType]}`}
+          </span>
+        </div>
+      )}
+      {hybrid.creatorPool?.enabled && (
+        <div className="crm-meta-row">
+          <span>
+            Creator Pool
+            <small className="crm-contact-sub" style={{ display: "block" }}>
+              Distributed by {hybrid.creatorPool.customDistributionMethod ||
+                POOL_DISTRIBUTION_LABELS[hybrid.creatorPool.distributionMethod] ||
+                "campaign rules"}
+            </small>
+          </span>
+          <span className="crm-money">{formatCents(hybrid.creatorPool.poolAmountCents)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function splitReadableSentences(text: string): string[] {
   return text
@@ -50,6 +265,19 @@ function sentenceChunks(text: string): string[] {
     chunks.push(sentences.slice(i, i + 2).join(" "));
   }
   return chunks;
+}
+
+function renderReadableInline(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+function cleanListItem(text: string): string {
+  return text.replace(/^(\d+\.\s+|[-*•]\s+)/, "").trim();
 }
 
 function FormattedCampaignText({
@@ -81,9 +309,22 @@ function FormattedCampaignText({
           return (
             <ol key={`numbered-${blockIndex}`}>
               {numberedLines.map((line) => (
-                <li key={line}>{line.replace(/^\d+\.\s+/, "")}</li>
+                <li key={line}>{renderReadableInline(cleanListItem(line))}</li>
               ))}
             </ol>
+          );
+        }
+
+        if (
+          numberedLines.length > 1 &&
+          numberedLines.every((line) => /^[-*•]\s+/.test(line))
+        ) {
+          return (
+            <ul key={`line-bullets-${blockIndex}`}>
+              {numberedLines.map((line) => (
+                <li key={line}>{renderReadableInline(cleanListItem(line))}</li>
+              ))}
+            </ul>
           );
         }
 
@@ -95,12 +336,12 @@ function FormattedCampaignText({
           return (
             <div key={`bullets-${blockIndex}`}>
               {sentenceChunks(intro).map((chunk) => (
-                <p key={chunk}>{chunk}</p>
+                <p key={chunk}>{renderReadableInline(chunk)}</p>
               ))}
               {items.length > 0 && (
                 <ul>
                   {items.map((item) => (
-                    <li key={item}>{item}</li>
+                    <li key={item}>{renderReadableInline(item)}</li>
                   ))}
                 </ul>
               )}
@@ -109,7 +350,7 @@ function FormattedCampaignText({
         }
 
         return sentenceChunks(block).map((chunk) => (
-          <p key={`${blockIndex}-${chunk}`}>{chunk}</p>
+          <p key={`${blockIndex}-${chunk}`}>{renderReadableInline(chunk)}</p>
         ));
       })}
     </div>
@@ -138,6 +379,8 @@ export function MarketplaceDetailContent() {
   const [respondingApplicationId, setRespondingApplicationId] = useState<string | null>(
     null,
   );
+  const [acceptanceSnapshot, setAcceptanceSnapshot] =
+    useState<AcceptanceSnapshot | null>(null);
 
   useEffect(() => {
     if (!isBrand || !listingId) {
@@ -170,6 +413,33 @@ export function MarketplaceDetailContent() {
     };
   }, [authenticatedRequest, isBrand, listingId, data.listings]);
 
+  useEffect(() => {
+    if (isBrand || !listingId) {
+      setAcceptanceSnapshot(null);
+      return;
+    }
+    const listing = data.listings.find((item) => item.id === listingId);
+    if (!listing?.campaignId) {
+      setAcceptanceSnapshot(null);
+      return;
+    }
+    let active = true;
+    authenticatedRequest<{ snapshot: AcceptanceSnapshot | null }>(
+      `/api/invites/campaign/acceptance-snapshot?campaignId=${encodeURIComponent(
+        listing.campaignId,
+      )}`,
+    )
+      .then((data) => {
+        if (active) setAcceptanceSnapshot(data.snapshot);
+      })
+      .catch(() => {
+        if (active) setAcceptanceSnapshot(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticatedRequest, data.listings, isBrand, listingId]);
+
   if (!ready || (isBrand && !invitesReady) || (isBrand && !applicantsReady)) {
     return null;
   }
@@ -195,12 +465,24 @@ export function MarketplaceDetailContent() {
   const invites = isBrand ? getInvitesForCampaign(inviteData, inviteCampaignId) : [];
   const requirementRows = requirementRowsFromListing(listing);
   const paymentSummary = formatListingPayment(listing.payment);
+  const acceptedPaymentSummary = acceptanceSnapshot
+    ? formatAcceptedPayment(acceptanceSnapshot.paymentSnapshot)
+    : null;
   const contentTypesSummary = formatListingContentTypes(listing.contentTypes);
   const contentRights = listing.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS;
   const showCreatorDisclosure = !isBrand && (listing.creatorDisclosureEnabled ?? false);
-  const paymentCalloutText = listing.payment.notes
-    ? `${PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}\n\n${listing.payment.notes}`
-    : PAYMENT_STRUCTURE_LABELS[listing.payment.structure];
+  const paymentCalloutText = acceptanceSnapshot
+    ? [
+        `${CAMPAIGN_PAYMENT_LABELS[acceptanceSnapshot.paymentSnapshot.model]} terms accepted on ${new Date(
+          acceptanceSnapshot.acceptedAt,
+        ).toLocaleDateString()}.`,
+        acceptanceSnapshot.paymentSnapshot.notes,
+      ]
+        .filter(Boolean)
+        .join("\n\n")
+    : listing.payment.notes
+      ? `${PAYMENT_STRUCTURE_LABELS[listing.payment.structure]}\n\n${listing.payment.notes}`
+      : PAYMENT_STRUCTURE_LABELS[listing.payment.structure];
 
   const refreshInvites = () => {
     void reloadInvites(inviteCampaignId);
@@ -367,9 +649,13 @@ export function MarketplaceDetailContent() {
 
               <div className="marketplace-pay-callout">
                 <div>
-                  <span className="marketplace-pay-callout-label">Creator payout</span>
+                  <span className="marketplace-pay-callout-label">
+                    {acceptedPaymentSummary
+                      ? "Accepted compensation"
+                      : "Creator payout"}
+                  </span>
                   <strong className="marketplace-pay-callout-value">
-                    {paymentSummary}
+                    {acceptedPaymentSummary ?? paymentSummary}
                   </strong>
                   <div className="marketplace-pay-callout-note">
                     <FormattedCampaignText
@@ -678,20 +964,7 @@ export function MarketplaceDetailContent() {
                 </>
               )}
               {listing.payment.structure === "hybrid" && (
-                <>
-                  <div className="crm-meta-row">
-                    <span>Flat fee</span>
-                    <span>
-                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-                        (listing.payment.hybridFlatCents ?? 0) / 100,
-                      )}
-                    </span>
-                  </div>
-                  <div className="crm-meta-row">
-                    <span>Royalty</span>
-                    <span>{listing.payment.hybridRoyaltyPercent}%</span>
-                  </div>
-                </>
+                <HybridPaymentDetails payment={listing.payment} />
               )}
               {listing.payment.notes && (
                 <div className="marketplace-section-note">

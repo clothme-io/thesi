@@ -52,6 +52,18 @@ export class InvitesController {
     return { status: HttpStatus.OK, error: null, data };
   }
 
+  @Get('campaign/acceptance-snapshot')
+  @ApiOperation({
+    summary: 'Get the accepted campaign terms snapshot for the current creator',
+  })
+  async getAcceptanceSnapshot(
+    @CurrentUser() user: AuthJwtPayload,
+    @Query('campaignId') campaignId: string,
+  ) {
+    const data = await this.invites.getAcceptanceSnapshot(user.sub, campaignId);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
   @Post('campaign/respond')
   @ApiOperation({
     summary: 'Creator accepts or declines a campaign invite',

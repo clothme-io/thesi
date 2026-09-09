@@ -103,6 +103,7 @@ export function CampaignDetailContent() {
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [limitedEndDate, setLimitedEndDate] = useState("");
+  const [limitedCreatorCapacity, setLimitedCreatorCapacity] = useState("");
   const [newExampleVideoLinks, setNewExampleVideoLinks] = useState<string[]>([""]);
 
   const campaign = useMemo(
@@ -145,6 +146,9 @@ export function CampaignDetailContent() {
   useEffect(() => {
     if (!campaign) return;
     setLimitedEndDate(toDateInputValue(campaign.endDate));
+    setLimitedCreatorCapacity(
+      campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
+    );
     setNewExampleVideoLinks([""]);
   }, [campaign]);
 
@@ -166,6 +170,9 @@ export function CampaignDetailContent() {
   const brandName = session?.user.fullName ?? "Your Brand";
   const invites = getInvitesForCampaign(inviteData, campaign.id);
   const hasAcceptedCreator = invites.some((invite) => invite.status === "accepted");
+  const acceptedCreatorCount = invites.filter(
+    (invite) => invite.status === "accepted",
+  ).length;
   const hasLimitedPostPublishEditing =
     campaign.status === "active" && hasAcceptedCreator;
   const payoutByCreator = new Map(
@@ -281,6 +288,9 @@ export function CampaignDetailContent() {
       await updateCampaign(campaign.id, {
         ...toCampaignInput(campaign),
         endDate: limitedEndDate,
+        ...(limitedCreatorCapacity.trim()
+          ? { creatorCapacity: Number(limitedCreatorCapacity) }
+          : {}),
         exampleVideoLinks: [...campaign.exampleVideoLinks, ...linksToAdd],
       });
       let fileUploadFailed = false;
@@ -505,18 +515,35 @@ export function CampaignDetailContent() {
                   </h3>
                   <p className="workspace-hint" style={{ marginTop: 0 }}>
                     A creator has accepted this campaign. You can only extend
-                    the closing date, add files, and add example video links.
-                    All other campaign fields below are read-only.
+                    the closing date, adjust creator capacity, add files, and
+                    add example video links. All other campaign fields below are
+                    read-only.
                   </p>
                   <div className="workspace-grid">
                     <label className="workspace-field">
                       <span>Closing date</span>
                       <input
+                        aria-label="Closing date"
                         type="date"
                         value={limitedEndDate}
                         min={toDateInputValue(campaign.endDate)}
                         onChange={(e) => setLimitedEndDate(e.target.value)}
                       />
+                    </label>
+                    <label className="workspace-field">
+                      <span>Creator capacity</span>
+                      <input
+                        aria-label="Creator capacity"
+                        type="number"
+                        min={Math.max(1, acceptedCreatorCount)}
+                        value={limitedCreatorCapacity}
+                        onChange={(e) =>
+                          setLimitedCreatorCapacity(e.target.value)
+                        }
+                      />
+                      <span className="workspace-hint" style={{ marginTop: 6 }}>
+                        Cannot be lower than accepted creators ({acceptedCreatorCount}).
+                      </span>
                     </label>
                     <label className="workspace-field">
                       <span>Upload files</span>

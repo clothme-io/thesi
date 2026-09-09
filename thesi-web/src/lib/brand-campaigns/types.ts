@@ -18,6 +18,41 @@ export type BrandCampaignPaymentModel = "flat_rate" | "milestone" | "royalty" | 
 export type BrandCampaignMilestoneStructure =
   | "cumulative"
   | "highest_achieved";
+export type BrandCampaignHybridBaseTrigger =
+  | "campaign_accepted"
+  | "contract_signed"
+  | "content_submitted"
+  | "content_accepted"
+  | "content_published"
+  | "campaign_completed"
+  | "custom";
+export type BrandCampaignHybridMetric =
+  | "views"
+  | "qualified_signups"
+  | "account_creations"
+  | "fit_profiles_completed"
+  | "purchases"
+  | "sales_revenue"
+  | "engagement"
+  | "clicks"
+  | "custom";
+export type BrandCampaignHybridMilestoneAmountType =
+  | "total_compensation"
+  | "bonus_in_addition_to_base";
+export type BrandCampaignHybridAffiliateType =
+  | "percentage_of_sale"
+  | "percentage_of_platform_commission"
+  | "fixed_amount_per_sale";
+export type BrandCampaignHybridPoolDistribution =
+  | "impact_score"
+  | "proportional_performance"
+  | "equal_distribution"
+  | "manual"
+  | "custom";
+export type BrandCampaignHybridPoolSettlement =
+  | "campaign_end"
+  | "days_after_campaign_end"
+  | "manual";
 
 export interface BrandCampaignFile {
   id: string;
@@ -30,6 +65,49 @@ export interface BrandCampaignMilestone {
   label: string;
   trigger: string;
   amountCents: number;
+}
+
+export interface BrandCampaignHybridPayment {
+  base?: {
+    enabled: boolean;
+    amountCents?: number;
+    currency: "USD";
+    trigger: BrandCampaignHybridBaseTrigger;
+    customTrigger?: string;
+  };
+  milestones?: {
+    enabled: boolean;
+    metric: BrandCampaignHybridMetric;
+    customMetric?: string;
+    payoutMethod: BrandCampaignMilestoneStructure;
+    amountType: BrandCampaignHybridMilestoneAmountType;
+    tiers: BrandCampaignMilestone[];
+  };
+  affiliate?: {
+    enabled: boolean;
+    commissionType: BrandCampaignHybridAffiliateType;
+    commissionPercent?: number;
+    fixedAmountCents?: number;
+    currency: "USD";
+    attributionWindowDays?: number;
+    terms?: string;
+  };
+  creatorPool?: {
+    enabled: boolean;
+    poolAmountCents?: number;
+    currency: "USD";
+    campaignGoal?: string;
+    distributionMethod: BrandCampaignHybridPoolDistribution;
+    customDistributionMethod?: string;
+    metrics: Array<{
+      id: string;
+      name: string;
+      weightPercent: number;
+    }>;
+    settlementType: BrandCampaignHybridPoolSettlement;
+    settlementDays?: number;
+    rules?: string;
+  };
 }
 
 export interface BrandCampaignRequiredTask {
@@ -90,6 +168,7 @@ export interface BrandCampaign {
     milestoneStructure?: BrandCampaignMilestoneStructure;
     milestones?: BrandCampaignMilestone[];
     royaltyPercent?: number;
+    hybrid?: BrandCampaignHybridPayment;
     notes?: string;
   };
   requiredTasks: BrandCampaignRequiredTask[];
@@ -196,8 +275,24 @@ export function getCampaignBudgetLabel(campaign: BrandCampaign): string {
     case "royalty":
       return `${payment.royaltyPercent ?? 0}% royalty`;
     case "hybrid": {
-      const flat = formatMoney(payment.flatRateCents ?? 0);
-      return `${flat} + ${payment.royaltyPercent ?? 0}%`;
+      const base = payment.hybrid?.base?.enabled
+        ? payment.hybrid.base.amountCents ?? 0
+        : payment.flatRateCents ?? 0;
+      const milestoneAmounts = payment.hybrid?.milestones?.enabled
+        ? payment.hybrid.milestones.tiers.map((m) => m.amountCents)
+        : [];
+      const milestoneTotal =
+        payment.hybrid?.milestones?.payoutMethod === "cumulative"
+          ? milestoneAmounts.reduce((sum, amount) => sum + amount, 0)
+          : Math.max(0, ...milestoneAmounts);
+      const pool = payment.hybrid?.creatorPool?.enabled
+        ? payment.hybrid.creatorPool.poolAmountCents ?? 0
+        : 0;
+      const parts = [formatMoney(base)];
+      if (milestoneTotal > 0) parts.push(`${formatMoney(milestoneTotal)} performance`);
+      if (payment.hybrid?.affiliate?.enabled) parts.push("affiliate");
+      if (pool > 0) parts.push(`${formatMoney(pool)} pool`);
+      return parts.join(" + ");
     }
     default:
       return "—";

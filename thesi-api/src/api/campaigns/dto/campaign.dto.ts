@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
@@ -49,6 +50,53 @@ export const CAMPAIGN_PAYMENT_MODELS = [
 export const CAMPAIGN_MILESTONE_STRUCTURES = [
   'cumulative',
   'highest_achieved',
+] as const;
+
+export const CAMPAIGN_HYBRID_BASE_TRIGGERS = [
+  'campaign_accepted',
+  'contract_signed',
+  'content_submitted',
+  'content_accepted',
+  'content_published',
+  'campaign_completed',
+  'custom',
+] as const;
+
+export const CAMPAIGN_HYBRID_METRICS = [
+  'views',
+  'qualified_signups',
+  'account_creations',
+  'fit_profiles_completed',
+  'purchases',
+  'sales_revenue',
+  'engagement',
+  'clicks',
+  'custom',
+] as const;
+
+export const CAMPAIGN_HYBRID_MILESTONE_AMOUNT_TYPES = [
+  'total_compensation',
+  'bonus_in_addition_to_base',
+] as const;
+
+export const CAMPAIGN_HYBRID_AFFILIATE_TYPES = [
+  'percentage_of_sale',
+  'percentage_of_platform_commission',
+  'fixed_amount_per_sale',
+] as const;
+
+export const CAMPAIGN_HYBRID_POOL_DISTRIBUTIONS = [
+  'impact_score',
+  'proportional_performance',
+  'equal_distribution',
+  'manual',
+  'custom',
+] as const;
+
+export const CAMPAIGN_HYBRID_POOL_SETTLEMENTS = [
+  'campaign_end',
+  'days_after_campaign_end',
+  'manual',
 ] as const;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -120,6 +168,197 @@ export class CampaignMilestoneDto {
   amountCents: number;
 }
 
+export class CampaignHybridBaseDto {
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  amountCents?: number;
+
+  @ApiProperty({ enum: ['USD'] })
+  @IsIn(['USD'])
+  currency: 'USD';
+
+  @ApiProperty({ enum: CAMPAIGN_HYBRID_BASE_TRIGGERS })
+  @IsIn(CAMPAIGN_HYBRID_BASE_TRIGGERS)
+  trigger: (typeof CAMPAIGN_HYBRID_BASE_TRIGGERS)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  customTrigger?: string;
+}
+
+export class CampaignHybridMilestonesDto {
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean;
+
+  @ApiProperty({ enum: CAMPAIGN_HYBRID_METRICS })
+  @IsIn(CAMPAIGN_HYBRID_METRICS)
+  metric: (typeof CAMPAIGN_HYBRID_METRICS)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  customMetric?: string;
+
+  @ApiProperty({ enum: CAMPAIGN_MILESTONE_STRUCTURES })
+  @IsIn(CAMPAIGN_MILESTONE_STRUCTURES)
+  payoutMethod: (typeof CAMPAIGN_MILESTONE_STRUCTURES)[number];
+
+  @ApiProperty({ enum: CAMPAIGN_HYBRID_MILESTONE_AMOUNT_TYPES })
+  @IsIn(CAMPAIGN_HYBRID_MILESTONE_AMOUNT_TYPES)
+  amountType: (typeof CAMPAIGN_HYBRID_MILESTONE_AMOUNT_TYPES)[number];
+
+  @ApiProperty({ type: [CampaignMilestoneDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CampaignMilestoneDto)
+  tiers: CampaignMilestoneDto[];
+}
+
+export class CampaignHybridAffiliateDto {
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean;
+
+  @ApiProperty({ enum: CAMPAIGN_HYBRID_AFFILIATE_TYPES })
+  @IsIn(CAMPAIGN_HYBRID_AFFILIATE_TYPES)
+  commissionType: (typeof CAMPAIGN_HYBRID_AFFILIATE_TYPES)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  commissionPercent?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  fixedAmountCents?: number;
+
+  @ApiProperty({ enum: ['USD'] })
+  @IsIn(['USD'])
+  currency: 'USD';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  attributionWindowDays?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  terms?: string;
+}
+
+export class CampaignHybridPoolMetricDto {
+  @ApiProperty()
+  @IsString()
+  @MaxLength(80)
+  id: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(160)
+  name: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @Min(0)
+  weightPercent: number;
+}
+
+export class CampaignHybridCreatorPoolDto {
+  @ApiProperty()
+  @IsBoolean()
+  enabled: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  poolAmountCents?: number;
+
+  @ApiProperty({ enum: ['USD'] })
+  @IsIn(['USD'])
+  currency: 'USD';
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  campaignGoal?: string;
+
+  @ApiProperty({ enum: CAMPAIGN_HYBRID_POOL_DISTRIBUTIONS })
+  @IsIn(CAMPAIGN_HYBRID_POOL_DISTRIBUTIONS)
+  distributionMethod: (typeof CAMPAIGN_HYBRID_POOL_DISTRIBUTIONS)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  customDistributionMethod?: string;
+
+  @ApiProperty({ type: [CampaignHybridPoolMetricDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CampaignHybridPoolMetricDto)
+  metrics: CampaignHybridPoolMetricDto[];
+
+  @ApiProperty({ enum: CAMPAIGN_HYBRID_POOL_SETTLEMENTS })
+  @IsIn(CAMPAIGN_HYBRID_POOL_SETTLEMENTS)
+  settlementType: (typeof CAMPAIGN_HYBRID_POOL_SETTLEMENTS)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  settlementDays?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  rules?: string;
+}
+
+export class CampaignHybridPaymentDto {
+  @ApiPropertyOptional({ type: CampaignHybridBaseDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignHybridBaseDto)
+  base?: CampaignHybridBaseDto;
+
+  @ApiPropertyOptional({ type: CampaignHybridMilestonesDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignHybridMilestonesDto)
+  milestones?: CampaignHybridMilestonesDto;
+
+  @ApiPropertyOptional({ type: CampaignHybridAffiliateDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignHybridAffiliateDto)
+  affiliate?: CampaignHybridAffiliateDto;
+
+  @ApiPropertyOptional({ type: CampaignHybridCreatorPoolDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignHybridCreatorPoolDto)
+  creatorPool?: CampaignHybridCreatorPoolDto;
+}
+
 export class CampaignPaymentDto {
   @ApiProperty({ enum: CAMPAIGN_PAYMENT_MODELS })
   @ValidateIf((_, value) => value !== undefined)
@@ -152,6 +391,12 @@ export class CampaignPaymentDto {
   @IsInt()
   @Min(0)
   royaltyPercent?: number;
+
+  @ApiPropertyOptional({ type: CampaignHybridPaymentDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignHybridPaymentDto)
+  hybrid?: CampaignHybridPaymentDto;
 
   @ApiPropertyOptional()
   @IsOptional()

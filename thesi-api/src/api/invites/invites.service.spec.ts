@@ -7,6 +7,7 @@ import type { InboxService } from 'src/api/inbox/inbox.service';
 import type { NovuService } from 'src/shared/novu/novu.service';
 import type {
   CampaignInviteRecord,
+  CreateAcceptanceSnapshotInput,
   InviteStatus,
   InviteUser,
   InvitesRepository,
@@ -19,6 +20,7 @@ class FakeInvitesRepository implements InvitesRepository {
   campaigns = new Map<string, { id: string; name: string; ownerUserId: string }>();
   campaignInvites: CampaignInviteRecord[] = [];
   platformInvites: PlatformBrandInviteRecord[] = [];
+  acceptanceSnapshots: CreateAcceptanceSnapshotInput[] = [];
 
   async getUser(userId: string) {
     return this.users.get(userId) ?? null;
@@ -147,6 +149,75 @@ class FakeInvitesRepository implements InvitesRepository {
     if (!invite || invite.status !== 'sent') return null;
     invite.status = status;
     return invite;
+  }
+
+  async createAcceptanceSnapshot(input: CreateAcceptanceSnapshotInput) {
+    if (
+      this.acceptanceSnapshots.some(
+        (snapshot) =>
+          snapshot.campaignId === input.campaignId &&
+          snapshot.creatorEmail.toLowerCase() === input.creatorEmail.toLowerCase(),
+      )
+    ) {
+      return;
+    }
+    this.acceptanceSnapshots.push(input);
+  }
+
+  async getAcceptanceSnapshotForCreator(
+    campaignId: string,
+    creatorUserId: string,
+    creatorEmail: string,
+  ) {
+    const snapshot =
+      this.acceptanceSnapshots.find(
+        (item) =>
+          item.campaignId === campaignId &&
+          (item.creatorUserId === creatorUserId ||
+            item.creatorEmail.toLowerCase() === creatorEmail.toLowerCase()),
+      ) ?? null;
+    if (!snapshot) return null;
+    return {
+      id: 'snapshot-1',
+      campaignId: snapshot.campaignId,
+      brandUserId: snapshot.brandUserId,
+      ...(snapshot.creatorUserId
+        ? { creatorUserId: snapshot.creatorUserId }
+        : {}),
+      creatorEmail: snapshot.creatorEmail,
+      creatorName: snapshot.creatorName,
+      source: snapshot.source,
+      sourceId: snapshot.sourceId,
+      campaignName: 'Summer Drop',
+      campaignType: 'experience',
+      contentTypes: ['tiktok'],
+      startDate: '2026-09-01',
+      endDate: '2026-10-01',
+      brief: 'Brief',
+      deliverables: 'Deliverables',
+      paymentSnapshot: { model: 'flat_rate' as const, flatRateCents: 4000 },
+      creatorBenefitsSnapshot: {
+        productsKept: false,
+        bonusEligibility: false,
+        creatorPoolEligibility: false,
+        foundingCreatorRecognition: false,
+        portfolioUse: false,
+        priorityFutureCampaigns: false,
+        brandOpportunityAccess: false,
+        customBenefits: [],
+      },
+      productsProvidedSnapshot: [],
+      contentRightsSnapshot: {
+        organicUsage: true,
+        websiteAppUsage: false,
+        paidAdsUsage: false,
+        duration: '',
+        rawContentAccess: false,
+      },
+      requiredTasksSnapshot: [],
+      acceptedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
   }
 
   async setCampaignInviteNovuTransactionId() {}
@@ -310,6 +381,16 @@ describe('InvitesService', () => {
     expect(invite.creatorId).toBe('creator-1');
     expect(novu.trigger).not.toHaveBeenCalled();
     expect(inbox.deliverCampaignInvite).not.toHaveBeenCalled();
+    expect(repository.acceptanceSnapshots).toEqual([
+      expect.objectContaining({
+        campaignId: 'camp-1',
+        brandUserId: 'brand-1',
+        creatorUserId: 'creator-1',
+        creatorEmail: 'creator@example.com',
+        source: 'marketplace_application',
+        sourceId: invite.id,
+      }),
+    ]);
   });
 
   it('rejects duplicate campaign invites', async () => {
@@ -414,6 +495,43 @@ describe('InvitesService', () => {
         campaignId: 'camp-1',
       }),
     );
+    expect(repository.acceptanceSnapshots).toEqual([
+      expect.objectContaining({
+        campaignId: 'camp-1',
+        brandUserId: 'brand-1',
+        creatorUserId: 'creator-1',
+        creatorEmail: 'creator@example.com',
+        source: 'campaign_invite',
+        sourceId: updated.id,
+      }),
+    ]);
+  });
+
+  it('returns the accepted compensation snapshot to the creator', async () => {
+    await service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1',
+      campaignName: 'Summer Drop',
+      brandName: 'Acme',
+      creatorId: 'creator-1',
+      creatorEmail: 'creator@example.com',
+      creatorName: 'Alex Creator',
+      external: false,
+    });
+
+    await service.respondToCampaignInvite('creator-1', {
+      campaignId: 'camp-1',
+      decision: 'accepted',
+    });
+
+    await expect(
+      service.getAcceptanceSnapshot('creator-1', 'camp-1'),
+    ).resolves.toEqual({
+      snapshot: expect.objectContaining({
+        campaignId: 'camp-1',
+        creatorUserId: 'creator-1',
+        paymentSnapshot: { model: 'flat_rate', flatRateCents: 4000 },
+      }),
+    });
   });
 
   it('declines a campaign invite', async () => {

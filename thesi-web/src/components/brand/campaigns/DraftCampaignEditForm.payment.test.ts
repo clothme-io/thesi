@@ -78,4 +78,38 @@ describe("draft form milestone round-trip", () => {
       ],
     });
   });
+
+  it("keeps commas inside line-based campaign list fields", () => {
+    const form = draftFormFromCampaign(campaign());
+    form.requiredTasks = "1. Download the app, create a profile\n- Submit feedback, notes, and screenshots";
+    form.productsProvided = "T-shirt, pants, and pyjamas";
+    form.creatorBenefits.customBenefits = [
+      "Priority consideration, including future ClothME work",
+    ];
+
+    const input = draftFormToInput(form);
+
+    expect(input.requiredTasks).toEqual([
+      {
+        id: "task-1",
+        title: "Download the app, create a profile",
+        required: true,
+      },
+      {
+        id: "task-2",
+        title: "Submit feedback, notes, and screenshots",
+        required: true,
+      },
+    ]);
+    expect(input.productsProvided).toEqual([
+      {
+        id: "product-1",
+        name: "T-shirt, pants, and pyjamas",
+        creatorKeeps: false,
+      },
+    ]);
+    expect(input.creatorBenefits.customBenefits).toEqual([
+      "Priority consideration, including future ClothME work",
+    ]);
+  });
 });

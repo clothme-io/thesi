@@ -339,6 +339,7 @@ export class MarketplaceService implements MarketplaceCampaignSync {
         creatorUserId: existing.creatorUserId,
         creatorEmail: existing.creatorEmail,
         creatorName: existing.creatorName,
+        applicationId: application.id,
       });
     }
 
