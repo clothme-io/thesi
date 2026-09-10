@@ -51,6 +51,9 @@ export type MarketplaceListingRecord = {
   location: string;
   remoteOk: boolean;
   slots: number;
+  totalSlots: number;
+  acceptedCreatorsCount: number;
+  slotsLeft: number;
   applicantsCount: number;
   postedAt: string;
 };

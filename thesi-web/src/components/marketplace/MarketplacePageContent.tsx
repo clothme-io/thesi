@@ -207,7 +207,10 @@ export function MarketplacePageContent() {
                     <span>Apply by {listing.applicationDeadline}</span>
                   </div>
                   <div className="marketplace-card-footer">
-                    <span>{listing.slots} slots</span>
+                    <span>
+                      {listing.slotsLeft ?? listing.slots} of{" "}
+                      {listing.totalSlots ?? listing.slots} slots left
+                    </span>
                     <span>{listing.applicantsCount} applicants</span>
                     <span>{listing.remoteOk ? "Remote OK" : listing.location}</span>
                   </div>

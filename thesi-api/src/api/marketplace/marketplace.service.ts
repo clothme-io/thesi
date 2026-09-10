@@ -288,6 +288,9 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     if (existing.status !== 'pending') {
       throw new ConflictException(`Application already ${existing.status}`);
     }
+    if (decision === 'accepted' && listing.slotsLeft <= 0) {
+      throw new ConflictException('No slots left for this campaign.');
+    }
 
     const application = await this.marketplace.updateApplicationStatus(
       applicationId,
@@ -381,6 +384,7 @@ export class MarketplaceService implements MarketplaceCampaignSync {
 
   private isClosedForApplications(listing: MarketplaceListingRecord): boolean {
     if (listing.status === 'closed') return true;
+    if (listing.slotsLeft <= 0) return true;
     const today = new Date().toISOString().slice(0, 10);
     return Boolean(
       listing.applicationDeadline && listing.applicationDeadline < today,

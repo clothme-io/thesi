@@ -362,7 +362,7 @@ export function MarketplaceDetailContent() {
   const listingId = params.id as string;
   const { session, authenticatedRequest, authenticatedBinaryRequest } = useAuth();
   const isBrand = session?.user.role === "brand";
-  const { data, ready, error, applyToListing, linkListingToCrm } =
+  const { data, ready, error, reload, applyToListing, linkListingToCrm } =
     useMarketplace(authenticatedRequest);
   const { data: inviteData, ready: invitesReady, reload: reloadInvites } =
     useInvites(authenticatedRequest, isBrand);
@@ -557,6 +557,7 @@ export function MarketplaceDetailContent() {
             : application,
         ),
       );
+      await reload();
       showToast(
         decision === "accepted" ? "Application accepted." : "Application rejected.",
       );
@@ -997,8 +998,16 @@ export function MarketplaceDetailContent() {
                 <span>{listing.applicationDeadline}</span>
               </div>
               <div className="crm-meta-row">
-                <span>Open slots</span>
-                <span>{listing.slots}</span>
+                <span>Total slots</span>
+                <span>{listing.totalSlots ?? listing.slots}</span>
+              </div>
+              <div className="crm-meta-row">
+                <span>Slots left</span>
+                <span>{listing.slotsLeft ?? listing.slots}</span>
+              </div>
+              <div className="crm-meta-row">
+                <span>Accepted creators</span>
+                <span>{listing.acceptedCreatorsCount ?? 0}</span>
               </div>
               <div className="crm-meta-row">
                 <span>Applicants so far</span>

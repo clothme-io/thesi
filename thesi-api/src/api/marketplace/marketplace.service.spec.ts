@@ -83,6 +83,9 @@ class FakeMarketplaceRepository implements MarketplaceRepository {
       location: input.campaign.requirements.location || 'Remote',
       remoteOk: true,
       slots: 5,
+      totalSlots: 5,
+      acceptedCreatorsCount: 0,
+      slotsLeft: 5,
       applicantsCount: 0,
       postedAt: new Date().toISOString(),
     };
@@ -410,6 +413,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 0,
         postedAt: new Date().toISOString(),
       },
@@ -438,6 +444,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 0,
         postedAt: new Date().toISOString(),
       },
@@ -466,6 +475,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 0,
         postedAt: new Date().toISOString(),
       },
@@ -509,6 +521,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 0,
         postedAt: new Date().toISOString(),
       },
@@ -575,6 +590,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 1,
         postedAt: new Date().toISOString(),
       },
@@ -640,6 +658,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 1,
         postedAt: new Date().toISOString(),
       },
@@ -695,6 +716,66 @@ describe('MarketplaceService', () => {
     await expect(
       service.respondToApplication('brand-1', 'listing-1', 'app-1', 'rejected'),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('blocks accepting a marketplace application when no slots are left', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand',
+      companyName: 'Acme',
+    };
+    repository.listings = [
+      {
+        id: 'listing-1',
+        name: 'Summer',
+        brandName: 'Acme',
+        ownerUserId: 'brand-1',
+        campaignId: 'campaign-1',
+        campaignType: 'experience',
+        contentTypes: ['tiktok'],
+        status: 'open',
+        startDate: '2026-07-01',
+        endDate: '2026-08-01',
+        applicationDeadline: '2026-07-01',
+        brief: 'Brief',
+        deliverables: '1 video',
+        exampleVideoLinks: [],
+        requirements: [],
+        files: [],
+        payment: {
+          structure: 'flat_rate',
+          currency: 'USD',
+          flatAmountCents: 1000,
+        },
+        location: 'Remote',
+        remoteOk: true,
+        slots: 1,
+        totalSlots: 1,
+        acceptedCreatorsCount: 1,
+        slotsLeft: 0,
+        applicantsCount: 2,
+        postedAt: new Date().toISOString(),
+      },
+    ];
+    repository.applications = [
+      {
+        id: 'app-1',
+        listingId: 'listing-1',
+        pitch: 'Hello pitch',
+        appliedAt: new Date().toISOString(),
+        addedToCrm: true,
+        status: 'pending',
+        creatorUserId: 'creator-1',
+        creatorName: 'Alex',
+        creatorEmail: 'alex@example.com',
+      },
+    ];
+
+    await expect(
+      service.respondToApplication('brand-1', 'listing-1', 'app-1', 'accepted'),
+    ).rejects.toThrow('No slots left for this campaign.');
+    expect(invites.acceptMarketplaceApplicant).not.toHaveBeenCalled();
   });
 
   it('blocks brands from applying', async () => {
@@ -756,6 +837,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 0,
         postedAt: new Date().toISOString(),
       },
@@ -800,6 +884,9 @@ describe('MarketplaceService', () => {
         location: 'Remote',
         remoteOk: true,
         slots: 5,
+        totalSlots: 5,
+        acceptedCreatorsCount: 0,
+        slotsLeft: 5,
         applicantsCount: 0,
         postedAt: new Date().toISOString(),
       },
