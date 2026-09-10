@@ -67,7 +67,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         },
       })
       .returning();
-    return this.mapListing(row, await this.countApplicants(row.id));
+    return this.mapListing(
+      row,
+      await this.countApplicants(row.id),
+      await this.countAcceptedCreators(row.id, row.campaignId),
+    );
   }
 
   async deleteListingByCampaignId(campaignId: string): Promise<void> {
@@ -83,7 +87,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       .orderBy(desc(schema.marketplaceListing.postedAt));
     return Promise.all(
       rows.map(async (row) =>
-        this.mapListing(row, await this.countApplicants(row.id)),
+        this.mapListing(
+          row,
+          await this.countApplicants(row.id),
+          await this.countAcceptedCreators(row.id, row.campaignId),
+        ),
       ),
     );
   }
@@ -96,7 +104,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       .orderBy(desc(schema.marketplaceListing.postedAt));
     return Promise.all(
       rows.map(async (row) =>
-        this.mapListing(row, await this.countApplicants(row.id)),
+        this.mapListing(
+          row,
+          await this.countApplicants(row.id),
+          await this.countAcceptedCreators(row.id, row.campaignId),
+        ),
       ),
     );
   }
@@ -108,7 +120,11 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       .where(eq(schema.marketplaceListing.id, listingId))
       .limit(1);
     return row
-      ? this.mapListing(row, await this.countApplicants(row.id))
+      ? this.mapListing(
+          row,
+          await this.countApplicants(row.id),
+          await this.countAcceptedCreators(row.id, row.campaignId),
+        )
       : null;
   }
 
@@ -354,10 +370,51 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     return Number(row?.count ?? 0);
   }
 
+  private async countAcceptedCreators(
+    listingId: string,
+    campaignId: string,
+  ): Promise<number> {
+    const acceptedApplications = await this.db
+      .select({
+        creatorUserId: schema.marketplaceApplication.creatorUserId,
+      })
+      .from(schema.marketplaceApplication)
+      .where(
+        and(
+          eq(schema.marketplaceApplication.listingId, listingId),
+          eq(schema.marketplaceApplication.status, 'accepted'),
+        ),
+      );
+    const acceptedInvites = await this.db
+      .select({
+        creatorUserId: schema.campaignInvite.creatorUserId,
+        creatorEmail: schema.campaignInvite.creatorEmail,
+      })
+      .from(schema.campaignInvite)
+      .where(
+        and(
+          eq(schema.campaignInvite.campaignId, campaignId),
+          eq(schema.campaignInvite.status, 'accepted'),
+        ),
+      );
+    const creators = new Set<string>();
+    for (const application of acceptedApplications) {
+      creators.add(application.creatorUserId);
+    }
+    for (const invite of acceptedInvites) {
+      creators.add(
+        invite.creatorUserId ?? `email:${invite.creatorEmail.toLowerCase()}`,
+      );
+    }
+    return creators.size;
+  }
+
   private mapListing(
     row: typeof schema.marketplaceListing.$inferSelect,
     applicantsCount: number,
+    acceptedCreatorsCount: number,
   ): MarketplaceListingRecord {
+    const totalSlots = row.slots;
     return {
       id: row.id,
       name: row.name,
@@ -398,7 +455,10 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       creatorDisclosureEnabled: row.creatorDisclosureEnabled,
       location: row.location,
       remoteOk: row.remoteOk,
-      slots: row.slots,
+      slots: totalSlots,
+      totalSlots,
+      acceptedCreatorsCount,
+      slotsLeft: Math.max(totalSlots - acceptedCreatorsCount, 0),
       applicantsCount,
       postedAt: row.postedAt.toISOString(),
     };

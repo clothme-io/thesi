@@ -10,6 +10,7 @@ const authenticatedRequest = vi.fn();
 const authenticatedBinaryRequest = vi.fn();
 const fetchListingApplicationsMock = vi.fn();
 const respondToListingApplicationMock = vi.fn();
+const reloadMarketplaceMock = vi.fn();
 
 const listing: MarketplaceListing = {
   id: "listing-1",
@@ -44,6 +45,9 @@ const listing: MarketplaceListing = {
   location: "Remote",
   remoteOk: true,
   slots: 5,
+  totalSlots: 5,
+  acceptedCreatorsCount: 1,
+  slotsLeft: 4,
   applicantsCount: 1,
   postedAt: "2026-07-01T00:00:00.000Z",
 };
@@ -101,7 +105,7 @@ vi.mock("@/lib/marketplace/storage", async () => {
       error: "",
       applyToListing: vi.fn(),
       linkListingToCrm: vi.fn(),
-      reload: vi.fn(),
+      reload: reloadMarketplaceMock,
     }),
     fetchListingApplications: (...args: unknown[]) =>
       fetchListingApplicationsMock(...args),
@@ -140,6 +144,13 @@ describe("MarketplaceDetailContent applicant actions", () => {
     applicants = [{ ...pendingApplicant, status: "pending" }];
     fetchListingApplicationsMock.mockReset();
     respondToListingApplicationMock.mockReset();
+    reloadMarketplaceMock.mockReset();
+    reloadMarketplaceMock.mockResolvedValue({
+      customListings: [listing],
+      listings: [listing],
+      applications: [],
+      crmLinkedListingIds: [],
+    });
     fetchListingApplicationsMock.mockImplementation(async () =>
       applicants.map((application) => ({ ...application })),
     );
@@ -185,6 +196,19 @@ describe("MarketplaceDetailContent applicant actions", () => {
         screen.queryByRole("button", { name: "Accept" }),
       ).not.toBeInTheDocument();
     });
+  });
+
+  it("shows total slots, slots left, accepted creators, and applicants", async () => {
+    const { MarketplaceDetailContent } = await import(
+      "./MarketplaceDetailContent"
+    );
+    render(<MarketplaceDetailContent />);
+
+    expect(await screen.findByText("Total slots")).toBeInTheDocument();
+    expect(screen.getByText("Slots left")).toBeInTheDocument();
+    expect(screen.getByText("Accepted creators")).toBeInTheDocument();
+    expect(screen.getByText("Applicants so far")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
   });
 
   it("rejects a pending application", async () => {

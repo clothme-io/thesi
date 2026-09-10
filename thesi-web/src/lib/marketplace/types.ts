@@ -93,6 +93,9 @@ export interface MarketplaceListing {
   location: string;
   remoteOk: boolean;
   slots: number;
+  totalSlots?: number;
+  acceptedCreatorsCount?: number;
+  slotsLeft?: number;
   applicantsCount: number;
   postedAt: string;
 }
@@ -199,6 +202,11 @@ export function normalizeMarketplaceListing(listing: MarketplaceListing): Market
       ? listing.productsProvided
       : [],
     creatorDisclosureEnabled: listing.creatorDisclosureEnabled ?? false,
+    totalSlots: listing.totalSlots ?? listing.slots,
+    acceptedCreatorsCount: listing.acceptedCreatorsCount ?? 0,
+    slotsLeft:
+      listing.slotsLeft ??
+      Math.max((listing.totalSlots ?? listing.slots) - (listing.acceptedCreatorsCount ?? 0), 0),
   };
 }
 
