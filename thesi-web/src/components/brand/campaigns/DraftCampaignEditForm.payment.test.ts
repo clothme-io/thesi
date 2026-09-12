@@ -1,3 +1,4 @@
+import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { describe, expect, it } from "vitest";
 import {
   draftFormFromCampaign,
@@ -24,6 +25,9 @@ function campaign(overrides: Partial<BrandCampaign> = {}): BrandCampaign {
       platforms: ["Instagram"],
     },
     files: [],
+    requiredTasks: [],
+    creatorBenefits: { ...EMPTY_CREATOR_BENEFITS },
+    productsProvided: [],
     payment: {
       model: "milestone",
       milestones: [

@@ -31,6 +31,7 @@ import {
 } from "@/lib/brand-campaigns/types";
 import { MilestoneBuilder } from "./MilestoneBuilder";
 import { HybridPaymentBuilder } from "./HybridPaymentBuilder";
+import { CommissionPaymentBuilder } from "./CommissionPaymentBuilder";
 import {
   calculatePlatformFeeCents,
   formatCents,
@@ -60,6 +61,7 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Flat Rate", value: "flat_rate" },
   { label: "Milestone", value: "milestone" },
   { label: "Royalty", value: "royalty" },
+  { label: "Base + Commission", value: "commission" },
   { label: "Hybrid", value: "hybrid" },
 ];
 
@@ -705,6 +707,16 @@ export function DraftCampaignEditForm({
                 rows={form.milestones}
                 onChange={(milestones) => onChange({ ...form, milestones })}
               />
+            </>
+          ) : form.paymentModel === "commission" ? (
+            <>
+              <CommissionPaymentBuilder
+                value={form.hybridPayment}
+                onChange={(next) => set("hybridPayment", next)}
+              />
+              <p className="workspace-hint">
+                Fee and budget estimates include only the fixed base; future commission is not included.
+              </p>
             </>
           ) : form.paymentModel === "hybrid" ? (
             <HybridPaymentBuilder

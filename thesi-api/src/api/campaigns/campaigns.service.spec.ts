@@ -1,3 +1,4 @@
+import { buildListingPayload } from '../marketplace/marketplace-listing.mapper';
 import {
   BadRequestException,
   ForbiddenException,
@@ -311,6 +312,32 @@ describe('CampaignsService', () => {
       connect as unknown as ConnectService,
       invites as never,
     );
+  });
+
+  it('round-trips commission terms into marketplace and blocks settlement through the legacy payout path', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const payment: UpsertCampaignDto['payment'] = {
+      model: 'commission',
+      hybrid: {
+        base: { enabled: true, amountCents: 20000, currency: 'USD', trigger: 'content_accepted' },
+        affiliate: { enabled: true, commissionType: 'percentage_of_platform_commission', commissionPercent: 10.25, currency: 'USD', attributionWindowDays: 30, terms: 'Net platform revenue excluding refunds. Paid monthly.' },
+      },
+    };
+    const campaign = await service.create('brand-1', sampleCampaign({ payment }));
+    expect((await service.get('brand-1', campaign.id)).payment).toEqual(payment);
+    expect(buildListingPayload(campaign, 'Brand').payment).toMatchObject({ structure: 'commission', hybrid: payment.hybrid, hybridFlatCents: 20000 });
+    const updated = await service.update('brand-1', campaign.id, sampleCampaign({ payment: { ...payment, notes: 'Updated note' } }));
+    expect(updated.payment.hybrid).toEqual(payment.hybrid);
+    await expect(service.payCreator('brand-1', campaign.id, { creatorUserId: 'creator-9' })).rejects.toThrow(/settlements are not available/);
+    expect(stripe.chargeOffSession).not.toHaveBeenCalled();
+    expect(stripe.createTransfer).not.toHaveBeenCalled();
+    await expect(service.update('brand-1', campaign.id, sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/base payment/i);
+  });
+
+  it('rejects incomplete commission terms before persisting a campaign', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    await expect(service.create('brand-1', sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/base payment/i);
+    expect(repository.rows).toHaveLength(0);
   });
 
   it('lists campaigns for a brand', async () => {

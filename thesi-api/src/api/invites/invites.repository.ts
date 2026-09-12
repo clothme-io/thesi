@@ -109,7 +109,7 @@ export interface InvitesRepository {
   findOwnedCampaign(
     brandUserId: string,
     campaignId: string,
-  ): Promise<{ id: string; name: string } | null>;
+  ): Promise<{ id: string; name: string; payment?: CampaignPaymentJson } | null>;
   listCampaignInvites(
     brandUserId: string,
     campaignId?: string,

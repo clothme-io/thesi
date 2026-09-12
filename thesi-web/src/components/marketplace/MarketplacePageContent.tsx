@@ -39,6 +39,7 @@ const PAYMENT_OPTIONS: Array<PaymentStructure | "all"> = [
   "milestone",
   "royalty",
   "hybrid",
+  "commission",
 ];
 
 const STATUS_OPTIONS: Array<MarketplaceListingStatus | "all"> = ["all", "open", "closing_soon", "closed"];

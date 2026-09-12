@@ -39,6 +39,9 @@ export function campaignPayoutCents(payment: CampaignPaymentForFee): number {
     case 'flat_rate':
     case 'royalty':
       return Math.max(0, payment.flatRateCents ?? 0);
+    // Configuration-only estimate: future sales commissions are not known yet.
+    case 'commission':
+      return Math.max(0, payment.hybrid?.base?.amountCents ?? 0);
     case 'hybrid': {
       const base = payment.hybrid?.base?.enabled
         ? payment.hybrid.base.amountCents ?? 0

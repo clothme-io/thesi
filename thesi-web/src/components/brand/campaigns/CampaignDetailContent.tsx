@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { toDateInputValue } from "@/lib/brand-campaigns/date";
+import { CommissionPaymentDetails } from "./CommissionPaymentDetails";
 import { paymentFormError } from "@/lib/brand-campaigns/payment-form";
 import {
   downloadCampaignFile,
@@ -874,10 +875,12 @@ export function CampaignDetailContent() {
                             <button
                               type="button"
                               className="inbox-btn-text"
-                              disabled={payingCreatorId === invite.creatorId}
+                              disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
                               onClick={() => void payCreator(invite.creatorId!)}
                             >
-                              {payingCreatorId === invite.creatorId
+                              {campaign.payment.model === "commission"
+                                ? "Commission payouts coming soon"
+                                : payingCreatorId === invite.creatorId
                                 ? "Paying…"
                                 : "Pay creator"}
                             </button>
@@ -901,6 +904,9 @@ export function CampaignDetailContent() {
                   <span>Budget</span>
                   <span>{getCampaignBudgetLabel(campaign)}</span>
                 </div>
+                {campaign.payment.model === "commission" && (
+                  <CommissionPaymentDetails payment={campaign.payment.hybrid} />
+                )}
                 {campaign.payment.milestones?.map((milestone) => (
                   <div className="crm-meta-row" key={milestone.id}>
                     <span>{milestone.label}</span>

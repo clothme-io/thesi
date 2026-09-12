@@ -1,3 +1,4 @@
+import { assertCommissionPayment } from './commission-payment';
 import {
   BadRequestException,
   ForbiddenException,
@@ -88,6 +89,7 @@ export class CampaignsService {
   }
 
   previewPlatformFee(payment: CampaignPaymentDto) {
+    assertCommissionPayment(payment);
     return previewPlatformFee(payment as CampaignPaymentForFee);
   }
 
@@ -110,6 +112,7 @@ export class CampaignsService {
     await this.requireBrand(userId);
     this.assertPublishReady(dto);
     const input = this.normalizeCampaignInput(dto);
+    assertCommissionPayment(input.payment);
     this.assertDateRange(input);
     const needsFee = this.requiresPlatformFee(input);
     const createDto = needsFee
@@ -142,6 +145,7 @@ export class CampaignsService {
     }
     this.assertPublishReady(dto, existing);
     const input = this.normalizeCampaignInput(dto, existing);
+    assertCommissionPayment(input.payment);
     this.assertDateRange(input);
     const acceptedCreatorCount =
       existing.status === 'active'
@@ -206,6 +210,10 @@ export class CampaignsService {
     const campaign = await this.campaigns.getByIdForOwner(userId, campaignId);
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
+    }
+
+    if (campaign.payment.model === 'commission') {
+      throw new BadRequestException('Base + Commission records payment terms only. Commission settlements are not available yet.');
     }
 
     const creatorUserId = input.creatorUserId.trim();

@@ -5,6 +5,7 @@ import { LandingHero } from "@/components/landing/LandingHero";
 import { LandingContrast } from "@/components/landing/LandingContrast";
 import { LandingEcosystem } from "@/components/landing/LandingEcosystem";
 import { LandingWhatCreatorsGet } from "@/components/landing/LandingWhatCreatorsGet";
+import { LandingCommission } from "@/components/landing/LandingCommission";
 import { LandingPhilosophy } from "@/components/landing/LandingPhilosophy";
 import { LandingPlatform } from "@/components/landing/LandingPlatform";
 import { LandingCurated } from "@/components/landing/LandingCurated";
@@ -25,6 +26,7 @@ export default function HomePage() {
         <LandingContrast />
         <LandingEcosystem />
         <LandingWhatCreatorsGet />
+        <LandingCommission />
         <LandingPhilosophy />
         <LandingPlatform />
         <LandingCurated />

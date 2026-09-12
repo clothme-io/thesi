@@ -40,7 +40,7 @@ export type CampaignMilestoneJson = {
 };
 
 export type CampaignPaymentJson = {
-  model: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid';
+  model: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid' | 'commission';
   flatRateCents?: number;
   milestoneStructure?: 'cumulative' | 'highest_achieved';
   milestones?: CampaignMilestoneJson[];

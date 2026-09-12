@@ -45,6 +45,7 @@ export const CAMPAIGN_PAYMENT_MODELS = [
   'milestone',
   'royalty',
   'hybrid',
+  'commission',
 ] as const;
 
 export const CAMPAIGN_MILESTONE_STRUCTURES = [

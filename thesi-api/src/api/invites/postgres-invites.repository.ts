@@ -61,6 +61,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .select({
         id: schema.campaign.id,
         name: schema.campaign.name,
+        payment: schema.campaign.payment,
       })
       .from(schema.campaign)
       .where(

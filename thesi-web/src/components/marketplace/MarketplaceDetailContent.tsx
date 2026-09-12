@@ -1,5 +1,9 @@
 "use client";
 
+import { CommissionPaymentDetails } from "@/components/brand/campaigns/CommissionPaymentDetails";
+import { commissionSummary } from "@/lib/brand-campaigns/commission";
+
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -44,7 +48,7 @@ type AcceptanceSnapshot = {
   campaignId: string;
   campaignName: string;
   paymentSnapshot: {
-    model: "flat_rate" | "milestone" | "royalty" | "hybrid";
+    model: "flat_rate" | "milestone" | "royalty" | "hybrid" | "commission";
     flatRateCents?: number;
     milestoneStructure?: "cumulative" | "highest_achieved";
     milestones?: Array<{
@@ -65,6 +69,7 @@ const CAMPAIGN_PAYMENT_LABELS: Record<AcceptanceSnapshot["paymentSnapshot"]["mod
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
+  commission: "Base + Commission",
 };
 
 function formatCents(cents = 0): string {
@@ -89,6 +94,8 @@ function formatAcceptedPayment(
     }
     case "royalty":
       return `${payment.royaltyPercent ?? 0}% royalty`;
+    case "commission":
+      return commissionSummary(payment.hybrid);
     case "hybrid":
       return formatHybridPaymentSummary({
         structure: "hybrid",
@@ -963,6 +970,9 @@ export function MarketplaceDetailContent() {
                     </div>
                   )}
                 </>
+              )}
+              {listing.payment.structure === "commission" && (
+                <CommissionPaymentDetails payment={acceptanceSnapshot?.paymentSnapshot.model === "commission" ? acceptanceSnapshot.paymentSnapshot.hybrid : listing.payment.hybrid} />
               )}
               {listing.payment.structure === "hybrid" && (
                 <HybridPaymentDetails payment={listing.payment} />

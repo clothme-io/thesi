@@ -16,7 +16,7 @@ import { thesiUser } from './userSchema';
 const thesiSchema = pgSchema('thesi');
 
 export type MarketplacePaymentJson = {
-  structure: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid';
+  structure: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid' | 'commission';
   currency: 'USD';
   flatAmountCents?: number;
   milestoneStructure?: 'cumulative' | 'highest_achieved';

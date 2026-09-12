@@ -166,6 +166,7 @@ export class InboxService {
       campaignId: string;
       campaignName: string;
       brandName: string;
+      paymentTerms?: string;
       external: boolean;
     },
   ): Promise<{ delivered: boolean }> {
@@ -193,7 +194,7 @@ export class InboxService {
       senderUserId: brandUserId,
       recipientUserId: creator.id,
       subject: `Campaign invite: ${input.campaignName}`,
-      content: `${input.brandName} invited you to collaborate on "${input.campaignName}". Open this thread to reply or ask questions about the campaign brief.`,
+      content: `${input.brandName} invited you to collaborate on "${input.campaignName}". Open this thread to reply or ask questions about the campaign brief.${input.paymentTerms ? `\n\n${input.paymentTerms}` : ""}`,
       kind: 'invite',
       campaignId: input.campaignId,
     });

@@ -1,3 +1,4 @@
+import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -25,6 +26,9 @@ function campaign(): BrandCampaign {
       platforms: ["Instagram"],
     },
     files: [],
+    requiredTasks: [],
+    creatorBenefits: { ...EMPTY_CREATOR_BENEFITS },
+    productsProvided: [],
     payment: {
       model: "flat_rate",
       flatRateCents: 20000,
@@ -52,6 +56,7 @@ describe("DraftCampaignEditForm field handles", () => {
         onChange={onChange}
         pendingFiles={[]}
         onPendingFiles={vi.fn()}
+        onDeleteFile={vi.fn()}
       />,
     );
 
