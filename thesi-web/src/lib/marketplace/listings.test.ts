@@ -1,3 +1,4 @@
+import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { describe, expect, it } from "vitest";
 import {
   canCreatorApplyToListing,
@@ -23,6 +24,9 @@ const baseListing: MarketplaceListing = {
   exampleVideoLinks: [],
   requirements: [],
   files: [],
+    requiredTasks: [],
+    creatorBenefits: { ...EMPTY_CREATOR_BENEFITS },
+    productsProvided: [],
   payment: { structure: "flat_rate", currency: "USD", flatAmountCents: 50000 },
   location: "Remote",
   remoteOk: true,

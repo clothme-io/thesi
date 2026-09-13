@@ -31,6 +31,7 @@ export type NovuWorkflowEvent =
     }
   | {
       type: 'campaign_invite';
+      paymentTerms?: string;
       toEmail: string;
       subscriberId: string;
       creatorName: string;
@@ -256,6 +257,7 @@ export class NovuService {
           brandName: event.brandName,
           campaignName: event.campaignName,
           campaignTitle: event.campaignName,
+          ...(event.paymentTerms ? { paymentTerms: event.paymentTerms } : {}),
           campaignId: event.campaignId,
           inviteId: event.inviteId,
           external: event.external,

@@ -1,3 +1,4 @@
+import { commissionInviteTerms } from '../campaigns/commission-payment';
 import {
   BadRequestException,
   ConflictException,
@@ -188,6 +189,7 @@ export class InvitesService {
 
     const owned = await this.invites.findOwnedCampaign(userId, campaignId);
     const campaignName = owned?.name?.trim() || input.campaignName.trim();
+    const paymentTerms = owned?.payment?.model === 'commission' ? commissionInviteTerms(owned.payment) : undefined;
     const brandName = input.brandName.trim() || user.fullName;
 
     let creatorUserId = input.creatorId?.trim() || null;
@@ -225,6 +227,7 @@ export class InvitesService {
         campaignId: invite.campaignId,
         campaignName: invite.campaignName,
         brandName: invite.brandName,
+        ...(paymentTerms ? { paymentTerms } : {}),
         external: false,
       });
     }
@@ -232,6 +235,7 @@ export class InvitesService {
     try {
       const transactionId = await this.novu.trigger({
         type: 'campaign_invite',
+        ...(paymentTerms ? { paymentTerms } : {}),
         toEmail: invite.creatorEmail,
         subscriberId: invite.creatorId ?? `email:${invite.creatorEmail}`,
         creatorName: invite.creatorName,

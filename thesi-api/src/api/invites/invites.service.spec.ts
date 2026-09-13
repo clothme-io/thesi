@@ -1,3 +1,4 @@
+import type { CampaignPaymentJson } from 'src/dbConfig/drizzle/schema';
 import {
   ConflictException,
   ForbiddenException,
@@ -17,7 +18,7 @@ import { InvitesService } from './invites.service';
 
 class FakeInvitesRepository implements InvitesRepository {
   users = new Map<string, InviteUser>();
-  campaigns = new Map<string, { id: string; name: string; ownerUserId: string }>();
+  campaigns = new Map<string, { id: string; name: string; ownerUserId: string; payment?: CampaignPaymentJson }>();
   campaignInvites: CampaignInviteRecord[] = [];
   platformInvites: PlatformBrandInviteRecord[] = [];
   acceptanceSnapshots: CreateAcceptanceSnapshotInput[] = [];
@@ -37,7 +38,7 @@ class FakeInvitesRepository implements InvitesRepository {
   async findOwnedCampaign(brandUserId: string, campaignId: string) {
     const campaign = this.campaigns.get(campaignId);
     if (!campaign || campaign.ownerUserId !== brandUserId) return null;
-    return { id: campaign.id, name: campaign.name };
+    return { id: campaign.id, name: campaign.name, payment: campaign.payment };
   }
 
   async listCampaignInvites(brandUserId: string, campaignId?: string) {
@@ -316,6 +317,23 @@ describe('InvitesService', () => {
       novu as unknown as NovuService,
       creatorCrm as never,
     );
+  });
+
+  it('includes commission terms from the owned campaign in invitation delivery', async () => {
+    repository.campaigns.get('camp-1')!.payment = {
+      model: 'commission', hybrid: {
+        base: { enabled: true, amountCents: 20000, currency: 'USD', trigger: 'content_accepted' },
+        affiliate: { enabled: true, commissionType: 'percentage_of_sale', commissionPercent: 10, currency: 'USD', attributionWindowDays: 30, terms: 'Excludes refunded sales. Settled monthly.' },
+      },
+    };
+    await service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1', campaignName: 'Summer Drop', brandName: 'Acme',
+      creatorId: 'creator-1', creatorEmail: 'creator@example.com', creatorName: 'Alex Creator', external: false,
+    });
+    const terms = inbox.deliverCampaignInvite.mock.calls[0][1].paymentTerms;
+    expect(terms).toContain('$200.00 base per creator + 10% of eligible sales');
+    expect(terms).toContain('Excludes refunded sales. Settled monthly.');
+    expect(novu.trigger).toHaveBeenCalledWith(expect.objectContaining({ paymentTerms: terms }));
   });
 
   it('creates an internal campaign invite, delivers inbox, and triggers Novu', async () => {

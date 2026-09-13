@@ -1,3 +1,4 @@
+import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,6 +30,9 @@ function buildCampaign(
       platforms: ["TikTok"],
     },
     files: [],
+    requiredTasks: [],
+    creatorBenefits: { ...EMPTY_CREATOR_BENEFITS },
+    productsProvided: [],
     payment: { model: "flat_rate", flatRateCents: 50000 },
     postToMarketplace: true,
     createdAt: "2026-07-01T00:00:00.000Z",

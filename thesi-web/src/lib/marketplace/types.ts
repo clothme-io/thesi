@@ -1,3 +1,4 @@
+import { commissionSummary } from "@/lib/brand-campaigns/commission";
 import type { BrandCampaignGoalType } from "@/lib/brand-campaigns/types";
 import type { BrandCampaignHybridPayment } from "@/lib/brand-campaigns/types";
 
@@ -9,7 +10,7 @@ export type MarketplaceListingType =
   | "mixed_bundle"
   | "long_form";
 
-export type PaymentStructure = "flat_rate" | "milestone" | "royalty" | "hybrid";
+export type PaymentStructure = "flat_rate" | "milestone" | "royalty" | "hybrid" | "commission";
 export type MilestoneStructure = "cumulative" | "highest_achieved";
 
 export type MarketplaceListingStatus = "open" | "closing_soon" | "closed";
@@ -149,6 +150,7 @@ export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
+  commission: "Base + Commission",
 };
 
 export const EMPTY_LISTING_CREATOR_BENEFITS: MarketplaceListing["creatorBenefits"] = {
@@ -238,6 +240,8 @@ export function formatListingPayment(payment: MarketplacePayment): string {
     }
     case "royalty":
       return `${payment.royaltyPercent}% royalty${payment.royaltyMinimumCents ? ` · min ${formatCents(payment.royaltyMinimumCents)}` : ""}`;
+    case "commission":
+      return commissionSummary(payment.hybrid);
     case "hybrid":
       return formatHybridPaymentSummary(payment);
     default:

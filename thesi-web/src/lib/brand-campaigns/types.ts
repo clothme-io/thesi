@@ -1,3 +1,4 @@
+import { commissionSummary } from "@/lib/brand-campaigns/commission";
 export type BrandCampaignGoalType =
   | "experience"
   | "growth"
@@ -14,7 +15,7 @@ export type BrandCampaignType =
   | "long_form";
 
 export type BrandCampaignStatus = "draft" | "active" | "paused" | "completed";
-export type BrandCampaignPaymentModel = "flat_rate" | "milestone" | "royalty" | "hybrid";
+export type BrandCampaignPaymentModel = "flat_rate" | "milestone" | "royalty" | "hybrid" | "commission";
 export type BrandCampaignMilestoneStructure =
   | "cumulative"
   | "highest_achieved";
@@ -234,6 +235,7 @@ export const BRAND_CAMPAIGN_PAYMENT_LABELS: Record<BrandCampaignPaymentModel, st
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
+  commission: "Base + Commission",
 };
 
 export const EMPTY_CREATOR_BENEFITS: BrandCampaignCreatorBenefits = {
@@ -274,6 +276,8 @@ export function getCampaignBudgetLabel(campaign: BrandCampaign): string {
     }
     case "royalty":
       return `${payment.royaltyPercent ?? 0}% royalty`;
+    case "commission":
+      return commissionSummary(payment.hybrid);
     case "hybrid": {
       const base = payment.hybrid?.base?.enabled
         ? payment.hybrid.base.amountCents ?? 0

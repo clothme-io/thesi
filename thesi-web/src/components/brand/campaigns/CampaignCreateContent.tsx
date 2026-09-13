@@ -32,6 +32,7 @@ import { EMPTY_CONTENT_RIGHTS, EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campai
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { MilestoneBuilder } from "./MilestoneBuilder";
 import { HybridPaymentBuilder } from "./HybridPaymentBuilder";
+import { CommissionPaymentBuilder } from "./CommissionPaymentBuilder";
 import {
   BRAND_CAMPAIGN_GOAL_TYPE_LABELS,
   BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
@@ -66,6 +67,7 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Flat Rate", value: "flat_rate" },
   { label: "Milestone", value: "milestone" },
   { label: "Royalty", value: "royalty" },
+  { label: "Base + Commission", value: "commission" },
   { label: "Hybrid", value: "hybrid" },
 ];
 
@@ -889,6 +891,13 @@ export function CampaignCreateContent() {
                     </div>
                   </div>
                   <MilestoneBuilder rows={milestones} onChange={setMilestones} />
+                </>
+              ) : paymentModel === "commission" ? (
+                <>
+                  <CommissionPaymentBuilder value={hybridPayment} onChange={setHybridPayment} />
+                  <p className="workspace-hint">
+                    Fee and budget estimates include only the fixed base; future commission is not included.
+                  </p>
                 </>
               ) : paymentModel === "hybrid" ? (
                 <HybridPaymentBuilder

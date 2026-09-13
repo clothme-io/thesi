@@ -1,3 +1,4 @@
+import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
 import { describe, expect, it } from "vitest";
 import type { BrandCampaign } from "./types";
 import {
@@ -24,6 +25,9 @@ function campaign(overrides: Partial<BrandCampaign> = {}): BrandCampaign {
       platforms: ["TikTok"],
     },
     files: [],
+    requiredTasks: [],
+    creatorBenefits: { ...EMPTY_CREATOR_BENEFITS },
+    productsProvided: [],
     payment: { model: "flat_rate", flatRateCents: 0 },
     postToMarketplace: true,
     createdAt: "2026-08-14T00:00:00.000Z",

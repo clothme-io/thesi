@@ -347,6 +347,25 @@ export function paymentFormError(
   milestones: MilestoneFormRow[],
   hybrid?: HybridPaymentFormState,
 ): string | null {
+  if (model === "commission") {
+    if (!hybrid) return "Configure the base payment and commission.";
+    if (!/^\$?\d+(?:\.\d{1,2})?$/.test(hybrid.baseAmount.trim()) || parseMoneyToCents(hybrid.baseAmount) <= 0 || parseMoneyToCents(hybrid.baseAmount) > 2_147_483_647) {
+      return "Enter a positive base payment with at most two decimal places.";
+    }
+    const rate = Number(hybrid.affiliatePercent);
+    if (!/^\d+(?:\.\d{1,2})?$/.test(hybrid.affiliatePercent.trim()) || rate <= 0 || rate > 100) {
+      return "Enter a commission rate greater than 0 and no more than 100%, with at most two decimal places.";
+    }
+    if (!["percentage_of_sale", "percentage_of_platform_commission"].includes(hybrid.affiliateType)) {
+      return "Choose eligible sales or platform commission as the commission base.";
+    }
+    if (!/^\d+$/.test(hybrid.affiliateAttributionDays.trim()) || Number(hybrid.affiliateAttributionDays) < 1 || Number(hybrid.affiliateAttributionDays) > 365) {
+      return "Enter an attribution window between 1 and 365 days.";
+    }
+    if (hybrid.baseTrigger === "custom" && !hybrid.baseCustomTrigger.trim()) return "Describe when the base payment is earned.";
+    if (!hybrid.affiliateTerms.trim()) return "Describe eligible sales, refunds, and the settlement schedule.";
+    return null;
+  }
   if (model === "hybrid") {
     if (!hybrid) return "Configure at least one hybrid compensation component.";
     if (
@@ -384,6 +403,7 @@ export function formPayoutCents(
   milestoneStructure: BrandCampaignMilestoneStructure = DEFAULT_MILESTONE_STRUCTURE,
   hybrid?: HybridPaymentFormState,
 ): number {
+  if (model === "commission") return hybrid ? parseMoneyToCents(hybrid.baseAmount) : 0;
   if (model === "hybrid" && hybrid) return hybridPayoutCents(hybrid);
   if (model === "milestone") {
     const amounts = completeMilestoneRows(milestones).map(
@@ -411,6 +431,20 @@ export function buildCampaignPayment(input: {
       model: "milestone",
       milestoneStructure: input.milestoneStructure,
       milestones: completeMilestoneRows(input.milestones),
+      ...(notes ? { notes } : {}),
+    };
+  }
+  if (input.model === "commission") {
+    const form = input.hybrid ?? defaultHybridPaymentForm();
+    const error = paymentFormError("commission", [], form);
+    if (error) throw new Error(error);
+    const hybrid = completeHybridPayment(form);
+    return {
+      model: "commission",
+      hybrid: {
+        base: { ...hybrid.base!, enabled: true },
+        affiliate: { ...hybrid.affiliate!, enabled: true, fixedAmountCents: undefined },
+      },
       ...(notes ? { notes } : {}),
     };
   }
