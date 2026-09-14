@@ -1,3 +1,4 @@
+import { workspaceContext } from '../brand-workspaces/workspace-context';
 import {
   ForbiddenException,
   Inject,
@@ -340,6 +341,21 @@ export class BillingService {
     paymentMethodId: string;
     stripeConfigured: boolean;
   } | null> {
+    const workspace = workspaceContext.getStore();
+    if (workspace && (workspace.isDefault === false || workspace.role !== 'owner' || workspace.actorUserId !== userId)) {
+      throw new ForbiddenException('Billing for this brand must be explicitly configured before charging');
+    }
+    return this.resolveOwnerChargeContext(userId);
+  }
+
+  /** Explicit campaign deposit authorization, restricted to the selected workspace owner. */
+  async resolveCampaignFundingChargeContext(userId:string,workspaceId:string) {
+    const w=workspaceContext.getStore();
+    if(!w||w.workspaceId!==workspaceId||w.actorUserId!==userId||w.role!=='owner') throw new ForbiddenException('Only the selected workspace owner can fund a campaign');
+    return this.resolveOwnerChargeContext(userId);
+  }
+
+  private async resolveOwnerChargeContext(userId:string) {
     await this.requireBrand(userId);
     const profile =
       (await this.billing.getProfile(userId)) ??

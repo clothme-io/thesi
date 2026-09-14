@@ -1,3 +1,4 @@
+import { workspaceResourceOwner } from '../brand-workspaces/workspace-context';
 import {
   Body,
   Controller,
@@ -32,7 +33,7 @@ export class InboxController {
   @Get()
   @ApiOperation({ summary: 'Get inbox contacts, messages, and notifications' })
   async getInbox(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.inbox.getInbox(user.sub);
+    const data = await this.inbox.getInbox(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -43,7 +44,7 @@ export class InboxController {
     @Body() dto: SendInboxReplyDto,
   ) {
     const data = await this.inbox.sendReply(
-      user.sub,
+      workspaceResourceOwner(user.sub),
       dto.contactId,
       dto.subject,
       dto.content,
@@ -57,7 +58,7 @@ export class InboxController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    await this.inbox.markContactRead(user.sub, id);
+    await this.inbox.markContactRead(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data: { read: true } };
   }
 
@@ -67,7 +68,7 @@ export class InboxController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    await this.inbox.deleteMessage(user.sub, id);
+    await this.inbox.deleteMessage(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data: { deleted: true } };
   }
 
@@ -77,14 +78,14 @@ export class InboxController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: CreateSelfNotificationDto,
   ) {
-    const data = await this.inbox.notifySelf(user.sub, dto);
+    const data = await this.inbox.notifySelf(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.CREATED, error: null, data };
   }
 
   @Post('notifications/read-all')
   @ApiOperation({ summary: 'Mark all notifications as read' })
   async markAllNotificationsRead(@CurrentUser() user: AuthJwtPayload) {
-    await this.inbox.markAllNotificationsRead(user.sub);
+    await this.inbox.markAllNotificationsRead(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data: { read: true } };
   }
 
@@ -94,7 +95,7 @@ export class InboxController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    await this.inbox.markNotificationRead(user.sub, id);
+    await this.inbox.markNotificationRead(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data: { read: true } };
   }
 
@@ -106,7 +107,7 @@ export class InboxController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: DeliverCampaignInviteDto,
   ) {
-    const data = await this.inbox.deliverCampaignInvite(user.sub, dto);
+    const data = await this.inbox.deliverCampaignInvite(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.OK, error: null, data };
   }
 }

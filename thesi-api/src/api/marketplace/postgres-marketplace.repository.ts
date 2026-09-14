@@ -1,3 +1,4 @@
+import { workspaceWrite, workspaceFilter, brandProfileFilter } from '../brand-workspaces/workspace-context';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -40,7 +41,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     const [profile] = await this.db
       .select({ companyName: schema.brandProfile.companyName })
       .from(schema.brandProfile)
-      .where(eq(schema.brandProfile.userId, userId))
+      .where(brandProfileFilter(schema.brandProfile, sql`${schema.brandProfile.userId}`, userId))
       .limit(1);
     if (profile?.companyName) return profile.companyName;
     const user = await this.getUser(userId);
@@ -54,6 +55,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     const [row] = await this.db
       .insert(schema.marketplaceListing)
       .values({
+        ...workspaceWrite(),
         campaignId: input.campaign.id,
         ownerUserId: input.ownerUserId,
         ...payload,
@@ -77,13 +79,14 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
   async deleteListingByCampaignId(campaignId: string): Promise<void> {
     await this.db
       .delete(schema.marketplaceListing)
-      .where(eq(schema.marketplaceListing.campaignId, campaignId));
+      .where(and(workspaceFilter(schema.marketplaceListing), eq(schema.marketplaceListing.campaignId, campaignId)));
   }
 
   async listAll(): Promise<MarketplaceListingRecord[]> {
     const rows = await this.db
       .select()
       .from(schema.marketplaceListing)
+      .where(workspaceFilter(schema.marketplaceListing))
       .orderBy(desc(schema.marketplaceListing.postedAt));
     return Promise.all(
       rows.map(async (row) =>
@@ -100,7 +103,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     const rows = await this.db
       .select()
       .from(schema.marketplaceListing)
-      .where(eq(schema.marketplaceListing.ownerUserId, ownerUserId))
+      .where(and(workspaceFilter(schema.marketplaceListing), eq(schema.marketplaceListing.ownerUserId, ownerUserId)))
       .orderBy(desc(schema.marketplaceListing.postedAt));
     return Promise.all(
       rows.map(async (row) =>
@@ -117,7 +120,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     const [row] = await this.db
       .select()
       .from(schema.marketplaceListing)
-      .where(eq(schema.marketplaceListing.id, listingId))
+      .where(and(workspaceFilter(schema.marketplaceListing), eq(schema.marketplaceListing.id, listingId)))
       .limit(1);
     return row
       ? this.mapListing(
@@ -152,10 +155,10 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
             schema.campaignFile.campaignId,
             schema.marketplaceListing.campaignId,
           ),
-          eq(schema.campaignFile.id, fileId),
+          and(workspaceFilter(schema.campaignFile), eq(schema.campaignFile.id, fileId)),
         ),
       )
-      .where(eq(schema.marketplaceListing.id, listingId))
+      .where(and(workspaceFilter(schema.marketplaceListing), eq(schema.marketplaceListing.id, listingId)))
       .limit(1);
 
     return row
@@ -393,7 +396,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       .from(schema.campaignInvite)
       .where(
         and(
-          eq(schema.campaignInvite.campaignId, campaignId),
+          and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.campaignId, campaignId)),
           eq(schema.campaignInvite.status, 'accepted'),
         ),
       );

@@ -1,4 +1,9 @@
+import { MerchantAccessModule } from './shared/auth/merchant-access.module';
+import { CommissionEarningsModule } from './api/commission-earnings/commission-earnings.module';
+import { CreatorTrackingModule } from './api/creator-tracking/creator-tracking.module';
+import { MerchantLinksModule } from './api/merchant-links/merchant-links.module';
 import { Module } from '@nestjs/common';
+import { BrandWorkspacesModule } from './api/brand-workspaces/brand-workspaces.module';
 import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from './dbConfig/drizzle/drizzle.module';
 import { AuthModule } from './api/auth/auth.module';
@@ -26,12 +31,17 @@ import { StripeModule } from './shared/stripe/stripe.module';
 
 @Module({
   imports: [
+    CreatorTrackingModule,
+    CommissionEarningsModule,
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     DrizzleModule,
+    MerchantAccessModule,
     EmailModule,
     NovuModule,
     StripeModule,
     AuthModule,
+    BrandWorkspacesModule,
+    MerchantLinksModule,
     CreatorApplicationsModule,
     ProfilesModule,
     SettingsModule,

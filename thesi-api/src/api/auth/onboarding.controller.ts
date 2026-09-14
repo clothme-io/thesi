@@ -33,7 +33,7 @@ export class OnboardingController {
   async completeWelcome(
     @CurrentUser() user: AuthJwtPayload,
   ): Promise<AuthResponse> {
-    const data = await this.authService.completeWelcome(user.sub);
+    const data = await this.authService.completeWelcome(user.sub, user.merchantSessionId);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -47,7 +47,7 @@ export class OnboardingController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: OnboardingAnswersDto,
   ): Promise<AuthResponse> {
-    const data = await this.authService.submitOnboarding(user.sub, dto);
+    const data = await this.authService.submitOnboarding(user.sub, dto, user.merchantSessionId);
     return { status: HttpStatus.OK, error: null, data };
   }
 }

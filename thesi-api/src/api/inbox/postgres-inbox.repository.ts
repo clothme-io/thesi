@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { workspaceContext, workspaceFilter, workspaceCampaignFilter, workspaceThreadFilter } from '../brand-workspaces/workspace-context';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
@@ -52,13 +53,14 @@ export class PostgresInboxRepository implements InboxRepository {
     return this.db
       .select({
         id: schema.inboxThread.id,
+        workspaceId: schema.inboxThread.workspaceId,
         brandUserId: schema.inboxThread.brandUserId,
         creatorUserId: schema.inboxThread.creatorUserId,
       })
       .from(schema.inboxThread)
       .where(
         or(
-          eq(schema.inboxThread.brandUserId, userId),
+          and(workspaceFilter(schema.inboxThread), eq(schema.inboxThread.brandUserId, userId)),
           eq(schema.inboxThread.creatorUserId, userId),
         ),
       )
@@ -69,15 +71,16 @@ export class PostgresInboxRepository implements InboxRepository {
     const [thread] = await this.db
       .select({
         id: schema.inboxThread.id,
+        workspaceId: schema.inboxThread.workspaceId,
         brandUserId: schema.inboxThread.brandUserId,
         creatorUserId: schema.inboxThread.creatorUserId,
       })
       .from(schema.inboxThread)
       .where(
         and(
-          eq(schema.inboxThread.id, threadId),
+          and(workspaceFilter(schema.inboxThread), eq(schema.inboxThread.id, threadId)),
           or(
-            eq(schema.inboxThread.brandUserId, userId),
+            and(workspaceFilter(schema.inboxThread), eq(schema.inboxThread.brandUserId, userId)),
             eq(schema.inboxThread.creatorUserId, userId),
           ),
         ),
@@ -86,17 +89,32 @@ export class PostgresInboxRepository implements InboxRepository {
     return thread ?? null;
   }
 
-  async ensureThread(brandUserId: string, creatorUserId: string) {
+  async ensureThread(brandUserId: string, creatorUserId: string, campaignId?: string) {
+    let workspaceId = workspaceContext.getStore()?.workspaceId;
+    if (campaignId) {
+      const [campaign] = await this.db.select({ workspaceId: schema.campaign.workspaceId }).from(schema.campaign)
+        .where(and(eq(schema.campaign.id, campaignId), eq(schema.campaign.ownerUserId, brandUserId), workspaceFilter(schema.campaign))).limit(1);
+      if (!campaign?.workspaceId) throw new NotFoundException('Campaign not available');
+      workspaceId = campaign.workspaceId;
+    }
+    if (!workspaceId) {
+      const [workspace] = await this.db.select({ id: schema.brandWorkspace.id }).from(schema.brandWorkspace)
+        .where(eq(schema.brandWorkspace.legacyOwnerUserId, brandUserId)).limit(1);
+      if (!workspace) throw new NotFoundException('Workspace not available');
+      workspaceId = workspace.id;
+    }
+    const threadScope = eq(schema.inboxThread.workspaceId, workspaceId);
     const [existing] = await this.db
       .select({
         id: schema.inboxThread.id,
+        workspaceId: schema.inboxThread.workspaceId,
         brandUserId: schema.inboxThread.brandUserId,
         creatorUserId: schema.inboxThread.creatorUserId,
       })
       .from(schema.inboxThread)
       .where(
         and(
-          eq(schema.inboxThread.brandUserId, brandUserId),
+          and(threadScope, eq(schema.inboxThread.brandUserId, brandUserId)),
           eq(schema.inboxThread.creatorUserId, creatorUserId),
         ),
       )
@@ -105,16 +123,22 @@ export class PostgresInboxRepository implements InboxRepository {
 
     const [created] = await this.db
       .insert(schema.inboxThread)
-      .values({ brandUserId, creatorUserId })
+      .values({ brandUserId, creatorUserId, workspaceId })
+      .onConflictDoNothing()
       .returning({
         id: schema.inboxThread.id,
+        workspaceId: schema.inboxThread.workspaceId,
         brandUserId: schema.inboxThread.brandUserId,
         creatorUserId: schema.inboxThread.creatorUserId,
       });
-    return created;
+    if (created) return created;
+    const [concurrent] = await this.db.select({ id: schema.inboxThread.id, brandUserId: schema.inboxThread.brandUserId, creatorUserId: schema.inboxThread.creatorUserId })
+      .from(schema.inboxThread).where(and(threadScope, eq(schema.inboxThread.brandUserId, brandUserId), eq(schema.inboxThread.creatorUserId, creatorUserId))).limit(1);
+    if (!concurrent) throw new Error('Conversation creation conflict');
+    return concurrent;
   }
 
-  async getContactDisplay(viewerUserId: string, peerUserId: string) {
+  async getContactDisplay(viewerUserId: string, peerUserId: string, workspaceId?: string | null) {
     const peer = await this.getUser(peerUserId);
     if (!peer) {
       return { name: 'Unknown', email: '' };
@@ -124,12 +148,12 @@ export class PostgresInboxRepository implements InboxRepository {
       const [profile] = await this.db
         .select({ companyName: schema.brandProfile.companyName })
         .from(schema.brandProfile)
-        .where(eq(schema.brandProfile.userId, peerUserId))
+        .where(workspaceId ? eq(schema.brandProfile.workspaceId, workspaceId) : eq(schema.brandProfile.userId, peerUserId))
         .limit(1);
       const company =
         profile?.companyName || peer.companyName || peer.fullName;
       return {
-        name: peer.fullName,
+        name: company,
         email: peer.email,
         company,
         brandId: peerUserId,
@@ -170,7 +194,7 @@ export class PostgresInboxRepository implements InboxRepository {
           eq(schema.inboxMessageState.userId, userId),
         ),
       )
-      .where(eq(schema.inboxMessageState.deleted, false))
+      .where(and(eq(schema.inboxMessageState.deleted, false), workspaceThreadFilter(sql`${schema.inboxMessage.threadId}`)))
       .orderBy(asc(schema.inboxMessage.createdAt));
 
     return rows.map((row) => ({
@@ -217,7 +241,7 @@ export class PostgresInboxRepository implements InboxRepository {
     await this.db
       .update(schema.inboxThread)
       .set({ updatedAt: new Date() })
-      .where(eq(schema.inboxThread.id, input.threadId));
+      .where(and(workspaceFilter(schema.inboxThread), eq(schema.inboxThread.id, input.threadId)));
 
     return {
       id: message.id,
@@ -241,6 +265,7 @@ export class PostgresInboxRepository implements InboxRepository {
         AND message.thread_id = ${threadId}::uuid
         AND message.sender_user_id <> ${userId}
         AND state.deleted = false
+        AND ${workspaceThreadFilter(sql`message.thread_id`)}
     `);
   }
 
@@ -252,6 +277,9 @@ export class PostgresInboxRepository implements InboxRepository {
         and(
           eq(schema.inboxMessageState.messageId, messageId),
           eq(schema.inboxMessageState.userId, userId),
+          sql`EXISTS (SELECT 1 FROM thesi.inbox_message AS scoped_message
+            WHERE scoped_message.id = ${schema.inboxMessageState.messageId}
+            AND ${workspaceThreadFilter(sql`scoped_message.thread_id`)})`,
         ),
       )
       .returning({ messageId: schema.inboxMessageState.messageId });
@@ -264,7 +292,7 @@ export class PostgresInboxRepository implements InboxRepository {
     const rows = await this.db
       .select()
       .from(schema.inboxNotification)
-      .where(eq(schema.inboxNotification.userId, userId))
+      .where(and(eq(schema.inboxNotification.userId, userId), notificationWorkspaceFilter()))
       .orderBy(desc(schema.inboxNotification.createdAt));
     return rows.map(mapNotification);
   }
@@ -298,6 +326,7 @@ export class PostgresInboxRepository implements InboxRepository {
         and(
           eq(schema.inboxNotification.id, notificationId),
           eq(schema.inboxNotification.userId, userId),
+          notificationWorkspaceFilter(),
         ),
       )
       .returning({ id: schema.inboxNotification.id });
@@ -308,8 +337,13 @@ export class PostgresInboxRepository implements InboxRepository {
     await this.db
       .update(schema.inboxNotification)
       .set({ read: true })
-      .where(eq(schema.inboxNotification.userId, userId));
+      .where(and(eq(schema.inboxNotification.userId, userId), notificationWorkspaceFilter()));
   }
+}
+
+function notificationWorkspaceFilter() {
+  // Notifications without a campaign are personal account notifications.
+  return sql`(${schema.inboxNotification.campaignId} IS NULL OR ${workspaceCampaignFilter(sql`${schema.inboxNotification.campaignId}`)})`;
 }
 
 function mapNotification(

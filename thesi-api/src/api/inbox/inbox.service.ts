@@ -36,7 +36,7 @@ export class InboxService {
         thread.brandUserId === userId
           ? thread.creatorUserId
           : thread.brandUserId;
-      const display = await this.inbox.getContactDisplay(userId, peerId);
+      const display = await this.inbox.getContactDisplay(userId, peerId, thread.workspaceId);
       contacts.push({
         id: thread.id,
         name: display.name,
@@ -188,7 +188,7 @@ export class InboxService {
       throw new NotFoundException('Creator account not found for invite delivery');
     }
 
-    const thread = await this.inbox.ensureThread(brandUserId, creator.id);
+    const thread = await this.inbox.ensureThread(brandUserId, creator.id, input.campaignId);
     await this.inbox.createMessage({
       threadId: thread.id,
       senderUserId: brandUserId,
@@ -231,6 +231,7 @@ export class InboxService {
     const thread = await this.inbox.ensureThread(
       input.brandUserId,
       creatorUserId,
+      input.campaignId,
     );
     await this.inbox.createMessage({
       threadId: thread.id,

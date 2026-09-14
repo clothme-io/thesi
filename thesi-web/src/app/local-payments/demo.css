@@ -1,0 +1,14 @@
+.local-payments-demo {color:#18394b;background:#f8fafc;min-height:100vh;line-height:1.6}
+.local-payments-demo h1 {font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1.15;margin:8px 0 12px}
+.local-payments-demo h2 {font-size:23px;font-weight:650;line-height:1.3;margin:0 0 12px}
+.local-payments-demo h3 {font-size:19px;font-weight:650;margin:0 0 16px}
+.local-payments-demo p {margin:8px 0 12px}
+.local-payments-demo > section {background:white}
+.local-payments-demo button {font-size:14px;font-weight:600;padding:9px 13px;border-radius:8px;cursor:pointer;margin:3px 3px 3px 0;line-height:1.4}
+.local-payments-demo button:not(.crm-btn-primary) {background:#fff;border:1px solid #b9ccd6;color:#164f6b}
+.local-payments-demo button:hover:not(:disabled) {filter:brightness(.96)}
+.local-payments-demo button:disabled {opacity:.38;cursor:not-allowed}
+.local-payments-demo a {font-size:14px;text-decoration:underline;text-underline-offset:3px;align-self:center}
+.local-payments-demo details {padding:14px;background:#f4f7f9;border-radius:8px;margin:16px 0}
+.local-payments-demo summary {cursor:pointer;font-size:14px;font-weight:600}
+@media(max-width:640px){.local-payments-demo h1{font-size:27px}.local-payments-demo>header{flex-direction:column;align-items:flex-start!important}.local-payments-demo>section{padding:16px!important}.local-payments-demo .workspace-section{padding:16px!important}}

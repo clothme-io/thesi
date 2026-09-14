@@ -1,3 +1,4 @@
+import { workspaceResourceOwner } from '../brand-workspaces/workspace-context';
 import {
   Body,
   Controller,
@@ -29,7 +30,7 @@ export class MarketplaceController {
   @Get()
   @ApiOperation({ summary: 'Get marketplace listings and creator application state' })
   async getMarketplace(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.marketplace.getMarketplace(user.sub);
+    const data = await this.marketplace.getMarketplace(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -39,7 +40,7 @@ export class MarketplaceController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.marketplace.getListing(user.sub, id);
+    const data = await this.marketplace.getListing(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -52,7 +53,7 @@ export class MarketplaceController {
     @Res() res: Response,
   ) {
     const file = await this.marketplace.downloadListingFile(
-      user.sub,
+      workspaceResourceOwner(user.sub),
       id,
       fileId,
     );
@@ -72,7 +73,7 @@ export class MarketplaceController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.marketplace.listListingApplications(user.sub, id);
+    const data = await this.marketplace.listListingApplications(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -87,7 +88,7 @@ export class MarketplaceController {
     @Body() dto: RespondToApplicationDto,
   ) {
     const data = await this.marketplace.respondToApplication(
-      user.sub,
+      workspaceResourceOwner(user.sub),
       id,
       applicationId,
       dto.decision,
@@ -103,7 +104,7 @@ export class MarketplaceController {
     @Body() dto: ApplyToListingDto,
   ) {
     const data = await this.marketplace.apply(
-      user.sub,
+      workspaceResourceOwner(user.sub),
       id,
       dto.pitch,
       dto.addToCrm ?? true,
@@ -117,7 +118,7 @@ export class MarketplaceController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.marketplace.linkToCrm(user.sub, id);
+    const data = await this.marketplace.linkToCrm(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 }

@@ -1,3 +1,4 @@
+import { workspaceResourceOwner } from '../brand-workspaces/workspace-context';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   HttpStatus,
   Put,
   Param,
+  ParseUUIDPipe,
   Post,
   Res,
   UploadedFile,
@@ -42,7 +44,7 @@ export class ProfilesController {
   @Get()
   @ApiOperation({ summary: 'Get the authenticated account profile' })
   async getCurrent(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.profiles.getCurrent(user.sub);
+    const data = await this.profiles.getCurrent(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -52,7 +54,7 @@ export class ProfilesController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: UpdateCreatorProfileDto,
   ) {
-    const data = await this.profiles.updateCreator(user.sub, dto);
+    const data = await this.profiles.updateCreator(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -86,7 +88,7 @@ export class ProfilesController {
         }
       | undefined,
   ) {
-    const data = await this.profiles.uploadCreatorProfileImage(user.sub, file);
+    const data = await this.profiles.uploadCreatorProfileImage(workspaceResourceOwner(user.sub), file);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -120,7 +122,7 @@ export class ProfilesController {
         }
       | undefined,
   ) {
-    const data = await this.profiles.uploadBrandLogo(user.sub, file);
+    const data = await this.profiles.uploadBrandLogo(workspaceResourceOwner(user.sub), file);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -130,7 +132,7 @@ export class ProfilesController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: UpdateBrandProfileDto,
   ) {
-    const data = await this.profiles.updateBrand(user.sub, dto);
+    const data = await this.profiles.updateBrand(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.OK, error: null, data };
   }
 }
@@ -139,6 +141,14 @@ export class ProfilesController {
 @Controller('profile-images')
 export class ProfileImagesController {
   constructor(private readonly profiles: ProfilesService) {}
+
+  @Get('brands/workspace/:workspaceId')
+  async renderWorkspaceBrandLogo(@Param('workspaceId', ParseUUIDPipe) workspaceId: string, @Res() res: Response) {
+    const image = await this.profiles.getBrandLogo('', workspaceId);
+    res.setHeader('Content-Type', image.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(image.buffer);
+  }
 
   @Get('creators/:userId')
   @ApiOperation({ summary: 'Render a creator profile image' })

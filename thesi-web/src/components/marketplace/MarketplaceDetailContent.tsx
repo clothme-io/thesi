@@ -1,5 +1,9 @@
 "use client";
 
+import { CreatorTrackingLink } from "@/components/brand/campaigns/CreatorTrackingLink";
+import type { PromotedProduct } from "@/lib/brand-campaigns/types";
+import {campaignProducts} from "@/components/brand/campaigns/CampaignProductSelection";
+import { PromotedProductDetails } from "@/components/brand/campaigns/PromotedProductDetails";
 import { CommissionPaymentDetails } from "@/components/brand/campaigns/CommissionPaymentDetails";
 import { commissionSummary } from "@/lib/brand-campaigns/commission";
 
@@ -48,6 +52,8 @@ type AcceptanceSnapshot = {
   campaignId: string;
   campaignName: string;
   paymentSnapshot: {
+    promotedProduct?: PromotedProduct;
+  promotedProducts?: PromotedProduct[];
     model: "flat_rate" | "milestone" | "royalty" | "hybrid" | "commission";
     flatRateCents?: number;
     milestoneStructure?: "cumulative" | "highest_achieved";
@@ -69,7 +75,7 @@ const CAMPAIGN_PAYMENT_LABELS: Record<AcceptanceSnapshot["paymentSnapshot"]["mod
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
-  commission: "Base + Commission",
+  commission: "Commission",
 };
 
 function formatCents(cents = 0): string {
@@ -641,6 +647,8 @@ export function MarketplaceDetailContent() {
         )}
         <div className="marketplace-detail-grid">
           <div className="marketplace-detail-main">
+            {!isBrand && acceptanceSnapshot?.paymentSnapshot.promotedProduct && process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true" && campaignProducts(acceptanceSnapshot.paymentSnapshot).map(p=><CreatorTrackingLink key={p.productId} campaignId={acceptanceSnapshot.campaignId} productId={p.productId} productTitle={p.title}/>)}
+            {campaignProducts(acceptanceSnapshot ? acceptanceSnapshot.paymentSnapshot : listing.payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
             <section className="marketplace-panel">
               <div className="marketplace-detail-badges">
                 <span className={`marketplace-status marketplace-status--${effectiveStatus}`}>

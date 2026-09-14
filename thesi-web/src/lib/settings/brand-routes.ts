@@ -6,6 +6,7 @@ export const BRAND_SETTINGS_ROUTES = {
   paymentMethods: "/app/settings/payment-methods",
   paymentHistory: "/app/settings/payment-history",
   security: "/app/settings/security",
+  integrations: "/app/settings/integrations",
   preferences: "/app/settings/preferences",
 } as const;
 

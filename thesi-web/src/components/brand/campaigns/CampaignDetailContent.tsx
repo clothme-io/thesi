@@ -1,10 +1,14 @@
 "use client";
+import {campaignProducts} from "./CampaignProductSelection";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
+import {useWorkspacePermissions} from '@/context/WorkspacePermissions';
 import { toDateInputValue } from "@/lib/brand-campaigns/date";
+import { PromotedProductDetails } from "./PromotedProductDetails";
+import { CampaignFundingPanel } from "./CampaignFundingPanel";
 import { CommissionPaymentDetails } from "./CommissionPaymentDetails";
 import { paymentFormError } from "@/lib/brand-campaigns/payment-form";
 import {
@@ -76,6 +80,7 @@ const PAYOUT_STATUS_LABELS: Record<CreatorPayout["status"], string> = {
 };
 
 export function CampaignDetailContent() {
+  const {canEdit,canManageFunds}=useWorkspacePermissions();
   const { id } = useParams<{ id: string }>();
   const { session, authenticatedRequest, authenticatedBinaryRequest } =
     useAuth();
@@ -120,12 +125,12 @@ export function CampaignDetailContent() {
   );
 
   const loadPayouts = useCallback(async () => {
-    if (!id) return;
+    if (!id||!canManageFunds) return;
     const result = await authenticatedRequest<{ payouts: CreatorPayout[] }>(
       `/api/campaigns/${id}/payouts`,
     );
     setPayouts(result.payouts ?? []);
-  }, [authenticatedRequest, id]);
+  }, [authenticatedRequest, id,canManageFunds]);
 
   useEffect(() => {
     if (!ready || !id) return;
@@ -175,7 +180,7 @@ export function CampaignDetailContent() {
     (invite) => invite.status === "accepted",
   ).length;
   const hasLimitedPostPublishEditing =
-    campaign.status === "active" && hasAcceptedCreator;
+    canEdit && campaign.status === "active" && hasAcceptedCreator;
   const payoutByCreator = new Map(
     payouts.map((payout) => [payout.creatorUserId, payout]),
   );
@@ -330,7 +335,8 @@ export function CampaignDetailContent() {
   const canPause =
     campaign.status === "active" && !hasLimitedPostPublishEditing;
   const canComplete =
-    (campaign.status === "active" && !hasLimitedPostPublishEditing) ||
+    (campaign.status === "draft" && campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1) ||
+    (campaign.status === "active" && (!hasLimitedPostPublishEditing || campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1)) ||
     campaign.status === "paused";
   const canUnpublish =
     campaign.postToMarketplace &&
@@ -360,7 +366,7 @@ export function CampaignDetailContent() {
             justifyContent: "flex-end",
           }}
         >
-          {isDraft && (
+          {canEdit && isDraft && (
             <button
               type="button"
               className="crm-btn-primary"
@@ -370,7 +376,7 @@ export function CampaignDetailContent() {
               {savingDraft ? "Saving…" : "Save draft"}
             </button>
           )}
-          {hasLimitedPostPublishEditing && (
+          {canEdit && hasLimitedPostPublishEditing && (
             <button
               type="button"
               className="crm-btn-primary"
@@ -380,7 +386,7 @@ export function CampaignDetailContent() {
               {savingDraft ? "Saving…" : "Save updates"}
             </button>
           )}
-          {canPublish && (
+          {canEdit && canPublish && (
             <button
               type="button"
               className="crm-btn-primary"
@@ -395,7 +401,7 @@ export function CampaignDetailContent() {
               {campaign.status === "draft" ? "Publish" : "Post to marketplace"}
             </button>
           )}
-          {canResume && (
+          {canEdit && canResume && (
             <button
               type="button"
               className="crm-btn-primary"
@@ -405,7 +411,7 @@ export function CampaignDetailContent() {
               Resume
             </button>
           )}
-          {canPause && (
+          {canEdit && canPause && (
             <button
               type="button"
               className="crm-btn-secondary"
@@ -415,7 +421,7 @@ export function CampaignDetailContent() {
               Pause
             </button>
           )}
-          {canComplete && (
+          {canEdit && canComplete && (
             <button
               type="button"
               className="crm-btn-secondary"
@@ -425,7 +431,7 @@ export function CampaignDetailContent() {
               Mark complete
             </button>
           )}
-          {canUnpublish && (
+          {canEdit && canUnpublish && (
             <button
               type="button"
               className="crm-btn-secondary"
@@ -439,18 +445,20 @@ export function CampaignDetailContent() {
             type="button"
             className="crm-btn-secondary"
             onClick={() => setInviteOpen(true)}
+            disabled={!canEdit}
           >
             Invite creators
           </button>
-          <Link
+          {canEdit && <Link
             href={`/app/campaigns/new?from=${campaign.id}`}
             className="crm-btn-secondary"
           >
             Duplicate as new
-          </Link>
+          </Link>}
         </div>
       </header>
       <div className="app-content">
+        {campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1 && <CampaignFundingPanel campaign={campaign} />}
         {(lifecycleError || error) && (
           <p className="workspace-hint" style={{ marginBottom: 16 }} role="alert">
             {lifecycleError || error}
@@ -462,7 +470,7 @@ export function CampaignDetailContent() {
           </p>
         )}
 
-        {isDraft && form ? (
+        {canEdit && isDraft && form ? (
           <div className="crm-detail-grid">
             <DraftCampaignEditForm
               campaign={campaign}
@@ -507,6 +515,7 @@ export function CampaignDetailContent() {
         ) : (
           <div className="crm-detail-grid">
             <div className="crm-detail-panel">
+              {campaignProducts(campaign.payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
               {hasLimitedPostPublishEditing && (
                 <div style={{ marginBottom: 24 }}>
                   <h3>
@@ -833,7 +842,7 @@ export function CampaignDetailContent() {
                       ? payoutByCreator.get(invite.creatorId)
                       : undefined;
                     const canPay =
-                      Boolean(invite.creatorId) &&
+                      canManageFunds && Boolean(invite.creatorId) &&
                       !invite.external &&
                       invite.status === "accepted" &&
                       payout?.status !== "transferred";

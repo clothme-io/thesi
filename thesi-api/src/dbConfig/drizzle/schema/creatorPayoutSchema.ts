@@ -14,6 +14,7 @@ const thesiSchema = pgSchema('thesi');
 export const creatorPayout = thesiSchema.table(
   'creator_payout',
   {
+    workspaceId: uuid('workspace_id'),
     id: uuid('id').primaryKey().defaultRandom(),
     campaignId: uuid('campaign_id')
       .notNull()

@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { workspaceContext } from '../brand-workspaces/workspace-context';
 import { sanitizeFileName } from 'src/shared/storage/file-helpers';
 import {
   FILE_STORAGE,
@@ -156,8 +157,9 @@ export class ProfilesService {
 
   async getBrandLogo(
     userId: string,
+    workspaceId?: string,
   ): Promise<{ buffer: Buffer; contentType: string }> {
-    const image = await this.profiles.getBrandLogo(userId);
+    const image = workspaceId ? await this.profiles.getBrandLogo(userId, workspaceId) : await this.profiles.getBrandLogo(userId);
     if (!image) {
       throw new NotFoundException('Brand logo not found');
     }
@@ -226,9 +228,10 @@ export class ProfilesService {
   }
 
   private brandLogoUrl(userId: string, stored: StoredFileRef): string {
+    const context = workspaceContext.getStore();
     return (
       stored.publicUrl ??
-      `/v1/profile-images/brands/${encodeURIComponent(userId)}?v=${Date.now()}`
+      `/v1/profile-images/brands/${context?.isDefault === false ? `workspace/${context.workspaceId}` : encodeURIComponent(userId)}?v=${Date.now()}`
     );
   }
 }

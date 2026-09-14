@@ -29,6 +29,28 @@ export function commissionFixture(): CampaignPaymentDto {
 }
 
 describe('commission terms', () => {
+  it('supports commission only without creating a base fee or milestone', () => {
+    const payment = commissionFixture();
+    delete payment.hybrid!.base;
+    expect(() => assertCommissionPayment(payment)).not.toThrow();
+    expect(previewPlatformFee(payment)).toMatchObject({payoutCents:0,feeCents:0});
+    expect(commissionInviteTerms(payment)).toContain('Commission only: 12.25%');
+    expect(commissionInviteTerms(payment)).not.toContain('Base payment earned when');
+  });
+  it('does not count a disabled historical base in estimates', () => {
+    const payment = commissionFixture(); payment.hybrid!.base!.enabled=false;
+    expect(() => assertCommissionPayment(payment)).not.toThrow();
+    expect(previewPlatformFee(payment).feeCents).toBe(0);
+  });
+  it('includes the product context and honest demo destination in invitations', () => {
+    const payment = commissionFixture();
+    payment.promotedProduct = { productId: 'p', brandId: 'b', vendorId: 'v', linkId: 'l', workspaceId: 'w',
+      title: 'Linen shirt', brandName: 'Brand', description: '', imageUrl: null, verifiedAt: 'today', previewUrl: 'https://thesi.test/product-preview/b/p' };
+    const terms = commissionInviteTerms(payment);
+    expect(terms).toContain('Product to promote: Linen shirt — Brand');
+    expect(terms).toContain('https://thesi.test/product-preview/b/p');
+    expect(terms).toContain('does not track sales or earn commission');
+  });
   it.each(['percentage_of_sale', 'percentage_of_platform_commission'] as const)(
     'accepts %s and limits fee estimates to the base',
     (commissionType) => {

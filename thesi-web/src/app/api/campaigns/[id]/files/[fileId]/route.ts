@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -20,7 +21,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       backendApiUrl(`/campaigns/${id}/files/${fileId}`),
       {
         method: "DELETE",
-        headers: authorization ? { Authorization: authorization } : {},
+        headers: { ...workspaceHeaders(request), ...(authorization ? { Authorization: authorization } : {}) },
         cache: "no-store",
       },
     );

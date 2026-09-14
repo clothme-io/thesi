@@ -1,3 +1,5 @@
+import type { CommissionRules } from 'src/api/campaigns/commission-rules';
+import type { PromotedProduct } from '../../../api/campaigns/campaign-products.service';
 import {
   boolean,
   date,
@@ -40,6 +42,8 @@ export type CampaignMilestoneJson = {
 };
 
 export type CampaignPaymentJson = {
+  promotedProduct?: PromotedProduct;
+  promotedProducts?: PromotedProduct[];
   model: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid' | 'commission';
   flatRateCents?: number;
   milestoneStructure?: 'cumulative' | 'highest_achieved';
@@ -78,6 +82,7 @@ export type CampaignPaymentJson = {
       tiers: CampaignMilestoneJson[];
     };
     affiliate?: {
+      rules?: CommissionRules;
       enabled: boolean;
       commissionType:
         | 'percentage_of_sale'
@@ -142,6 +147,7 @@ export type CampaignProductProvidedJson = {
 };
 
 export const campaign = thesiSchema.table('campaign', {
+    workspaceId: uuid('workspace_id'),
   id: uuid('id').primaryKey().defaultRandom(),
   ownerUserId: text('owner_user_id')
     .notNull()
@@ -219,6 +225,7 @@ export const campaign = thesiSchema.table('campaign', {
 export const campaignAcceptanceSnapshot = thesiSchema.table(
   'campaign_acceptance_snapshot',
   {
+    workspaceId: uuid('workspace_id'),
     id: uuid('id').primaryKey().defaultRandom(),
     campaignId: uuid('campaign_id')
       .notNull()

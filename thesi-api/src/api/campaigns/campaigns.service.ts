@@ -1,3 +1,6 @@
+import { CampaignFundingService } from '../campaign-funding/campaign-funding.service';
+import { isDeepStrictEqual } from 'node:util';
+import { CampaignProductsService } from './campaign-products.service';
 import { assertCommissionPayment } from './commission-payment';
 import {
   BadRequestException,
@@ -71,6 +74,8 @@ export class CampaignsService {
     @Optional()
     @Inject(MARKETPLACE_CAMPAIGN_SYNC)
     private readonly marketplaceSync?: MarketplaceCampaignSync,
+    @Optional() private readonly products?: CampaignProductsService,
+    @Optional() private readonly funding?: CampaignFundingService,
   ) {}
 
   async list(userId: string): Promise<{ campaigns: CampaignRecord[] }> {
@@ -112,6 +117,8 @@ export class CampaignsService {
     await this.requireBrand(userId);
     this.assertPublishReady(dto);
     const input = this.normalizeCampaignInput(dto);
+    await this.funding?.beforeSave(input);
+    await this.products?.prepare(userId, input);
     assertCommissionPayment(input.payment);
     this.assertDateRange(input);
     const needsFee = this.requiresPlatformFee(input);
@@ -145,6 +152,9 @@ export class CampaignsService {
     }
     this.assertPublishReady(dto, existing);
     const input = this.normalizeCampaignInput(dto, existing);
+    if (input.payment.hybrid?.affiliate?.fundingFlowVersion === 1 && existing.payment.hybrid?.affiliate?.fundingFlowVersion !== 1 && (existing.status !== 'draft' || await this.campaigns.countAcceptedCreators(campaignId) > 0)) throw new BadRequestException('Existing published or accepted terms cannot switch funding flow. Create a new campaign.');
+    const funded = await this.funding?.beforeSave(input,campaignId);
+    await this.products?.prepare(userId, input, existing, !!funded);
     assertCommissionPayment(input.payment);
     this.assertDateRange(input);
     const acceptedCreatorCount =
@@ -525,7 +535,7 @@ export class CampaignsService {
     input: UpsertCampaignDto,
     acceptedCreatorCount: number,
   ): void {
-    const lockedFields: Array<keyof UpsertCampaignDto> = [
+    const lockedFields: Array<Exclude<keyof UpsertCampaignDto, 'merchantProductId'|'merchantProducts'>> = [
       'name',
       'campaignType',
       'contentTypes',
@@ -543,7 +553,7 @@ export class CampaignsService {
       'postToMarketplace',
     ];
     const changedLockedField = lockedFields.some(
-      (field) => !sameValue(existing[field], input[field]),
+      (field) => !(field === 'status' && input.status === 'completed' && existing.payment.hybrid?.affiliate?.fundingFlowVersion === 1) && !sameValue(existing[field], input[field]),
     );
     if (changedLockedField) {
       throw new BadRequestException(
@@ -584,6 +594,8 @@ export class CampaignsService {
     const contentRights = dto.contentRights ?? existing?.contentRights;
 
     return {
+      merchantProductId: dto.merchantProductId,
+      merchantProducts: dto.merchantProducts,
       name: normalizeString(dto.name, existing?.name, 'Untitled campaign'),
       campaignType: dto.campaignType ?? existing?.campaignType ?? 'experience',
       contentTypes: dto.contentTypes ?? existing?.contentTypes ?? ['tiktok'],
@@ -770,7 +782,7 @@ function normalizeString(
 }
 
 function sameValue(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+  return isDeepStrictEqual(left ?? null, right ?? null);
 }
 
 function keepsExistingLinks(existing: string[], next: string[] = []): boolean {

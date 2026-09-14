@@ -105,6 +105,7 @@ export const creatorSocialConnection = thesiSchema.table(
 export const brandCreatorFavorite = thesiSchema.table(
   'brand_creator_favorite',
   {
+    workspaceId: uuid('workspace_id'),
     brandUserId: text('brand_user_id')
       .notNull()
       .references(() => thesiUser.id, { onDelete: 'cascade' }),
@@ -115,5 +116,5 @@ export const brandCreatorFavorite = thesiSchema.table(
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.brandUserId, table.creatorUserId] })],
+  (table) => [primaryKey({ columns: [table.workspaceId, table.creatorUserId] })],
 );

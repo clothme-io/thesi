@@ -1,6 +1,8 @@
 "use client";
 
+import {CampaignProductSelection,campaignProducts,productSelections,productInput,type ProductSelection} from "./CampaignProductSelection";
 import Link from "next/link";
+import {DEFAULT_COMMISSION_RULES} from "@/lib/brand-campaigns/commission-rules";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
@@ -20,6 +22,7 @@ import {
   type MilestoneFormRow,
 } from "@/lib/brand-campaigns/payment-form";
 import type {
+  PromotedProduct,
   BrandCampaignCreatorBenefits,
   BrandCampaignContentRights,
   BrandCampaignGoalType,
@@ -67,7 +70,7 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Flat Rate", value: "flat_rate" },
   { label: "Milestone", value: "milestone" },
   { label: "Royalty", value: "royalty" },
-  { label: "Base + Commission", value: "commission" },
+  { label: "Commission", value: "commission" },
   { label: "Hybrid", value: "hybrid" },
 ];
 
@@ -161,6 +164,8 @@ export function CampaignCreateContent() {
   const dates = defaultDates();
   const hydratedRef = useRef(false);
 
+  const [initialProducts,setInitialProducts]=useState<PromotedProduct[]>([]);
+  const [merchantProducts, setMerchantProducts] = useState<ProductSelection[]>([]);
   const [name, setName] = useState("");
   const [campaignType, setCampaignType] =
     useState<BrandCampaignGoalType>("experience");
@@ -229,6 +234,8 @@ export function CampaignCreateContent() {
     setLocation(source.requirements.location);
     setPlatforms(source.requirements.platforms);
     setPaymentModel(source.payment.model);
+    setMerchantProducts(productSelections(campaignProducts(source.payment)));
+    setInitialProducts(campaignProducts(source.payment));
     setMilestoneStructure(
       source.payment.milestoneStructure ?? DEFAULT_MILESTONE_STRUCTURE,
     );
@@ -241,7 +248,9 @@ export function CampaignCreateContent() {
         id: newMilestoneId(),
       })),
     );
-    setHybridPayment(hybridPaymentToForm(source.payment));
+    const copiedPayment=hybridPaymentToForm(source.payment);
+    if(process.env.NEXT_PUBLIC_COMMISSION_RULES_ENABLED==='true' && !copiedPayment.commissionRules)copiedPayment.commissionRules={...DEFAULT_COMMISSION_RULES};
+    setHybridPayment(copiedPayment);
     setPaymentNotes(source.payment.notes ?? "");
     setRequiredTasks(source.requiredTasks.map((task) => task.title).join("\n"));
     setProductsProvided(source.productsProvided.map((product) => product.name).join("\n"));
@@ -282,6 +291,7 @@ export function CampaignCreateContent() {
       platforms,
     },
     files: [],
+    ...productInput(paymentModel === "commission" ? merchantProducts : []),
     payment: buildCampaignPayment({
       model: paymentModel,
       flatAmount,
@@ -478,6 +488,7 @@ export function CampaignCreateContent() {
           </p>
         )}
         <div className="workspace-form">
+          {paymentModel === "commission" && <CampaignProductSelection initial={initialProducts} value={merchantProducts} onChange={setMerchantProducts} />}
           <section className="workspace-section">
             <h3>Campaign basics</h3>
             <div className="workspace-grid">
@@ -894,9 +905,9 @@ export function CampaignCreateContent() {
                 </>
               ) : paymentModel === "commission" ? (
                 <>
-                  <CommissionPaymentBuilder value={hybridPayment} onChange={setHybridPayment} />
+                  <CommissionPaymentBuilder creatorCapacity={creatorCapacity} value={hybridPayment} onChange={setHybridPayment} />
                   <p className="workspace-hint">
-                    Fee and budget estimates include only the fixed base; future commission is not included.
+                    Fee and budget estimates include only an enabled fixed base; future commission is not included.
                   </p>
                 </>
               ) : paymentModel === "hybrid" ? (

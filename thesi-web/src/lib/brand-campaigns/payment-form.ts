@@ -1,3 +1,4 @@
+import { DEFAULT_COMMISSION_RULES,assertCommissionRules,type CommissionRules } from './commission-rules';
 import type {
   BrandCampaign,
   BrandCampaignHybridPayment,
@@ -30,6 +31,7 @@ export type HybridPoolMetricFormRow = {
 };
 
 export type HybridPaymentFormState = {
+  commissionRules?: CommissionRules;
   baseEnabled: boolean;
   baseAmount: string;
   baseTrigger: BrandCampaignHybridBaseTrigger;
@@ -41,6 +43,9 @@ export type HybridPaymentFormState = {
   milestoneAmountType: BrandCampaignHybridMilestoneAmountType;
   milestoneRows: MilestoneFormRow[];
   affiliateEnabled: boolean;
+  commissionPayoutHandler: 'clothme'|'brand';
+  commissionFundingSource: ''|'brand'|'clothme'|'shared_custom';
+  commissionFundingTerms: string;
   affiliateType: BrandCampaignHybridAffiliateType;
   affiliatePercent: string;
   affiliateFixedAmount: string;
@@ -139,7 +144,11 @@ export function defaultHybridPaymentForm(): HybridPaymentFormState {
     milestoneStructure: DEFAULT_MILESTONE_STRUCTURE,
     milestoneAmountType: "bonus_in_addition_to_base",
     milestoneRows: defaultHybridMilestoneRows(),
+    commissionRules:process.env.NEXT_PUBLIC_COMMISSION_RULES_ENABLED==='true'?{...DEFAULT_COMMISSION_RULES}:undefined,
     affiliateEnabled: false,
+    commissionPayoutHandler: 'clothme',
+    commissionFundingSource: '',
+    commissionFundingTerms: '',
     affiliateType: "percentage_of_sale",
     affiliatePercent: "",
     affiliateFixedAmount: "",
@@ -211,7 +220,7 @@ export function hybridPaymentToForm(
     hybrid?.affiliate?.commissionPercent ?? payment?.royaltyPercent;
   return {
     ...defaults,
-    baseEnabled: hybrid?.base?.enabled ?? true,
+    baseEnabled: hybrid?.base?.enabled ?? (payment?.model !== "commission"),
     baseAmount: centsToInput(baseAmount),
     baseTrigger: hybrid?.base?.trigger ?? defaults.baseTrigger,
     baseCustomTrigger: hybrid?.base?.customTrigger ?? "",
@@ -223,7 +232,11 @@ export function hybridPaymentToForm(
     milestoneAmountType:
       hybrid?.milestones?.amountType ?? defaults.milestoneAmountType,
     milestoneRows: milestonesToFormRows(hybrid?.milestones?.tiers),
+    commissionRules:hybrid?.affiliate?.rules,
     affiliateEnabled: hybrid?.affiliate?.enabled ?? false,
+    commissionPayoutHandler: hybrid?.affiliate?.payoutHandler ?? 'clothme',
+    commissionFundingSource: hybrid?.affiliate?.fundingSource ?? '',
+    commissionFundingTerms: hybrid?.affiliate?.fundingTerms ?? '',
     affiliateType: hybrid?.affiliate?.commissionType ?? defaults.affiliateType,
     affiliatePercent: affiliatePercent ? String(affiliatePercent) : "",
     affiliateFixedAmount: centsToInput(hybrid?.affiliate?.fixedAmountCents),
@@ -348,10 +361,11 @@ export function paymentFormError(
   hybrid?: HybridPaymentFormState,
 ): string | null {
   if (model === "commission") {
-    if (!hybrid) return "Configure the base payment and commission.";
-    if (!/^\$?\d+(?:\.\d{1,2})?$/.test(hybrid.baseAmount.trim()) || parseMoneyToCents(hybrid.baseAmount) <= 0 || parseMoneyToCents(hybrid.baseAmount) > 2_147_483_647) {
+    if (!hybrid) return "Configure the commission terms.";
+    if (hybrid.baseEnabled && (!/^\$?\d+(?:\.\d{1,2})?$/.test(hybrid.baseAmount.trim()) || parseMoneyToCents(hybrid.baseAmount) <= 0 || parseMoneyToCents(hybrid.baseAmount) > 2_147_483_647)) {
       return "Enter a positive base payment with at most two decimal places.";
     }
+    if(hybrid.commissionRules){try{assertCommissionRules(hybrid.commissionRules);}catch{return 'Check the review period, payout schedule and minimum.';}}
     const rate = Number(hybrid.affiliatePercent);
     if (!/^\d+(?:\.\d{1,2})?$/.test(hybrid.affiliatePercent.trim()) || rate <= 0 || rate > 100) {
       return "Enter a commission rate greater than 0 and no more than 100%, with at most two decimal places.";
@@ -362,7 +376,6 @@ export function paymentFormError(
     if (!/^\d+$/.test(hybrid.affiliateAttributionDays.trim()) || Number(hybrid.affiliateAttributionDays) < 1 || Number(hybrid.affiliateAttributionDays) > 365) {
       return "Enter an attribution window between 1 and 365 days.";
     }
-    if (hybrid.baseTrigger === "custom" && !hybrid.baseCustomTrigger.trim()) return "Describe when the base payment is earned.";
     if (!hybrid.affiliateTerms.trim()) return "Describe eligible sales, refunds, and the settlement schedule.";
     return null;
   }
@@ -403,7 +416,7 @@ export function formPayoutCents(
   milestoneStructure: BrandCampaignMilestoneStructure = DEFAULT_MILESTONE_STRUCTURE,
   hybrid?: HybridPaymentFormState,
 ): number {
-  if (model === "commission") return hybrid ? parseMoneyToCents(hybrid.baseAmount) : 0;
+  if (model === "commission") return hybrid?.baseEnabled ? parseMoneyToCents(hybrid.baseAmount) : 0;
   if (model === "hybrid" && hybrid) return hybridPayoutCents(hybrid);
   if (model === "milestone") {
     const amounts = completeMilestoneRows(milestones).map(
@@ -442,8 +455,12 @@ export function buildCampaignPayment(input: {
     return {
       model: "commission",
       hybrid: {
-        base: { ...hybrid.base!, enabled: true },
-        affiliate: { ...hybrid.affiliate!, enabled: true, fixedAmountCents: undefined },
+        ...(form.baseEnabled ? { base: { ...hybrid.base!, enabled: true, trigger: "content_accepted", customTrigger: undefined } } : {}),
+        affiliate: { ...hybrid.affiliate!, enabled: true, fixedAmountCents: undefined,
+          ...(form.commissionRules?{rules:form.commissionRules}:{}),
+          fundingFlowVersion: 1, payoutHandler: 'clothme', fundingSource: 'brand',
+          fundingTerms: 'Commission is funded by qualifying sales; an enabled base is prepaid per creator slot.',
+        },
       },
       ...(notes ? { notes } : {}),
     };

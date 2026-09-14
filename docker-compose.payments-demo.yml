@@ -1,0 +1,16 @@
+name: thesi-payments-demo
+services:
+  postgres:
+    image: postgres:16
+    ports: ["127.0.0.1:5844:5432"]
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo-local-only
+    tmpfs: [/var/lib/postgresql/data]
+    volumes:
+      - ./scripts/local-payments/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U demo"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

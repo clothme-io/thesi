@@ -18,7 +18,14 @@ type AuthenticatedBinaryRequest = (
   },
 ) => Promise<{ blob: Blob; fileName: string | null }>;
 
-export type CampaignInput = Omit<BrandCampaign, "id" | "createdAt" | "updatedAt">;
+export type CampaignInput = Omit<BrandCampaign, "id" | "createdAt" | "updatedAt"> & { merchantProductId?: string | null;merchantProducts?:{productId:string;variantIds?:string[]}[] };
+
+function campaignRequest(input: CampaignInput) {
+  const payment = { ...input.payment };
+  delete payment.promotedProduct;
+  delete payment.promotedProducts;
+  return { ...input, payment };
+}
 
 const EMPTY_DATA: BrandCampaignData = { campaigns: [] };
 
@@ -65,7 +72,7 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
       setError("");
       const campaign = await authenticatedRequest<BrandCampaign>("/api/campaigns", {
         method: "POST",
-        body: input,
+        body: campaignRequest(input),
       });
       setData((prev) => ({
         campaigns: [campaign, ...prev.campaigns.filter((c) => c.id !== campaign.id)],
@@ -80,7 +87,7 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
       setError("");
       const campaign = await authenticatedRequest<BrandCampaign>(`/api/campaigns/${id}`, {
         method: "PUT",
-        body: input,
+        body: campaignRequest(input),
       });
       setData((prev) => ({
         campaigns: prev.campaigns.map((c) => (c.id === id ? campaign : c)),

@@ -38,9 +38,9 @@ export const creatorProfile = thesiSchema.table('creator_profile', {
 });
 
 export const brandProfile = thesiSchema.table('brand_profile', {
+    workspaceId: uuid('workspace_id'),
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id')
-    .notNull()
     .unique()
     .references(() => thesiUser.id, { onDelete: 'cascade' }),
   companyName: text('company_name').notNull(),

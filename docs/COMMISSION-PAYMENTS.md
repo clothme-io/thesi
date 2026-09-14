@@ -61,12 +61,28 @@ full settlement. Automatic campaign activation fee collection remains disabled.
 
 ## Deployment and next phase
 
-Deploy API support before the web option. The checked-in Drizzle definitions use
-JSONB, so no column change is included. The sibling `clothme-db` migrations were
-not present in this workspace: check any SQL constraints on payment model values
-before deploying. No existing campaign data is rewritten.
+Deploy API support before the web option. Campaign and listing payment columns
+use JSONB in the available `clothme-db` migrations; the commission option itself
+does not require a new payment-model column. Disposable SQL tests now store
+commission terms using those migrations. The separate multi-brand changes do
+require V33/backfill/V34 and the ordered gates in
+[BRAND-WORKSPACE-ROLLOUT.md](BRAND-WORKSPACE-ROLLOUT.md); do not deploy this combined
+API image using the earlier commission-only rollout assumptions.
 
 A later release needs a verified sales source, attribution rules, an earnings
 ledger with refund adjustments, and multiple independently retryable settlements
 per creator/campaign before commission payouts can be enabled. Define the fee
 policy for variable earnings as part of that release.
+
+Commission terms can now include a server-verified `payment.promotedProduct` snapshot. The browser supplies only `merchantProductId`; public product links currently open an approved demo. See [CAMPAIGN-PRODUCTS.md](CAMPAIGN-PRODUCTS.md).
+
+Creator links now preserve accepted campaign identity into matching pending order lines, behind activation flags. See [CREATOR-ATTRIBUTION.md](CREATOR-ATTRIBUTION.md). Verified sales, earnings and settlements remain future phases.
+
+### Local earnings reporting phase
+
+[Commission earnings](./COMMISSION-EARNINGS.md) now documents the disabled-by-default captured-payment reconciliation and reporting implementation. This extends attribution into review-only commission estimates and refund adjustments. It does not enable base or commission payouts.
+
+
+### Approved clarification: optional base payment
+
+Commission campaigns support commission only or commission plus an explicitly enabled fixed base. An absent/disabled base creates no fixed-payment obligation, content-payment trigger or estimated fee on a fixed payout. Existing accepted terms remain unchanged. Future base obligations and funding must be created only when the accepted snapshot explicitly enables a base; commission settlement proceeds independently. Exact refund allocation and funded settlement remain subsequent implementation work; this clarification does not enable production or payouts.

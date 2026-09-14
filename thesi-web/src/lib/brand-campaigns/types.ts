@@ -1,3 +1,4 @@
+import type { CommissionRules } from './commission-rules';
 import { commissionSummary } from "@/lib/brand-campaigns/commission";
 export type BrandCampaignGoalType =
   | "experience"
@@ -85,6 +86,11 @@ export interface BrandCampaignHybridPayment {
     tiers: BrandCampaignMilestone[];
   };
   affiliate?: {
+    rules?: CommissionRules;
+    fundingFlowVersion?: 1;
+  payoutHandler?: 'clothme'|'brand';
+    fundingSource?: 'brand'|'clothme'|'shared_custom';
+    fundingTerms?: string;
     enabled: boolean;
     commissionType: BrandCampaignHybridAffiliateType;
     commissionPercent?: number;
@@ -145,6 +151,12 @@ export interface BrandCampaignProductProvided {
   creatorKeeps: boolean;
 }
 
+export type PromotedProduct = {
+  productId: string; brandId: string; vendorId: string; linkId: string; workspaceId: string;
+  brandName: string; title: string; description: string; imageUrl: string | null;
+  previewUrl: string; verifiedAt: string;
+  variants?:{id:string;color:string;size:string;priceCents:number;currency:string}[];
+};
 export interface BrandCampaign {
   id: string;
   name: string;
@@ -164,6 +176,8 @@ export interface BrandCampaign {
   };
   files: BrandCampaignFile[];
   payment: {
+    promotedProduct?: PromotedProduct;
+  promotedProducts?: PromotedProduct[];
     model: BrandCampaignPaymentModel;
     flatRateCents?: number;
     milestoneStructure?: BrandCampaignMilestoneStructure;
@@ -235,7 +249,7 @@ export const BRAND_CAMPAIGN_PAYMENT_LABELS: Record<BrandCampaignPaymentModel, st
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
-  commission: "Base + Commission",
+  commission: "Commission",
 };
 
 export const EMPTY_CREATOR_BENEFITS: BrandCampaignCreatorBenefits = {

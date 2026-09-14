@@ -1,6 +1,11 @@
+import type { PromotedProduct } from '../campaign-products.service';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsUUID,
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsIn,
@@ -10,6 +15,7 @@ import {
   IsString,
   Matches,
   MaxLength,
+  Max,
   Min,
   ValidateIf,
   ValidateNested,
@@ -225,7 +231,23 @@ export class CampaignHybridMilestonesDto {
   tiers: CampaignMilestoneDto[];
 }
 
+export class CommissionRulesDto {
+  @IsIn([1]) version!: 1;
+  @IsInt() @Min(0) @Max(365) reviewDays!: number;
+  @IsIn(['on_approval','weekly','monthly']) payoutFrequency!: 'on_approval'|'weekly'|'monthly';
+  @IsInt() @Min(0) @Max(2147483647) minimumPayoutCents!: number;
+  @IsIn([0]) creatorFeeCents!: 0;
+  @IsIn(['hold_until_verified']) creditPolicy!: 'hold_until_verified';
+  @IsIn(['hold_until_reviewed']) selfReferralPolicy!: 'hold_until_reviewed';
+}
+
 export class CampaignHybridAffiliateDto {
+  @IsOptional() @ValidateNested() @Type(() => CommissionRulesDto) rules?: CommissionRulesDto;
+  @ApiPropertyOptional({enum:[1]}) @IsOptional() @IsIn([1]) fundingFlowVersion?: 1;
+  @ApiPropertyOptional({enum:['clothme','brand']}) @IsOptional() @IsIn(['clothme','brand']) payoutHandler?: 'clothme'|'brand';
+  @ApiPropertyOptional({enum:['brand','clothme','shared_custom']}) @IsOptional() @IsIn(['brand','clothme','shared_custom']) fundingSource?: 'brand'|'clothme'|'shared_custom';
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(2000) fundingTerms?: string;
+
   @ApiProperty()
   @IsBoolean()
   enabled: boolean;
@@ -361,6 +383,10 @@ export class CampaignHybridPaymentDto {
 }
 
 export class CampaignPaymentDto {
+  // Type-only server output. Do not emit an undefined class field: strict
+  // whitelist validation would reject that field on every campaign request.
+  declare promotedProduct?: PromotedProduct;
+  declare promotedProducts?: PromotedProduct[];
   @ApiProperty({ enum: CAMPAIGN_PAYMENT_MODELS })
   @ValidateIf((_, value) => value !== undefined)
   @IsIn(CAMPAIGN_PAYMENT_MODELS)
@@ -550,7 +576,13 @@ export class PayCreatorDto {
   amountCents?: number;
 }
 
+export class MerchantProductSelectionDto {
+  @IsUUID() productId!:string;
+  @IsOptional() @IsArray() @ArrayMinSize(1) @ArrayMaxSize(200) @ArrayUnique() @IsUUID(undefined,{each:true}) variantIds?:string[];
+}
 export class UpsertCampaignDto {
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @ValidateNested({each:true}) @Type(()=>MerchantProductSelectionDto) merchantProducts?:MerchantProductSelectionDto[];
+  @IsOptional() @IsUUID() merchantProductId?: string | null;
   @ApiProperty()
   @ValidateIf((_, value) => value !== undefined)
   @IsString()

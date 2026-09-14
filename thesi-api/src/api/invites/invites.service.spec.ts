@@ -319,6 +319,17 @@ describe('InvitesService', () => {
     );
   });
 
+  it('rejects a campaign outside the selected brand before invite delivery', async () => {
+    repository.campaigns.clear();
+    await expect(service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1', campaignName: 'Untrusted', brandName: 'Untrusted',
+      creatorEmail: 'creator@example.com', creatorName: 'Creator', external: false,
+    })).rejects.toThrow('Campaign not found in this brand');
+    expect(repository.campaignInvites).toHaveLength(0);
+    expect(inbox.deliverCampaignInvite).not.toHaveBeenCalled();
+    expect(novu.trigger).not.toHaveBeenCalled();
+  });
+
   it('includes commission terms from the owned campaign in invitation delivery', async () => {
     repository.campaigns.get('camp-1')!.payment = {
       model: 'commission', hybrid: {

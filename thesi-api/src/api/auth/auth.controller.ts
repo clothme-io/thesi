@@ -67,7 +67,7 @@ export class AuthController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: ChangePasswordDto,
   ): Promise<AuthResponse> {
-    const data = await this.authService.changePassword(user.sub, dto);
+    const data = await this.authService.changePassword(user.sub, dto, user.merchantSessionId);
     return { status: HttpStatus.OK, error: null, data };
   }
 

@@ -75,6 +75,7 @@ export interface InboxRepository {
       id: string;
       brandUserId: string;
       creatorUserId: string;
+      workspaceId?: string | null;
     }>
   >;
   getThreadForUser(
@@ -84,14 +85,17 @@ export interface InboxRepository {
     id: string;
     brandUserId: string;
     creatorUserId: string;
+    workspaceId?: string | null;
   } | null>;
   ensureThread(
     brandUserId: string,
     creatorUserId: string,
+    campaignId?: string,
   ): Promise<{ id: string; brandUserId: string; creatorUserId: string }>;
   getContactDisplay(
     viewerUserId: string,
     peerUserId: string,
+    workspaceId?: string | null,
   ): Promise<{ name: string; email: string; company?: string; brandId?: string }>;
   listMessagesForUser(userId: string): Promise<
     Array<{

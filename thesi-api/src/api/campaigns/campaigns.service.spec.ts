@@ -331,12 +331,12 @@ describe('CampaignsService', () => {
     await expect(service.payCreator('brand-1', campaign.id, { creatorUserId: 'creator-9' })).rejects.toThrow(/settlements are not available/);
     expect(stripe.chargeOffSession).not.toHaveBeenCalled();
     expect(stripe.createTransfer).not.toHaveBeenCalled();
-    await expect(service.update('brand-1', campaign.id, sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/base payment/i);
+    await expect(service.update('brand-1', campaign.id, sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/commission base/i);
   });
 
   it('rejects incomplete commission terms before persisting a campaign', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    await expect(service.create('brand-1', sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/base payment/i);
+    await expect(service.create('brand-1', sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/commission base/i);
     expect(repository.rows).toHaveLength(0);
   });
 

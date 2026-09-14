@@ -48,7 +48,7 @@ export interface ProfileRepository {
     userId: string,
   ): Promise<CreatorProfileImageRef | null>;
   getBrandProfile(userId: string): Promise<BrandProfileData | null>;
-  getBrandLogo(userId: string): Promise<BrandLogoRef | null>;
+  getBrandLogo(userId: string, workspaceId?: string): Promise<BrandLogoRef | null>;
   upsertCreatorProfile(
     userId: string,
     profile: CreatorProfileData,

@@ -1,4 +1,5 @@
 export * from './billingSchema';
+export * from './brandWorkspaceSchema';
 export * from './campaignSchema';
 export * from './campaignFileSchema';
 export * from './campaignPlatformFeeSchema';

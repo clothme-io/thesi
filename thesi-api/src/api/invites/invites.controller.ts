@@ -1,3 +1,4 @@
+import { workspaceResourceOwner } from '../brand-workspaces/workspace-context';
 import {
   Body,
   Controller,
@@ -33,7 +34,7 @@ export class InvitesController {
     @CurrentUser() user: AuthJwtPayload,
     @Query('campaignId') campaignId?: string,
   ) {
-    const data = await this.invites.listCampaignInvites(user.sub, campaignId);
+    const data = await this.invites.listCampaignInvites(workspaceResourceOwner(user.sub), campaignId);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -46,7 +47,7 @@ export class InvitesController {
     @Query('campaignId') campaignId: string,
   ) {
     const data = await this.invites.getReceivedCampaignInvite(
-      user.sub,
+      workspaceResourceOwner(user.sub),
       campaignId,
     );
     return { status: HttpStatus.OK, error: null, data };
@@ -60,7 +61,7 @@ export class InvitesController {
     @CurrentUser() user: AuthJwtPayload,
     @Query('campaignId') campaignId: string,
   ) {
-    const data = await this.invites.getAcceptanceSnapshot(user.sub, campaignId);
+    const data = await this.invites.getAcceptanceSnapshot(workspaceResourceOwner(user.sub), campaignId);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -72,7 +73,7 @@ export class InvitesController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: RespondCampaignInviteDto,
   ) {
-    const data = await this.invites.respondToCampaignInvite(user.sub, dto);
+    const data = await this.invites.respondToCampaignInvite(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -84,14 +85,14 @@ export class InvitesController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: CreateCampaignInviteDto,
   ) {
-    const data = await this.invites.createCampaignInvite(user.sub, dto);
+    const data = await this.invites.createCampaignInvite(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.CREATED, error: null, data };
   }
 
   @Get('platform-brand')
   @ApiOperation({ summary: 'List platform brand invites sent by the creator' })
   async listPlatformBrandInvites(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.invites.listPlatformBrandInvites(user.sub);
+    const data = await this.invites.listPlatformBrandInvites(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -103,7 +104,7 @@ export class InvitesController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: CreatePlatformBrandInviteDto,
   ) {
-    const data = await this.invites.createPlatformBrandInvite(user.sub, dto);
+    const data = await this.invites.createPlatformBrandInvite(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.CREATED, error: null, data };
   }
 }

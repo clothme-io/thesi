@@ -1,5 +1,6 @@
+import { workspaceContext, workspaceWrite, brandProfileFilter } from '../brand-workspaces/workspace-context';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { v4 as uuidv4 } from 'uuid';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
@@ -107,12 +108,12 @@ export class PostgresProfileRepository implements ProfileRepository {
     const [profile] = await this.db
       .select()
       .from(schema.brandProfile)
-      .where(eq(schema.brandProfile.userId, userId))
+      .where(brandProfileFilter(schema.brandProfile, sql`${schema.brandProfile.userId}`, userId))
       .limit(1);
     return profile ? mapBrandProfile(profile) : null;
   }
 
-  async getBrandLogo(userId: string): Promise<BrandLogoRef | null> {
+  async getBrandLogo(userId: string, workspaceId?: string): Promise<BrandLogoRef | null> {
     const [profile] = await this.db
       .select({
         storageProvider: schema.brandProfile.logoStorageProvider,
@@ -120,7 +121,7 @@ export class PostgresProfileRepository implements ProfileRepository {
         contentType: schema.brandProfile.logoContentType,
       })
       .from(schema.brandProfile)
-      .where(eq(schema.brandProfile.userId, userId))
+      .where(workspaceId ? and(eq(schema.brandProfile.workspaceId, workspaceId), sql`EXISTS (SELECT 1 FROM thesi.brand_workspace w WHERE w.id=${workspaceId}::uuid AND w.status='active')`) : brandProfileFilter(schema.brandProfile, sql`${schema.brandProfile.userId}`, userId))
       .limit(1);
 
     if (
@@ -322,9 +323,9 @@ export class PostgresProfileRepository implements ProfileRepository {
   ): Promise<BrandProfileData> {
     const [saved] = await this.db
       .insert(schema.brandProfile)
-      .values({ userId, ...profile })
+      .values({ ...profile, userId: workspaceContext.getStore()?.isDefault === false ? null : userId, ...workspaceWrite() })
       .onConflictDoUpdate({
-        target: schema.brandProfile.userId,
+        target: workspaceContext.getStore() ? schema.brandProfile.workspaceId : schema.brandProfile.userId,
         set: { ...profile, updatedAt: new Date() },
       })
       .returning();
@@ -344,7 +345,7 @@ export class PostgresProfileRepository implements ProfileRepository {
         logoContentType: image.contentType,
         updatedAt: new Date(),
       })
-      .where(eq(schema.brandProfile.userId, userId))
+      .where(brandProfileFilter(schema.brandProfile, sql`${schema.brandProfile.userId}`, userId))
       .returning();
 
     return saved ? mapBrandProfile(saved) : null;

@@ -10,7 +10,7 @@ const POSTHOG_ALLOWED_HOSTS = (process.env.NEXT_PUBLIC_POSTHOG_ALLOWED_HOSTS || 
   .filter(Boolean);
 
 function isAllowedAnalyticsHost() {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined" || (["/merchant-link", "/merchant-signin"].includes(window.location.pathname) || window.location.pathname.startsWith("/r/"))) return false;
 
   return POSTHOG_ALLOWED_HOSTS.includes(window.location.hostname.toLowerCase());
 }

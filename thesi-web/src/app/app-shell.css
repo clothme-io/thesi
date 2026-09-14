@@ -266,3 +266,32 @@
     margin-left: 0;
   }
 }
+
+
+.brand-workspace-selector {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  max-height: 45vh;
+  overflow-y: auto;
+  font-size: 13px;
+}
+.brand-workspace-selector label { font-weight: 600; }
+.brand-workspace-selector select,
+.brand-workspace-selector input,
+.brand-workspace-selector button {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+.brand-workspace-selector button { cursor: pointer; }
+.brand-workspace-selector button:disabled { opacity: .6; cursor: wait; }
+.brand-workspace-selector form { display: grid; gap: 8px; }
+.brand-workspace-selector p { margin: 0; color: #a12727; overflow-wrap: anywhere; }

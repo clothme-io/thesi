@@ -1,3 +1,4 @@
+import { workspaceContext } from '../brand-workspaces/workspace-context';
 import { commissionInviteTerms } from '../campaigns/commission-payment';
 import {
   BadRequestException,
@@ -188,9 +189,10 @@ export class InvitesService {
     }
 
     const owned = await this.invites.findOwnedCampaign(userId, campaignId);
-    const campaignName = owned?.name?.trim() || input.campaignName.trim();
+    if (!owned) throw new NotFoundException('Campaign not found in this brand');
+    const campaignName = owned.name.trim() || input.campaignName.trim();
     const paymentTerms = owned?.payment?.model === 'commission' ? commissionInviteTerms(owned.payment) : undefined;
-    const brandName = input.brandName.trim() || user.fullName;
+    const brandName = workspaceContext.getStore()?.name || input.brandName.trim() || user.fullName;
 
     let creatorUserId = input.creatorId?.trim() || null;
     let external = input.external;

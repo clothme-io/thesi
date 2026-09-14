@@ -1,3 +1,4 @@
+import { workspaceWrite, workspaceFilter } from '../brand-workspaces/workspace-context';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -103,7 +104,7 @@ export class PostgresCreatorsDirectoryRepository
         creatorUserId: schema.brandCreatorFavorite.creatorUserId,
       })
       .from(schema.brandCreatorFavorite)
-      .where(eq(schema.brandCreatorFavorite.brandUserId, brandUserId))
+      .where(and(workspaceFilter(schema.brandCreatorFavorite), eq(schema.brandCreatorFavorite.brandUserId, brandUserId)))
       .orderBy(desc(schema.brandCreatorFavorite.createdAt));
     return rows.map((row) => row.creatorUserId);
   }
@@ -111,7 +112,7 @@ export class PostgresCreatorsDirectoryRepository
   async addFavorite(brandUserId: string, creatorUserId: string): Promise<void> {
     await this.db
       .insert(schema.brandCreatorFavorite)
-      .values({ brandUserId, creatorUserId })
+      .values({ brandUserId, creatorUserId, ...workspaceWrite() })
       .onConflictDoNothing();
   }
 
@@ -123,7 +124,7 @@ export class PostgresCreatorsDirectoryRepository
       .delete(schema.brandCreatorFavorite)
       .where(
         and(
-          eq(schema.brandCreatorFavorite.brandUserId, brandUserId),
+          and(workspaceFilter(schema.brandCreatorFavorite), eq(schema.brandCreatorFavorite.brandUserId, brandUserId)),
           eq(schema.brandCreatorFavorite.creatorUserId, creatorUserId),
         ),
       );
