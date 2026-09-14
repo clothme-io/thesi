@@ -1,4 +1,5 @@
 import { MerchantAccessModule } from './shared/auth/merchant-access.module';
+import { CampaignFundingModule } from './api/campaign-funding/campaign-funding.module';
 import { CommissionEarningsModule } from './api/commission-earnings/commission-earnings.module';
 import { CreatorTrackingModule } from './api/creator-tracking/creator-tracking.module';
 import { MerchantLinksModule } from './api/merchant-links/merchant-links.module';
@@ -41,6 +42,7 @@ import { StripeModule } from './shared/stripe/stripe.module';
     StripeModule,
     AuthModule,
     BrandWorkspacesModule,
+    CampaignFundingModule,
     MerchantLinksModule,
     CreatorApplicationsModule,
     ProfilesModule,

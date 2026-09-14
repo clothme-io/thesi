@@ -1,3 +1,4 @@
+// Route intentionally kept explicit so release smoke tests can verify this deployment includes campaign products.
 import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
