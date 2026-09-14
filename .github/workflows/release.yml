@@ -166,7 +166,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "::notice::Automated tests will gate deploys in a later phase."
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: thesi-api/package-lock.json
+      - run: npm ci
+        working-directory: thesi-api
+      - run: npm test -- --runInBand
+        working-directory: thesi-api
+      - run: npm run build
+        working-directory: thesi-api
 
   build:
     needs: test

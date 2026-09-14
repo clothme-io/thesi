@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
+import { BrandWorkspaceSelector } from './BrandWorkspaceSelector';
 
 type NavItem = {
   href: string;
@@ -14,6 +15,8 @@ type NavItem = {
 };
 
 const CREATOR_NAV: NavItem[] = [
+  ...(process.env.NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED === "true" ? [{href:"/app/commission-earnings",label:"Commission earnings",icon:"▥"}] : []),
+  ...(process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true" ? [{href:"/app/creator-links",label:"Creator links",icon:"↗"}] : []),
   { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
   { href: CRM_ROUTES.brands, label: "CRM", icon: "◎", match: (path: string) => path.startsWith("/app/crm") },
   { href: CRM_ROUTES.invoices, label: "Invoices", icon: "▤", match: (path: string) => path.startsWith("/app/tools/invoices") },
@@ -24,6 +27,7 @@ const CREATOR_NAV: NavItem[] = [
 ];
 
 const BRAND_NAV: NavItem[] = [
+  ...(process.env.NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED === "true" ? [{href:"/app/commission-earnings",label:"Commission earnings",icon:"▥"}] : []),
   { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
   { href: "/app/campaigns", label: "Campaigns", icon: "▣" },
   { href: "/app/creators", label: "Creators", icon: "◈", match: (path: string) => path.startsWith("/app/creators") },
@@ -72,6 +76,7 @@ export function AppSidebar() {
         )}
       </div>
 
+      {!collapsed && <BrandWorkspaceSelector />}
       <nav className="app-sidebar-nav" aria-label="Main">
         {nav.map((item) => (
           <Link

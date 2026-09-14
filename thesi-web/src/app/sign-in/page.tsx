@@ -1,4 +1,5 @@
 "use client";
+import { startMerchantSignin } from '@/lib/merchant-signin';
 
 import { useState } from "react";
 import Link from "next/link";
@@ -37,6 +38,7 @@ export default function SignInPage() {
         title="Sign in"
         subtitle="Welcome back. Enter the email and password for your Thesi account."
       >
+        {process.env.NEXT_PUBLIC_MERCHANT_SSO_ENABLED === "true" && <button className="auth-submit" disabled={loading} onClick={() => void startMerchantSignin().catch(e=>setError(e.message))}>Continue with Merchant Hub</button>}
         <form onSubmit={handleSubmit}>
           {error && (
             <p className="auth-error" role="alert">

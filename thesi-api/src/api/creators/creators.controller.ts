@@ -1,3 +1,4 @@
+import { workspaceResourceOwner } from '../brand-workspaces/workspace-context';
 import {
   Controller,
   Delete,
@@ -25,14 +26,14 @@ export class CreatorsController {
   @Get()
   @ApiOperation({ summary: 'List creators in the brand directory' })
   async list(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.creators.list(user.sub);
+    const data = await this.creators.list(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data };
   }
 
   @Get('favorites')
   @ApiOperation({ summary: 'List favorited creator ids for the brand' })
   async listFavorites(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.creators.listFavorites(user.sub);
+    const data = await this.creators.listFavorites(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -42,7 +43,7 @@ export class CreatorsController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id') id: string,
   ) {
-    const data = await this.creators.get(user.sub, id);
+    const data = await this.creators.get(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -52,7 +53,7 @@ export class CreatorsController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id') id: string,
   ) {
-    const data = await this.creators.addFavorite(user.sub, id);
+    const data = await this.creators.addFavorite(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -62,7 +63,7 @@ export class CreatorsController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id') id: string,
   ) {
-    const data = await this.creators.removeFavorite(user.sub, id);
+    const data = await this.creators.removeFavorite(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 }

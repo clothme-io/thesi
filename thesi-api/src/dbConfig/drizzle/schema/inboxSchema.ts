@@ -11,6 +11,7 @@ import { thesiUser } from './userSchema';
 const thesiSchema = pgSchema('thesi');
 
 export const inboxThread = thesiSchema.table('inbox_thread', {
+    workspaceId: uuid('workspace_id'),
   id: uuid('id').primaryKey().defaultRandom(),
   brandUserId: text('brand_user_id')
     .notNull()

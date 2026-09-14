@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   try {
     const authorization = request.headers.get("authorization");
     const response = await fetch(backendApiUrl("/campaigns"), {
-      headers: authorization ? { Authorization: authorization } : {},
+      headers: { ...workspaceHeaders(request), ...(authorization ? { Authorization: authorization } : {}) },
       cache: "no-store",
     });
     const json = await response.json();
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...workspaceHeaders(request),
         ...(authorization ? { Authorization: authorization } : {}),
       },
       body: JSON.stringify(body),

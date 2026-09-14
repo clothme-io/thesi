@@ -18,6 +18,8 @@ import {
   storeSession,
 } from "@/lib/auth-storage";
 
+import { workspaceForRequest, WORKSPACE_HEADER } from "@/lib/brand-workspace-storage";
+
 interface AuthContextValue {
   session: AuthSession | null;
   isLoading: boolean;
@@ -63,12 +65,14 @@ async function callAuthApi<T>(
   body: unknown,
   accessToken?: string,
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "POST",
+  workspaceId?: string,
 ): Promise<T> {
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const res = await fetch(path, {
     method,
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(workspaceId ? { [WORKSPACE_HEADER]: workspaceId } : {}),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     ...(body === undefined
@@ -87,11 +91,13 @@ async function callAuthBinary(
   path: string,
   accessToken: string,
   method: "GET" | "DELETE" = "GET",
+  workspaceId?: string,
 ): Promise<{ blob: Blob; fileName: string | null }> {
   const res = await fetch(path, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      ...(workspaceId ? { [WORKSPACE_HEADER]: workspaceId } : {}),
     },
   });
 
@@ -153,12 +159,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("You must sign in to continue");
       }
 
+      const workspaceId = workspaceForRequest(path, session.user);
       try {
         return await callAuthApi<T>(
           path,
           options.body,
           session.accessToken,
           options.method ?? "GET",
+          workspaceId,
         );
       } catch (error) {
         if (!(error instanceof AuthApiError) || error.status !== 401) {
@@ -181,6 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           options.body,
           refreshed.accessToken,
           options.method ?? "GET",
+          workspaceId,
         );
       } catch (error) {
         if (error instanceof AuthApiError && error.status === 401) {
@@ -203,11 +212,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("You must sign in to continue");
       }
 
+      const workspaceId = workspaceForRequest(path, session.user);
       try {
         return await callAuthBinary(
           path,
           session.accessToken,
           options.method ?? "GET",
+          workspaceId,
         );
       } catch (error) {
         if (!(error instanceof AuthApiError) || error.status !== 401) {
@@ -229,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           path,
           refreshed.accessToken,
           options.method ?? "GET",
+          workspaceId,
         );
       } catch (error) {
         if (error instanceof AuthApiError && error.status === 401) {
@@ -272,8 +284,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signOut = useCallback(() => {
+    if(session?.refreshToken.startsWith('mh.'))void fetch('/api/merchant-login/logout',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.accessToken}`},body:'{}',keepalive:true}).catch(()=>{});
     persist(null);
-  }, [persist]);
+  }, [persist, session]);
 
   const changePassword = useCallback(
     async (input: { currentPassword: string; newPassword: string; confirmPassword: string }) => {

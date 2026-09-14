@@ -1,3 +1,6 @@
+import { CampaignFundingModule } from '../campaign-funding/campaign-funding.module';
+import { CampaignProductsService } from './campaign-products.service';
+import { ProductPreviewController } from './product-preview.controller';
 import { Module } from '@nestjs/common';
 import { AuthModule } from 'src/api/auth/auth.module';
 import { BillingModule } from 'src/api/billing/billing.module';
@@ -13,15 +16,18 @@ import { PostgresCampaignRepository } from './postgres-campaign.repository';
 
 @Module({
   imports: [
+    CampaignFundingModule,
     AuthModule,
     MarketplaceModule,
     BillingModule,
     ConnectModule,
     InvitesModule,
   ],
-  controllers: [CampaignsController],
+  exports: [CampaignProductsService],
+  controllers: [CampaignsController, ProductPreviewController],
   providers: [
     CampaignsService,
+    CampaignProductsService,
     {
       provide: CAMPAIGN_REPOSITORY,
       useClass: PostgresCampaignRepository,

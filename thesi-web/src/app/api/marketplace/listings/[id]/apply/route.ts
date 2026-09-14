@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -23,7 +24,8 @@ export async function POST(request: Request, context: RouteContext) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(authorization ? { Authorization: authorization } : {}),
+          ...workspaceHeaders(request),
+        ...(authorization ? { Authorization: authorization } : {}),
         },
         body: JSON.stringify(body),
         cache: "no-store",

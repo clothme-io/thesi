@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -19,7 +20,7 @@ export async function GET(request: Request, context: RouteContext) {
     const response = await fetch(
       backendApiUrl(`/marketplace/listings/${id}/files/${fileId}/download`),
       {
-        headers: authorization ? { Authorization: authorization } : {},
+        headers: { ...workspaceHeaders(request), ...(authorization ? { Authorization: authorization } : {}) },
         cache: "no-store",
       },
     );

@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -16,7 +17,7 @@ export async function GET(
     const { id } = await params;
     const authorization = request.headers.get("authorization");
     const response = await fetch(backendApiUrl(`/billing/invoices/${id}/pdf`), {
-      headers: authorization ? { Authorization: authorization } : {},
+      headers: { ...workspaceHeaders(request), ...(authorization ? { Authorization: authorization } : {}) },
       cache: "no-store",
     });
 

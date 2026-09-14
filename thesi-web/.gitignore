@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-merchant-identity/
 /out/
 
 # production
@@ -39,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Isolated local creator-link walkthrough cache
+.next-creator-demo/

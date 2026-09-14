@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BRAND_SETTINGS_ROUTES } from "@/lib/settings/brand-routes";
+import { useWorkspacePermissions } from '@/context/WorkspacePermissions';
 
 const BRAND_SETTINGS_NAV = [
+  { href: BRAND_SETTINGS_ROUTES.integrations, label: "Merchant Hub", match: (path: string) => path.startsWith(BRAND_SETTINGS_ROUTES.integrations) },
   {
     href: BRAND_SETTINGS_ROUTES.general,
     label: "General",
@@ -45,12 +47,13 @@ const BRAND_SETTINGS_NAV = [
 
 export function BrandSettingsSubnav() {
   const pathname = usePathname();
+  const {canManageFunds}=useWorkspacePermissions();
 
   return (
     <aside className="crm-subnav" aria-label="Settings">
       <div className="crm-subnav-header">Settings</div>
       <nav className="crm-subnav-list">
-        {BRAND_SETTINGS_NAV.map((item) => (
+        {BRAND_SETTINGS_NAV.filter(item=>canManageFunds||!['Merchant Hub','Billing','Payment methods','Payment history'].includes(item.label)).map((item) => (
           <Link
             key={item.href}
             href={item.href}

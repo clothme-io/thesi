@@ -1,3 +1,4 @@
+import type { PromotedProduct } from "../brand-campaigns/types";
 import { commissionSummary } from "@/lib/brand-campaigns/commission";
 import type { BrandCampaignGoalType } from "@/lib/brand-campaigns/types";
 import type { BrandCampaignHybridPayment } from "@/lib/brand-campaigns/types";
@@ -28,6 +29,8 @@ export interface MilestonePayment {
 }
 
 export interface MarketplacePayment {
+  promotedProduct?: PromotedProduct;
+  promotedProducts?: PromotedProduct[];
   structure: PaymentStructure;
   currency: "USD";
   flatAmountCents?: number;
@@ -150,7 +153,7 @@ export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
   milestone: "Milestone",
   royalty: "Royalty",
   hybrid: "Hybrid",
-  commission: "Base + Commission",
+  commission: "Commission",
 };
 
 export const EMPTY_LISTING_CREATOR_BENEFITS: MarketplaceListing["creatorBenefits"] = {

@@ -1,5 +1,7 @@
 "use client";
 
+import { brandStorageKey } from "@/lib/brand-workspace-storage";
+
 import { useCallback, useEffect, useState } from "react";
 import type { BrandProfile } from "./brand-types";
 import { DEFAULT_BRAND_PROFILE } from "./brand-types";
@@ -18,24 +20,24 @@ export function loadBrandProfile(fallbackCompanyName = ""): BrandProfile {
   if (typeof window === "undefined") {
     return { ...DEFAULT_BRAND_PROFILE, companyName: fallbackCompanyName };
   }
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(brandStorageKey(STORAGE_KEY));
   if (!raw) {
     const initial = { ...DEFAULT_BRAND_PROFILE, companyName: fallbackCompanyName };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    localStorage.setItem(brandStorageKey(STORAGE_KEY), JSON.stringify(initial));
     return initial;
   }
   try {
     return normalizeBrandProfile(JSON.parse(raw), fallbackCompanyName);
   } catch {
     const initial = { ...DEFAULT_BRAND_PROFILE, companyName: fallbackCompanyName };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    localStorage.setItem(brandStorageKey(STORAGE_KEY), JSON.stringify(initial));
     return initial;
   }
 }
 
 export function saveBrandProfile(profile: BrandProfile) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+  localStorage.setItem(brandStorageKey(STORAGE_KEY), JSON.stringify(profile));
 }
 
 function normalizeBrandProfile(

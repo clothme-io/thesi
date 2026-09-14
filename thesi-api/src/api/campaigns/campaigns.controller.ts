@@ -1,5 +1,9 @@
+import { workspaceResourceOwner } from '../brand-workspaces/workspace-context';
+import { CampaignProductsService } from './campaign-products.service';
 import {
   Body,
+  Query,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -34,12 +38,19 @@ import { CampaignsService } from './campaigns.service';
 @UseGuards(JwtAuthGuard)
 @Controller('campaigns')
 export class CampaignsController {
-  constructor(private readonly campaigns: CampaignsService) {}
+  constructor(private readonly campaigns: CampaignsService, private readonly products: CampaignProductsService) {}
+
+  @Get("products")
+  async listProducts(@CurrentUser() user: AuthJwtPayload, @Query("offset") raw?: string) {
+    const offset = raw === undefined ? 0 : Number(raw);
+    if (!Number.isInteger(offset) || offset < 0 || offset > 100000) throw new BadRequestException("Invalid product offset");
+    return { data: await this.products.list(workspaceResourceOwner(user.sub), offset), error: null, status: 200 };
+  }
 
   @Get()
   @ApiOperation({ summary: 'List campaigns for the authenticated brand' })
   async list(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.campaigns.list(user.sub);
+    const data = await this.campaigns.list(workspaceResourceOwner(user.sub));
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -56,7 +67,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.campaigns.get(user.sub, id);
+    const data = await this.campaigns.get(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -66,7 +77,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.campaigns.getPlatformFee(user.sub, id);
+    const data = await this.campaigns.getPlatformFee(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -76,7 +87,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.campaigns.payPlatformFee(user.sub, id);
+    const data = await this.campaigns.payPlatformFee(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -86,7 +97,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthJwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const data = await this.campaigns.listCreatorPayouts(user.sub, id);
+    const data = await this.campaigns.listCreatorPayouts(workspaceResourceOwner(user.sub), id);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -99,7 +110,7 @@ export class CampaignsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: PayCreatorDto,
   ) {
-    const data = await this.campaigns.payCreator(user.sub, id, dto);
+    const data = await this.campaigns.payCreator(workspaceResourceOwner(user.sub), id, dto);
     return { status: HttpStatus.CREATED, error: null, data };
   }
 
@@ -109,7 +120,7 @@ export class CampaignsController {
     @CurrentUser() user: AuthJwtPayload,
     @Body() dto: UpsertCampaignDto,
   ) {
-    const data = await this.campaigns.create(user.sub, dto);
+    const data = await this.campaigns.create(workspaceResourceOwner(user.sub), dto);
     return { status: HttpStatus.CREATED, error: null, data };
   }
 
@@ -120,7 +131,7 @@ export class CampaignsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpsertCampaignDto,
   ) {
-    const data = await this.campaigns.update(user.sub, id, dto);
+    const data = await this.campaigns.update(workspaceResourceOwner(user.sub), id, dto);
     return { status: HttpStatus.OK, error: null, data };
   }
 
@@ -155,7 +166,7 @@ export class CampaignsController {
         }
       | undefined,
   ) {
-    const data = await this.campaigns.uploadFile(user.sub, id, file);
+    const data = await this.campaigns.uploadFile(workspaceResourceOwner(user.sub), id, file);
     return { status: HttpStatus.CREATED, error: null, data };
   }
 
@@ -167,7 +178,7 @@ export class CampaignsController {
     @Param('fileId', ParseUUIDPipe) fileId: string,
     @Res() res: Response,
   ) {
-    const file = await this.campaigns.downloadFile(user.sub, id, fileId);
+    const file = await this.campaigns.downloadFile(workspaceResourceOwner(user.sub), id, fileId);
     res.setHeader('Content-Type', file.contentType);
     res.setHeader(
       'Content-Disposition',
@@ -183,7 +194,7 @@ export class CampaignsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('fileId', ParseUUIDPipe) fileId: string,
   ) {
-    const data = await this.campaigns.deleteFile(user.sub, id, fileId);
+    const data = await this.campaigns.deleteFile(workspaceResourceOwner(user.sub), id, fileId);
     return { status: HttpStatus.OK, error: null, data };
   }
 }

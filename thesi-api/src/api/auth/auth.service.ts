@@ -1,3 +1,6 @@
+import { Optional } from '@nestjs/common';
+import { sql } from 'drizzle-orm';
+import { MerchantAccessService } from 'src/shared/auth/merchant-access.service';
 import {
   BadRequestException,
   ConflictException,
@@ -48,6 +51,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly novu: NovuService,
+    @Optional() private readonly merchantAccess?: MerchantAccessService,
   ) {}
 
   async signUp(dto: SignUpDto): Promise<AuthSessionDto> {
@@ -92,7 +96,7 @@ export class AuthService {
   async signIn(dto: SignInDto): Promise<AuthSessionDto> {
     const email = dto.email.trim().toLowerCase();
     const user = await this.findUserByEmail(email);
-    if (!user) {
+    if (!user || user.passwordHash.startsWith('$external$')) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -134,17 +138,23 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    await this.db
-      .update(schema.thesiRefreshToken)
-      .set({ revokedAt: new Date() })
-      .where(eq(schema.thesiRefreshToken.id, stored.id));
-
-    return this.createSession(user);
+    let merchantSessionId: string | undefined;
+    if (dto.refreshToken.startsWith('mh.')) {
+      const row = (await this.db.execute(sql`SELECT session_id FROM thesi.merchant_session_refresh WHERE token_id=${stored.id}`)).rows[0];
+      if (!row || !this.merchantAccess) throw new UnauthorizedException('Merchant refresh unavailable');
+      merchantSessionId = String(row.session_id);
+      await this.merchantAccess.session(user.id, merchantSessionId);
+    }
+    const claimed = await this.db.update(schema.thesiRefreshToken).set({revokedAt:new Date()})
+      .where(and(eq(schema.thesiRefreshToken.id,stored.id),isNull(schema.thesiRefreshToken.revokedAt))).returning({id:schema.thesiRefreshToken.id});
+    if (!claimed.length) throw new UnauthorizedException('Refresh token already used');
+    return this.createSession(user,merchantSessionId);
   }
 
   async changePassword(
     userId: string,
     dto: ChangePasswordDto,
+    merchantSessionId?: string,
   ): Promise<AuthSessionDto> {
     if (dto.newPassword !== dto.confirmPassword) {
       throw new BadRequestException('Passwords do not match');
@@ -160,6 +170,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    if(user.passwordHash.startsWith('$external$'))throw new ForbiddenException('Manage this account password in Merchant Hub');
     const valid = await this.passwordService.compare(
       dto.currentPassword,
       user.passwordHash,
@@ -180,13 +191,13 @@ export class AuthService {
       .where(eq(schema.thesiUser.id, userId))
       .returning();
 
-    return this.createSession(updated);
+    return this.createSession(updated, merchantSessionId);
   }
 
   async requestPasswordReset(emailRaw: string): Promise<void> {
     const email = emailRaw.trim().toLowerCase();
     const user = await this.findUserByEmail(email);
-    if (!user) {
+    if (!user || user.passwordHash.startsWith('$external$')) {
       return;
     }
 
@@ -286,7 +297,7 @@ export class AuthService {
     });
   }
 
-  async completeWelcome(userId: string): Promise<AuthSessionDto> {
+  async completeWelcome(userId: string, merchantSessionId?: string): Promise<AuthSessionDto> {
     const [updated] = await this.db
       .update(schema.thesiUser)
       .set({
@@ -300,12 +311,13 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    return this.createSession(updated);
+    return this.createSession(updated, merchantSessionId);
   }
 
   async submitOnboarding(
     userId: string,
     dto: OnboardingAnswersDto,
+    merchantSessionId?: string,
   ): Promise<AuthSessionDto> {
     const [user] = await this.db
       .select()
@@ -357,7 +369,7 @@ export class AuthService {
       .where(eq(schema.thesiUser.id, userId))
       .returning();
 
-    return this.createSession(updated);
+    return this.createSession(updated, merchantSessionId);
   }
 
   async createUserFromApplication(
@@ -424,35 +436,39 @@ export class AuthService {
     return user;
   }
 
-  private async createSession(user: UserRow): Promise<AuthSessionDto> {
+  async createSession(user: UserRow, merchantSessionId?: string): Promise<AuthSessionDto> {
+    if (merchantSessionId) {
+      if (!this.merchantAccess) throw new UnauthorizedException('Merchant session verification unavailable');
+      await this.merchantAccess.session(user.id,merchantSessionId);
+    }
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       email: user.email,
       role: user.role,
+      ...(merchantSessionId ? {merchantSessionId} : {}),
     });
 
-    const refreshToken = generateRefreshToken();
+    const refreshToken = `${merchantSessionId ? 'mh.' : ''}${generateRefreshToken()}`;
     const refreshExpiration =
       this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d';
     const expiresAt = this.addDuration(new Date(), refreshExpiration);
 
-    await this.db.insert(schema.thesiRefreshToken).values({
-      id: uuidv4(),
-      userId: user.id,
-      tokenHash: hashToken(refreshToken),
-      expiresAt,
+    await this.db.transaction(async tx => {
+      const tokenId=uuidv4();
+      await tx.insert(schema.thesiRefreshToken).values({id:tokenId,userId:user.id,tokenHash:hashToken(refreshToken),expiresAt});
+      if (merchantSessionId) await tx.execute(sql`INSERT INTO thesi.merchant_session_refresh(token_id,session_id) VALUES(${tokenId},${merchantSessionId}::uuid)`);
     });
 
     return {
       accessToken,
       refreshToken,
-      user: this.mapUser(user),
+      user: this.mapUser(user,!!merchantSessionId),
     };
   }
 
-  private mapUser(user: UserRow): AuthUserDto {
+  private mapUser(user: UserRow, merchantSession = false): AuthUserDto {
     const forcePasswordChange = this.isForcePasswordChangeEnabled();
-    if (!forcePasswordChange) {
+    if (!forcePasswordChange && !merchantSession) {
       return {
         id: user.id,
         email: user.email,

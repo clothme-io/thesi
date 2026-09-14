@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -17,7 +18,7 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const authorization = request.headers.get("authorization");
     const response = await fetch(backendApiUrl(`/campaigns/${id}`), {
-      headers: authorization ? { Authorization: authorization } : {},
+      headers: { ...workspaceHeaders(request), ...(authorization ? { Authorization: authorization } : {}) },
       cache: "no-store",
     });
     const json = await response.json();
@@ -46,6 +47,7 @@ export async function PUT(request: Request, context: RouteContext) {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
+        ...workspaceHeaders(request),
         ...(authorization ? { Authorization: authorization } : {}),
       },
       body: JSON.stringify(body),

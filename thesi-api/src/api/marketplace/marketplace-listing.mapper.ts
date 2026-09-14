@@ -116,6 +116,8 @@ function campaignPaymentToListingPayment(
     case 'hybrid':
       return {
         structure: payment.model,
+        ...(payment.promotedProduct ? { promotedProduct: payment.promotedProduct } : {}),
+        ...(payment?.promotedProducts ? { promotedProducts: payment.promotedProducts } : {}),
         currency: 'USD',
         hybridFlatCents:
           payment.hybrid?.base?.enabled

@@ -10,6 +10,7 @@ import { thesiUser } from './userSchema';
 const thesiSchema = pgSchema('thesi');
 
 export const campaignInvite = thesiSchema.table('campaign_invite', {
+    workspaceId: uuid('workspace_id'),
   id: uuid('id').primaryKey().defaultRandom(),
   campaignId: text('campaign_id').notNull(),
   brandUserId: text('brand_user_id')

@@ -16,6 +16,8 @@ import { thesiUser } from './userSchema';
 const thesiSchema = pgSchema('thesi');
 
 export type MarketplacePaymentJson = {
+  promotedProduct?: CampaignPaymentJson['promotedProduct'];
+  promotedProducts?: CampaignPaymentJson['promotedProducts'];
   structure: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid' | 'commission';
   currency: 'USD';
   flatAmountCents?: number;
@@ -74,6 +76,7 @@ export type MarketplaceProductProvidedJson = {
 };
 
 export const marketplaceListing = thesiSchema.table('marketplace_listing', {
+    workspaceId: uuid('workspace_id'),
   id: uuid('id').primaryKey().defaultRandom(),
   campaignId: uuid('campaign_id')
     .notNull()

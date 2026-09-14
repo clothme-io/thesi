@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -18,7 +19,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     const authorization = request.headers.get("authorization");
     const response = await fetch(backendApiUrl(`/inbox/messages/${id}`), {
       method: "DELETE",
-      headers: authorization ? { Authorization: authorization } : {},
+      headers: { ...workspaceHeaders(request), ...(authorization ? { Authorization: authorization } : {}) },
       cache: "no-store",
     });
     const json = await response.json();

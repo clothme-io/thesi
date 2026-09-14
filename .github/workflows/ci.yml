@@ -1,0 +1,37 @@
+name: Thesi checks
+
+on:
+  pull_request:
+    paths:
+      - 'thesi-api/**'
+      - 'thesi-web/**'
+      - '.github/workflows/**'
+      - 'scripts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [thesi-api, thesi-web]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+      - run: npm ci
+      - if: matrix.project == 'thesi-api'
+        run: npm test -- --runInBand
+      - if: matrix.project == 'thesi-web'
+        run: npm test
+      - run: npm run build

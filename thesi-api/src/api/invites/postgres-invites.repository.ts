@@ -1,3 +1,4 @@
+import { workspaceWrite, workspaceFilter } from '../brand-workspaces/workspace-context';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -66,8 +67,8 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .from(schema.campaign)
       .where(
         and(
-          eq(schema.campaign.id, campaignId),
-          eq(schema.campaign.ownerUserId, brandUserId),
+          and(workspaceFilter(schema.campaign), eq(schema.campaign.id, campaignId)),
+          and(workspaceFilter(schema.campaign), eq(schema.campaign.ownerUserId, brandUserId)),
         ),
       )
       .limit(1);
@@ -81,10 +82,10 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .where(
         campaignId
           ? and(
-              eq(schema.campaignInvite.brandUserId, brandUserId),
-              eq(schema.campaignInvite.campaignId, campaignId),
+              and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.brandUserId, brandUserId)),
+              and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.campaignId, campaignId)),
             )
-          : eq(schema.campaignInvite.brandUserId, brandUserId),
+          : and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.brandUserId, brandUserId)),
       )
       .orderBy(desc(schema.campaignInvite.sentAt));
     return rows.map((row) => this.toCampaignInvite(row));
@@ -96,7 +97,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .from(schema.campaignInvite)
       .where(
         and(
-          eq(schema.campaignInvite.campaignId, campaignId),
+          and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.campaignId, campaignId)),
           sql`lower(${schema.campaignInvite.creatorEmail}) = ${creatorEmail.toLowerCase()}`,
         ),
       )
@@ -114,7 +115,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .from(schema.campaignInvite)
       .where(
         and(
-          eq(schema.campaignInvite.campaignId, campaignId),
+          and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.campaignId, campaignId)),
           or(
             eq(schema.campaignInvite.creatorUserId, creatorUserId),
             sql`lower(${schema.campaignInvite.creatorEmail}) = ${creatorEmail.toLowerCase()}`,
@@ -129,6 +130,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
     const [row] = await this.db
       .insert(schema.campaignInvite)
       .values({
+        ...workspaceWrite(),
         campaignId: input.campaignId,
         brandUserId: input.brandUserId,
         campaignName: input.campaignName,
@@ -159,7 +161,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
           brandName: input.brandName,
           external: false,
         })
-        .where(eq(schema.campaignInvite.id, existing.id))
+        .where(and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.id, existing.id)))
         .returning();
       if (!row) {
         throw new Error('Failed to update accepted campaign invite');
@@ -170,6 +172,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
     const [row] = await this.db
       .insert(schema.campaignInvite)
       .values({
+        ...workspaceWrite(),
         campaignId: input.campaignId,
         brandUserId: input.brandUserId,
         campaignName: input.campaignName,
@@ -196,7 +199,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .set({ status })
       .where(
         and(
-          eq(schema.campaignInvite.id, inviteId),
+          and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.id, inviteId)),
           eq(schema.campaignInvite.status, 'sent'),
         ),
       )
@@ -212,8 +215,8 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .from(schema.campaign)
       .where(
         and(
-          eq(schema.campaign.id, input.campaignId),
-          eq(schema.campaign.ownerUserId, input.brandUserId),
+          and(workspaceFilter(schema.campaign), eq(schema.campaign.id, input.campaignId)),
+          and(workspaceFilter(schema.campaign), eq(schema.campaign.ownerUserId, input.brandUserId)),
         ),
       )
       .limit(1);
@@ -222,6 +225,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
     await this.db
       .insert(schema.campaignAcceptanceSnapshot)
       .values({
+        ...workspaceWrite(),
         campaignId: campaign.id,
         brandUserId: campaign.ownerUserId,
         creatorUserId: input.creatorUserId ?? null,
@@ -257,7 +261,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
       .from(schema.campaignAcceptanceSnapshot)
       .where(
         and(
-          eq(schema.campaignAcceptanceSnapshot.campaignId, campaignId),
+          and(workspaceFilter(schema.campaignAcceptanceSnapshot), eq(schema.campaignAcceptanceSnapshot.campaignId, campaignId)),
           or(
             eq(schema.campaignAcceptanceSnapshot.creatorUserId, creatorUserId),
             sql`lower(${schema.campaignAcceptanceSnapshot.creatorEmail}) = ${creatorEmail.toLowerCase()}`,
@@ -275,7 +279,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
     await this.db
       .update(schema.campaignInvite)
       .set({ novuTransactionId: transactionId })
-      .where(eq(schema.campaignInvite.id, inviteId));
+      .where(and(workspaceFilter(schema.campaignInvite), eq(schema.campaignInvite.id, inviteId)));
   }
 
   async listPlatformBrandInvites(invitedByUserId: string) {

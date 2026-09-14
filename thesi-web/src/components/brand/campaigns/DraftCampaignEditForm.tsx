@@ -1,5 +1,6 @@
 "use client";
 
+import {CampaignProductSelection,campaignProducts,productSelections,productInput,type ProductSelection} from "./CampaignProductSelection";
 import { useEffect, useState } from "react";
 import { toDateInputValue } from "@/lib/brand-campaigns/date";
 import type { CampaignInput } from "@/lib/brand-campaigns/storage";
@@ -61,7 +62,7 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Flat Rate", value: "flat_rate" },
   { label: "Milestone", value: "milestone" },
   { label: "Royalty", value: "royalty" },
-  { label: "Base + Commission", value: "commission" },
+  { label: "Commission", value: "commission" },
   { label: "Hybrid", value: "hybrid" },
 ];
 
@@ -136,6 +137,7 @@ function centsFromPaymentInput(value: string): number | undefined {
 }
 
 export type DraftCampaignFormState = {
+  merchantProducts?: ProductSelection[];multiProductAgreement?:boolean;
   name: string;
   campaignType: BrandCampaignGoalType;
   contentTypes: BrandCampaignType[];
@@ -187,6 +189,8 @@ export function draftFormFromCampaign(
     creatorCapacity: campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
     creatorBenefits: campaign.creatorBenefits ?? { ...EMPTY_CREATOR_BENEFITS },
     contentRights: campaign.contentRights ?? { ...EMPTY_CONTENT_RIGHTS },
+    merchantProducts: productSelections(campaignProducts(campaign.payment)),
+    multiProductAgreement:!!campaign.payment.promotedProducts,
     paymentModel: campaign.payment.model,
     milestoneStructure:
       campaign.payment.milestoneStructure ?? DEFAULT_MILESTONE_STRUCTURE,
@@ -219,6 +223,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       platforms: form.platforms,
     },
     files: [],
+    ...productInput(form.paymentModel === "commission" ? form.merchantProducts??[] : [],form.multiProductAgreement),
     payment: buildCampaignPayment({
       model: form.paymentModel,
       flatAmount: form.flatAmount,
@@ -285,6 +290,7 @@ export function DraftCampaignEditForm({
 
   return (
     <div className="workspace-form">
+      {form.paymentModel === "commission" && <CampaignProductSelection value={form.merchantProducts??[]} onChange={products => set("merchantProducts", products)} initial={campaignProducts(campaign.payment)} locked={campaign.status !== "draft"} />}
       <section className="workspace-section">
         <h3>Campaign basics</h3>
         <div className="workspace-grid">
@@ -711,11 +717,12 @@ export function DraftCampaignEditForm({
           ) : form.paymentModel === "commission" ? (
             <>
               <CommissionPaymentBuilder
+                creatorCapacity={form.creatorCapacity}
                 value={form.hybridPayment}
                 onChange={(next) => set("hybridPayment", next)}
               />
               <p className="workspace-hint">
-                Fee and budget estimates include only the fixed base; future commission is not included.
+                Fee and budget estimates include only an enabled fixed base; future commission is not included.
               </p>
             </>
           ) : form.paymentModel === "hybrid" ? (

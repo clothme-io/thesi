@@ -14,6 +14,7 @@ const thesiSchema = pgSchema('thesi');
 export const campaignPlatformFee = thesiSchema.table(
   'campaign_platform_fee',
   {
+    workspaceId: uuid('workspace_id'),
     id: uuid('id').primaryKey().defaultRandom(),
     campaignId: uuid('campaign_id')
       .notNull()

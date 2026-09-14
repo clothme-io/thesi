@@ -1,3 +1,4 @@
+import { workspaceHeaders } from "@/lib/workspace-proxy";
 import { NextResponse } from "next/server";
 import { backendApiUrl, getBackendBaseUrl } from "@/lib/backendApi";
 
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
         `/invites/campaign/received?campaignId=${encodeURIComponent(campaignId)}`,
       ),
       {
-        headers: authorization ? { Authorization: authorization } : {},
+        headers: { ...workspaceHeaders(request), ...(authorization ? { Authorization: authorization } : {}) },
         cache: "no-store",
       },
     );

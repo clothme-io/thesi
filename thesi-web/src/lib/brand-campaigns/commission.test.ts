@@ -22,7 +22,28 @@ const form = () => ({
     "Net product sales excluding tax, shipping, and refunds. Monthly settlement after 30 days.",
 });
 
-describe("Base + Commission", () => {
+describe("Commission with optional base", () => {
+  it('uses agreed brand funding and ClothME handling instead of stale proposals',()=>{
+    const hybrid={...form(),commissionFundingSource:'shared_custom' as const,commissionFundingTerms:'Brand funds 70%; ClothME contribution requires approval.'};
+    const payment=buildCampaignPayment({model:'commission',flatAmount:'',milestoneStructure:'cumulative',notes:'',milestones:[],hybrid});
+    expect(payment.hybrid?.affiliate?.payoutHandler).toBe('clothme');
+    expect(payment.hybrid?.affiliate?.fundingSource).toBe('brand');
+    const campaign={...SEED_BRAND_CAMPAIGN_DATA.campaigns[0],payment};
+    expect(draftFormToInput(draftFormFromCampaign(campaign)).payment).toEqual(payment);
+    expect(payment.hybrid?.affiliate?.fundingFlowVersion).toBe(1);
+    expect(paymentFormError('commission',[],{...hybrid,commissionFundingTerms:''})).toBeNull();
+  });
+  it("round-trips commission only and ignores stale disabled base fields", () => {
+    const hybrid = {...form(),baseEnabled:false,baseAmount:"999",baseTrigger:"custom" as const,baseCustomTrigger:""};
+    expect(paymentFormError("commission",[],hybrid)).toBeNull();
+    const payment = buildCampaignPayment({model:"commission",flatAmount:"",milestoneStructure:"cumulative",notes:"",milestones:[],hybrid});
+    expect(payment.hybrid?.base).toBeUndefined();
+    const campaign = {...SEED_BRAND_CAMPAIGN_DATA.campaigns[0],payment};
+    expect(draftFormToInput(draftFormFromCampaign(campaign)).payment).toEqual(payment);
+    expect(formPayoutCents("commission","999",[],"cumulative",hybrid)).toBe(0);
+    expect(getCampaignBudgetLabel(campaign)).toContain("Commission only: 12.25%");
+    expect(formatListingPayment(campaignToListing(campaign,"Brand","brand-1").payment)).not.toContain("base per creator");
+  });
   it("preserves terms through editing and marketplace mapping without including stale hybrid bonuses", () => {
     const hybrid = {
       ...form(),
@@ -106,7 +127,7 @@ describe("Base + Commission", () => {
     ).toMatch(/attribution/i);
     expect(
       paymentFormError("commission", [], { ...form(), baseTrigger: "custom" }),
-    ).toMatch(/earned/i);
+    ).toBeNull();
     expect(
       paymentFormError("commission", [], { ...form(), affiliateTerms: " " }),
     ).toMatch(/settlement/i);
