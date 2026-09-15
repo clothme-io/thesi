@@ -8,6 +8,7 @@
 # DB   localhost:5436  (database `thesi`; 5434 is often used by vendor-postgres)
 #
 # Flyway SQL is read from sibling ../clothme-db/databases/thesi/sql.
+# Merchant Hub linking/SSO uses localhost origins and dedicated local keys (not for shared envs).
 
 services:
   postgres:
@@ -80,6 +81,15 @@ services:
       SOCIAL_TOKEN_ENCRYPTION_KEY: thesi-local-social-token-key
       TIKTOK_REDIRECT_URI: http://localhost:5010/v1/social/tiktok/callback
       INSTAGRAM_REDIRECT_URI: http://localhost:5010/v1/social/instagram/callback
+      BRAND_WORKSPACES_ENABLED: "true"
+      BRAND_WORKSPACE_ACCESS_ENABLED: "true"
+      MULTI_BRAND_ENABLED: "true"
+      MERCHANT_LINKING_ENABLED: "true"
+      MERCHANT_SSO_ENABLED: "true"
+      MERCHANT_HUB_URL: http://localhost:8080
+      MERCHANT_API_URL: http://localhost:3011
+      MERCHANT_LINK_SERVICE_KEY: local-thesi-merchant-link-key-32b
+      MERCHANT_IDENTITY_SERVICE_KEY: local-thesi-merchant-id-key-32byt
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,6 +126,8 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:5010
       THESI_API_URL: http://thesi-api:5000
       NEXT_PUBLIC_AUTH_DEV_MODE: "false"
+      NEXT_PUBLIC_MERCHANT_SSO_ENABLED: "true"
+      NEXT_PUBLIC_BRAND_WORKSPACES_ENABLED: "true"
       NODE_ENV: development
     depends_on:
       thesi-api:
