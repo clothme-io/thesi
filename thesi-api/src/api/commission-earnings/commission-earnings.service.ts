@@ -239,8 +239,8 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
             coalesce((SELECT sum(fe.amount_cents) FROM thesi.campaign_fund_entry fe JOIN fund_scope f ON f.campaign_id=fe.campaign_id WHERE fe.kind='refund_unused'),0)::text AS "unusedRefundedCents",
             coalesce((SELECT count(*) FROM obligation_scope),0)::int AS "baseObligations",
             coalesce((SELECT sum(amount_cents) FROM obligation_scope),0)::text AS "baseObligationCents",
-            coalesce((SELECT sum(fe.amount_cents) FROM thesi.campaign_fund_entry fe JOIN obligation_scope o ON o.id=fe.obligation_id WHERE fe.kind='release'),0)::text AS "releasedBaseCents",
-            coalesce((SELECT sum(fe.amount_cents) FROM thesi.campaign_fund_entry fe JOIN obligation_scope o ON o.id=fe.obligation_id WHERE fe.kind='refund_cancelled'),0)::text AS "cancelledBaseRefundCents"`)
+            coalesce((SELECT sum(fe.amount_cents) FROM thesi.campaign_fund_entry fe JOIN thesi.campaign_fund_operation op ON op.id=fe.operation_id JOIN obligation_scope o ON o.id=op.obligation_id WHERE fe.kind='release'),0)::text AS "releasedBaseCents",
+            coalesce((SELECT sum(fe.amount_cents) FROM thesi.campaign_fund_entry fe JOIN thesi.campaign_fund_operation op ON op.id=fe.operation_id JOIN obligation_scope o ON o.id=op.obligation_id WHERE fe.kind='refund_cancelled'),0)::text AS "cancelledBaseRefundCents"`)
         ).rows
       : [];
     const lines = (
