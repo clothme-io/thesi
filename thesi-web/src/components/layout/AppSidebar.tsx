@@ -74,6 +74,15 @@ export function AppSidebar() {
             <span>{session?.user.email}</span>
           </div>
         )}
+        <button
+          type="button"
+          className="app-sidebar-toggle"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((v) => !v)}
+        >
+          {collapsed ? "→" : "←"}
+        </button>
       </div>
 
       {!collapsed && <BrandWorkspaceSelector />}
@@ -94,13 +103,6 @@ export function AppSidebar() {
       </nav>
 
       <div className="app-sidebar-footer">
-        <button
-          type="button"
-          className="app-sidebar-toggle"
-          onClick={() => setCollapsed((v) => !v)}
-        >
-          {collapsed ? "→" : "← Collapse"}
-        </button>
         <button
           type="button"
           className="app-sidebar-signout"
