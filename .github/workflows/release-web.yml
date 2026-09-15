@@ -204,6 +204,13 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=https://dv.get-thesi.com
             NEXT_PUBLIC_AUTH_DEV_MODE=false
+            NEXT_PUBLIC_BRAND_WORKSPACES_ENABLED=true
+            NEXT_PUBLIC_CAMPAIGN_PRODUCTS_ENABLED=true
+            NEXT_PUBLIC_CAMPAIGN_MULTI_PRODUCTS_ENABLED=true
+            NEXT_PUBLIC_CREATOR_TRACKING_ENABLED=true
+            NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED=true
+            NEXT_PUBLIC_COMMISSION_RULES_ENABLED=true
+            NEXT_PUBLIC_MERCHANT_SSO_ENABLED=true
           load: true
           tags: ${{ env.IMAGE_REPOSITORY }}:${{ steps.sha_tag.outputs.tag }}
       - name: Push image with retry
@@ -520,14 +527,15 @@ jobs:
           sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
       - name: Configure prod kubeconfig
+        env:
+          PROD_KUBECONFIG: ${{ secrets.CLOTHME_PROD_KUBECONFIG }}
         run: |
-          if [ -z "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" ]; then
-            echo "::error::Set repository secret CLOTHME_PROD_KUBECONFIG (clothme-prod kubeconfig)."
-            exit 1
-          fi
+          test -n "$PROD_KUBECONFIG" || { echo "::error::Missing production kubeconfig"; exit 1; }
           mkdir -p "$HOME/.kube"
-          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          umask 077
+          printf '%s' "$PROD_KUBECONFIG" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl --request-timeout=20s get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o name
 
       - name: Wait for approved image and preview readiness
         env:
@@ -629,10 +637,15 @@ jobs:
           sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
       - name: Configure prod kubeconfig
+        env:
+          PROD_KUBECONFIG: ${{ secrets.CLOTHME_PROD_KUBECONFIG }}
         run: |
+          test -n "$PROD_KUBECONFIG" || { echo "::error::Missing production kubeconfig"; exit 1; }
           mkdir -p "$HOME/.kube"
-          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          umask 077
+          printf '%s' "$PROD_KUBECONFIG" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl --request-timeout=20s get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o name
 
       - name: Promote rollout
         run: |
@@ -724,10 +737,15 @@ jobs:
           sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
       - name: Configure prod kubeconfig
+        env:
+          PROD_KUBECONFIG: ${{ secrets.CLOTHME_PROD_KUBECONFIG }}
         run: |
+          test -n "$PROD_KUBECONFIG" || { echo "::error::Missing production kubeconfig"; exit 1; }
           mkdir -p "$HOME/.kube"
-          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          umask 077
+          printf '%s' "$PROD_KUBECONFIG" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl --request-timeout=20s get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o name
 
       - name: Undo rollout (fast rollback)
         run: |
@@ -810,10 +828,15 @@ jobs:
           sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
       - name: Configure prod kubeconfig
+        env:
+          PROD_KUBECONFIG: ${{ secrets.CLOTHME_PROD_KUBECONFIG }}
         run: |
+          test -n "$PROD_KUBECONFIG" || { echo "::error::Missing production kubeconfig"; exit 1; }
           mkdir -p "$HOME/.kube"
-          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          umask 077
+          printf '%s' "$PROD_KUBECONFIG" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl --request-timeout=20s get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o name
 
       - name: Wait for git rollback rollout
         run: |
@@ -836,10 +859,15 @@ jobs:
           sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
 
       - name: Configure prod kubeconfig
+        env:
+          PROD_KUBECONFIG: ${{ secrets.CLOTHME_PROD_KUBECONFIG }}
         run: |
+          test -n "$PROD_KUBECONFIG" || { echo "::error::Missing production kubeconfig"; exit 1; }
           mkdir -p "$HOME/.kube"
-          echo "${{ secrets.CLOTHME_PROD_KUBECONFIG }}" > "$HOME/.kube/config"
+          umask 077
+          printf '%s' "$PROD_KUBECONFIG" > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl --request-timeout=20s get rollout "${{ env.ROLLOUT_NAME }}" -n "${{ env.ROLLOUT_NAMESPACE }}" -o name
 
       - name: Confirm rollout healthy after fast rollback
         run: |
