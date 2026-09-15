@@ -4,6 +4,8 @@ import {
 } from './commission-earnings.controller';
 import { CommissionEventDto } from './commission-event.dto';
 import { validate } from 'class-validator';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 const ctx = (header: string, value: unknown) =>
   ({
     switchToHttp: () => ({
@@ -59,5 +61,16 @@ describe('commission service credentials', () => {
     expect(errors.some((e) => e.property === 'netSaleCents')).toBe(true);
     expect(errors.some((e) => e.property === 'platformFeeCents')).toBe(true);
     expect(errors.some((e) => e.property === 'receiptId')).toBe(true);
+  });
+  it('reports base payment movement through funding operations', () => {
+    const serviceSource = readFileSync(
+      join(__dirname, 'commission-earnings.service.ts'),
+      'utf8',
+    );
+
+    expect(serviceSource).toContain(
+      'JOIN thesi.campaign_fund_operation op ON op.id=fe.operation_id JOIN obligation_scope o ON o.id=op.obligation_id',
+    );
+    expect(serviceSource).not.toContain('fe.obligation_id');
   });
 });
