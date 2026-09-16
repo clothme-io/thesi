@@ -1,6 +1,7 @@
 import type { CommissionRules } from 'src/api/campaigns/commission-rules';
 import type { PromotedProduct } from '../../../api/campaigns/campaign-products.service';
 import {
+  bigint,
   boolean,
   date,
   integer,
@@ -307,4 +308,76 @@ export const campaignContentMetric = thesiSchema.table(
       table.externalMediaId,
     ),
   ],
+);
+
+export type CampaignContentReviewStatus =
+  | 'draft'
+  | 'in_review'
+  | 'changes_requested'
+  | 'approved'
+  | 'rejected';
+
+export type CampaignContentReviewEventType =
+  | 'submitted'
+  | 'comment'
+  | 'changes_requested'
+  | 'approved'
+  | 'rejected';
+
+export const campaignContentSubmission = thesiSchema.table(
+  'campaign_content_submission',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaign.id, { onDelete: 'cascade' }),
+    creatorUserId: text('creator_user_id')
+      .notNull()
+      .references(() => thesiUser.id, { onDelete: 'cascade' }),
+    deliverableLabel: text('deliverable_label').notNull().default(''),
+    title: text('title').notNull().default(''),
+    status: text('status').notNull(),
+    version: integer('version').notNull().default(1),
+    originalName: text('original_name').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    contentType: text('content_type').notNull(),
+    storageProvider: text('storage_provider').notNull(),
+    storageKey: text('storage_key').notNull(),
+    reviewedByUserId: text('reviewed_by_user_id').references(() => thesiUser.id, {
+      onDelete: 'set null',
+    }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique('campaign_content_submission_storage_unique').on(
+      table.storageProvider,
+      table.storageKey,
+    ),
+  ],
+);
+
+export const campaignContentReviewEvent = thesiSchema.table(
+  'campaign_content_review_event',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    submissionId: uuid('submission_id')
+      .notNull()
+      .references(() => campaignContentSubmission.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id')
+      .notNull()
+      .references(() => thesiUser.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    comment: text('comment').notNull().default(''),
+    version: integer('version').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
 );
