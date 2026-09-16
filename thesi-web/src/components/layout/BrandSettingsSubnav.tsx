@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { BRAND_SETTINGS_ROUTES } from "@/lib/settings/brand-routes";
 import { useWorkspacePermissions } from '@/context/WorkspacePermissions';
 
@@ -48,11 +49,18 @@ const BRAND_SETTINGS_NAV = [
 export function BrandSettingsSubnav() {
   const pathname = usePathname();
   const {canManageFunds}=useWorkspacePermissions();
+  const listRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    listRef.current
+      ?.querySelector(".crm-subnav-link--active")
+      ?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [pathname]);
 
   return (
     <aside className="crm-subnav" aria-label="Settings">
       <div className="crm-subnav-header">Settings</div>
-      <nav className="crm-subnav-list">
+      <nav className="crm-subnav-list" ref={listRef}>
         {BRAND_SETTINGS_NAV.filter(item=>canManageFunds||!['Merchant Hub','Billing','Payment methods','Payment history'].includes(item.label)).map((item) => (
           <Link
             key={item.href}

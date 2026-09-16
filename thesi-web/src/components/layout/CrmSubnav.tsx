@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { CRM_ROUTES } from "@/lib/creator-crm/routes";
 
 const CRM_NAV = [
@@ -20,11 +21,18 @@ const CRM_NAV = [
 
 export function CrmSubnav() {
   const pathname = usePathname();
+  const listRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    listRef.current
+      ?.querySelector(".crm-subnav-link--active")
+      ?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [pathname]);
 
   return (
     <aside className="crm-subnav" aria-label="CRM">
       <div className="crm-subnav-header">CRM</div>
-      <nav className="crm-subnav-list">
+      <nav className="crm-subnav-list" ref={listRef}>
         {CRM_NAV.map((item) => (
           <Link
             key={item.href}
