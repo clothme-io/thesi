@@ -16,9 +16,8 @@ describe('creator links',()=>{
  it('labels and requests the selected product link',async()=>{
   request.mockResolvedValue({url:'https://thesi.test/r/'+ 'c'.repeat(43)});
   render(<CreatorTrackingLink campaignId="campaign" productId="shirt" productTitle="Linen shirt"/>);
-  expect(screen.getByRole('heading',{name:'Your creator link for Linen shirt'})).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Get my creator link'}));
-  await screen.findByLabelText('Personal product link');
+  expect(await screen.findByLabelText('Commission link for Linen shirt')).toBeInTheDocument();
   expect(request).toHaveBeenCalledWith('/api/creator-tracking/links',{method:'POST',body:{campaignId:'campaign',productId:'shirt'}});
  });
  it('does not generate shopper clicks on page load',async()=>{

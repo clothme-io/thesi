@@ -89,15 +89,7 @@ export function CommissionSettlementPanel({
     (session?.user.role === "brand" && canManageFunds) || data?.canRecover;
   if (session?.user.role === "brand" && !canManageFunds) return null;
   return (
-    <section
-      className="workspace-section"
-      style={{
-        padding: 20,
-        border: "1px solid #ddd",
-        borderRadius: 12,
-        margin: "16px 0",
-      }}
-    >
+    <section className="workspace-section commission-settlement">
       <h2>Commission settlement</h2>
       <p>
         Sale {orderLineId.slice(0, 8)} · Base content payments are separate.
@@ -306,8 +298,17 @@ export function CommissionSettlementPanel({
           ))}
         </>
       )}
-      {error && <p role="alert">{error}</p>}
-      <button disabled={busy} onClick={() => void load()}>
+      {error && (
+        <p className="auth-error" role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        className="crm-btn-secondary"
+        disabled={busy}
+        onClick={() => void load()}
+      >
         Refresh settlement
       </button>
     </section>

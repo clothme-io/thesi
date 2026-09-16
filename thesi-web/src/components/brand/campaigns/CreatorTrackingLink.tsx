@@ -15,16 +15,10 @@ export function CreatorTrackingLink({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   return (
-    <section className="workspace-section" style={{ marginBottom: 24 }}>
-      <h3>
-        {productTitle
-          ? `Your creator link for ${productTitle}`
-          : "Your creator link"}
-      </h3>
+    <div style={{ marginTop: 16 }}>
       <p className="workspace-hint">
-        Share your personal product link. Shopper attribution is saved for
-        qualifying product purchases; commission follows the accepted campaign
-        terms.
+        Share your personal product link for this commission. Shopper attribution
+        follows the accepted campaign terms.
       </p>
       {!url ? (
         <button
@@ -57,7 +51,11 @@ export function CreatorTrackingLink({
       ) : (
         <>
           <label className="workspace-field">
-            <span>Personal product link</span>
+            <span>
+              {productTitle
+                ? `Commission link for ${productTitle}`
+                : "Personal product link"}
+            </span>
             <input readOnly value={url} onFocus={(e) => e.target.select()} />
           </label>
           <button
@@ -77,6 +75,6 @@ export function CreatorTrackingLink({
         </>
       )}
       {message && <p role="status">{message}</p>}
-    </section>
+    </div>
   );
 }

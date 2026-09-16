@@ -105,7 +105,7 @@ export function CommissionSettlementBatchPanel() {
   if (!owner) return null;
 
   return (
-    <section className="commission-batch">
+    <section className="workspace-section commission-batch">
       <div className="commission-batch__header">
         <div>
           <h2>Batch settlement</h2>
@@ -115,24 +115,29 @@ export function CommissionSettlementBatchPanel() {
             operation.
           </p>
         </div>
-        <button type="button" disabled={busy} onClick={() => void load()}>
+        <button
+          type="button"
+          className="crm-btn-secondary"
+          disabled={busy}
+          onClick={() => void load()}
+        >
           Refresh ready lines
         </button>
       </div>
 
       {preview && (
-        <div className="commission-metrics">
-          <div>
+        <div className="crm-dashboard-grid">
+          <div className="app-stat-card">
             <span>Ready lines</span>
             <strong>{preview.readyCount}</strong>
             <small>{preview.limit} lines checked</small>
           </div>
-          <div>
+          <div className="app-stat-card">
             <span>Ready commission</span>
             <strong>{money(preview.readyCents, preview.currency)}</strong>
             <small>Net of confirmed creator payments</small>
           </div>
-          <div>
+          <div className="app-stat-card">
             <span>Blocked / waiting</span>
             <strong>{preview.lines.length - preview.readyCount}</strong>
             <small>Open holds stay out of the batch</small>
@@ -140,7 +145,7 @@ export function CommissionSettlementBatchPanel() {
         </div>
       )}
 
-      <label className="commission-batch__reason">
+      <label className="workspace-field">
         <span>Batch review reason</span>
         <textarea
           value={reason}
@@ -149,19 +154,26 @@ export function CommissionSettlementBatchPanel() {
           placeholder="Confirm that the selected sales are past review, match the accepted campaign terms, and have no open holds."
         />
       </label>
-      <button
-        type="button"
-        disabled={busy || !reason.trim() || readyLines.length === 0}
-        onClick={() => void runBatch()}
-      >
-        Qualify ready commission lines
-      </button>
+      <div className="commission-batch__actions">
+        <button
+          type="button"
+          className="crm-btn-primary"
+          disabled={busy || !reason.trim() || readyLines.length === 0}
+          onClick={() => void runBatch()}
+        >
+          Qualify ready commission lines
+        </button>
+      </div>
 
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className="auth-error" role="alert">
+          {error}
+        </p>
+      )}
 
       {preview && preview.lines.length > 0 && (
-        <div className="commission-table commission-batch__table">
-          <table>
+        <div className="crm-table-wrap" style={{ marginTop: 20 }}>
+          <table className="crm-table">
             <thead>
               <tr>
                 <th>Order line</th>
@@ -177,7 +189,7 @@ export function CommissionSettlementBatchPanel() {
                   <td>
                     {line.ready ? "Ready" : "Waiting"}
                     {line.reasons.length > 0 && (
-                      <small>
+                      <small className="commission-line-reasons">
                         {line.reasons
                           .map((reasonText) => reasonText.replaceAll("_", " "))
                           .join("; ")}

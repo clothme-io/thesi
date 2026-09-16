@@ -15,9 +15,10 @@ type NavItem = {
 };
 
 const CREATOR_NAV: NavItem[] = [
-  ...(process.env.NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED === "true" ? [{href:"/app/commission-earnings",label:"Commission earnings",icon:"▥"}] : []),
-  ...(process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true" ? [{href:"/app/creator-links",label:"Creator links",icon:"↗"}] : []),
   { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
+  ...(process.env.NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED === "true"
+    ? [{ href: "/app/commission-earnings", label: "Commission earnings", icon: "▥" }]
+    : []),
   { href: CRM_ROUTES.brands, label: "CRM", icon: "◎", match: (path: string) => path.startsWith("/app/crm") },
   { href: CRM_ROUTES.invoices, label: "Invoices", icon: "▤", match: (path: string) => path.startsWith("/app/tools/invoices") },
   { href: "/app/inbox", label: "Inbox", icon: "✉" },
@@ -27,8 +28,10 @@ const CREATOR_NAV: NavItem[] = [
 ];
 
 const BRAND_NAV: NavItem[] = [
-  ...(process.env.NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED === "true" ? [{href:"/app/commission-earnings",label:"Commission earnings",icon:"▥"}] : []),
   { href: "/app/dashboard", label: "Dashboard", icon: "⌂" },
+  ...(process.env.NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED === "true"
+    ? [{ href: "/app/commission-earnings", label: "Commission earnings", icon: "▥" }]
+    : []),
   { href: "/app/campaigns", label: "Campaigns", icon: "▣" },
   { href: "/app/creators", label: "Creators", icon: "◈", match: (path: string) => path.startsWith("/app/creators") },
   { href: "/app/marketplace", label: "Marketplace", icon: "◆" },
@@ -52,7 +55,9 @@ export function AppSidebar() {
     let active = true;
     authenticatedRequest<{ compactSidebar: boolean }>("/api/settings")
       .then((settings) => {
-        if (active) setCollapsed(settings.compactSidebar);
+        if (active && !window.matchMedia("(max-width: 900px)").matches) {
+          setCollapsed(settings.compactSidebar);
+        }
       })
       .catch(() => {
         // Keep the expanded default if settings are temporarily unavailable.
@@ -63,9 +68,40 @@ export function AppSidebar() {
   }, [authenticatedRequest]);
 
   const nav = session?.user.role === "brand" ? BRAND_NAV : CREATOR_NAV;
+  const closeMobileMenu = () => {
+    if (window.matchMedia("(max-width: 900px)").matches) setCollapsed(true);
+  };
+
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 900px)");
+    const sync = () => {
+      if (mobile.matches) setCollapsed(true);
+    };
+    sync();
+    mobile.addEventListener("change", sync);
+    return () => mobile.removeEventListener("change", sync);
+  }, [pathname]);
 
   return (
-    <aside className={`app-sidebar ${collapsed ? "app-sidebar--collapsed" : ""}`}>
+    <>
+      <button
+        type="button"
+        className="app-sidebar-open"
+        aria-label="Open menu"
+        hidden={!collapsed}
+        onClick={() => setCollapsed(false)}
+      >
+        Menu
+      </button>
+      {!collapsed && (
+        <button
+          type="button"
+          className="app-sidebar-backdrop"
+          aria-label="Close menu"
+          onClick={() => setCollapsed(true)}
+        />
+      )}
+      <aside className={`app-sidebar ${collapsed ? "app-sidebar--collapsed" : ""}`}>
       <div className="app-sidebar-header">
         <img src="/clothme-logo.png" alt="" className="app-sidebar-logo" aria-hidden="true" />
         {!collapsed && (
@@ -93,6 +129,7 @@ export function AppSidebar() {
             href={item.href}
             className={`app-sidebar-link ${isActive(pathname, item.href, item.match) ? "app-sidebar-link--active" : ""}`}
             title={collapsed ? item.label : undefined}
+            onClick={closeMobileMenu}
           >
             <span className="app-sidebar-icon" aria-hidden="true">
               {item.icon}
@@ -115,5 +152,6 @@ export function AppSidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }

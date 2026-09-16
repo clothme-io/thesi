@@ -7,7 +7,7 @@ Implemented locally following approval of the product-selection phase. All activ
 ## What this increment does
 
 1. A creator accepts a Base + Commission campaign containing a verified Merchant product. Thesi uses the actual acceptance snapshot, not product/creator IDs submitted by a browser.
-2. The creator selects **Get my creator link** from the accepted marketplace campaign or the new **Creator links** page (`/app/creator-links`, covering direct invitations too). The API requires that the signed-in creator owns the acceptance snapshot. Repeated requests return the same random public URL.
+2. The creator selects **Get my creator link** on the accepted campaign’s product commission block (marketplace listing, or the accepted invite in Inbox for direct invitations). The API requires that the signed-in creator owns the acceptance snapshot. Repeated requests return the same random public URL.
 3. Public `/r/{code}` shows the current eligible product. Loading, crawler previews and Next.js prefetches do not create a click. PostHog initialization is excluded from this public-link route.
 4. The shopper explicitly prepares an app link. Thesi creates a random, hashed handoff grant and returns `clothme://creator-link/{grant}`. The page then presents **Open ClothME**. The handoff must be redeemed within 15 minutes of its original server click time.
 5. ClothME captures the handoff, persists it locally for login continuation, removes it from the active route and asks the signed-in shopper to continue. It waits for login/onboarding navigation to finish before resuming. Customer API resolves the JWT account and owned shopping person; body fields cannot nominate a shopper or creator.
