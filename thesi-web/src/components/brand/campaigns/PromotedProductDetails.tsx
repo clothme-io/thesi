@@ -1,7 +1,14 @@
 "use client";
 import { useState } from "react";
 import type { PromotedProduct } from "@/lib/brand-campaigns/types";
-export function PromotedProductDetails({ product }: { product?: PromotedProduct }) {
+import { CreatorTrackingLink } from "./CreatorTrackingLink";
+export function PromotedProductDetails({
+  product,
+  trackingCampaignId,
+}: {
+  product?: PromotedProduct;
+  trackingCampaignId?: string;
+}) {
   const [message, setMessage] = useState("");
   if (!product) return null;
   // Construct the local preview route from identity, never render an arbitrary stored URL.
@@ -22,5 +29,8 @@ export function PromotedProductDetails({ product }: { product?: PromotedProduct 
     </div>
     <p className="workspace-hint">Demo product preview. This link does not track sales or earn commission.</p>
     {message && <p role="status">{message}</p>}
+    {trackingCampaignId && process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true" && (
+      <CreatorTrackingLink campaignId={trackingCampaignId} productId={product.productId} productTitle={product.title} />
+    )}
   </section>;
 }

@@ -1,163 +1,110 @@
-.commission-report {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 40px 32px;
-  color: #233d34;
-}
-.commission-report header {
+.commission-stack {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 24px;
-  align-items: center;
-  margin-bottom: 28px;
-}
-.commission-report h1 {
-  font-size: 32px;
-  margin: 6px 0 12px;
-  letter-spacing: -1px;
-}
-.commission-report h2 {
-  font-size: 20px;
-  margin-top: 0;
-}
-.commission-report p {
-  line-height: 1.6;
-  color: #52645c;
-}
-.commission-report button {
-  background: #254a3d;
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
-  padding: 12px 20px;
-  cursor: pointer;
-}
-.commission-report aside {
-  background: #f3efe3;
-  border: 1px solid #e5ddc6;
-  border-radius: 12px;
-  padding: 20px;
-  line-height: 1.6;
-  margin-bottom: 24px;
-}
-.commission-report section {
-  background: #fff;
-  border: 1px solid #e0e6df;
-  padding: 24px;
-  border-radius: 14px;
-  margin-bottom: 24px;
-}
-.commission-eyebrow {
-  font-size: 11px;
-  letter-spacing: 2px;
-}
-.commission-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-.commission-metrics span,
-.commission-metrics small {
-  display: block;
-  color: #63776b;
-}
-.commission-metrics strong {
-  display: block;
-  font-size: 30px;
-  margin: 10px 0;
-}
-.commission-table {
-  overflow: auto;
-}
-.commission-report table {
-  border-collapse: collapse;
-  min-width: 540px;
-  width: 100%;
-  text-align: left;
-  font-size: 14px;
-}
-.commission-report td,
-.commission-report th {
-  padding: 16px 12px;
-  border-bottom: 1px solid #e5eae5;
-}
-.commission-report td small {
-  display: block;
-  max-width: 280px;
-  color: #6b6252;
-  line-height: 1.5;
-  margin-top: 5px;
-}
-@media (max-width: 640px) {
-  .commission-report {
-    padding: 24px 16px;
-  }
-  .commission-report header {
-    align-items: flex-start;
-  }
-  .commission-report h1 {
-    font-size: 26px;
-  }
-  .commission-metrics {
-    grid-template-columns: 1fr;
-  }
-  .commission-report section {
-    padding: 18px;
-  }
 }
 
-.commission-report { width: 100%; min-width: 0; }
-@media (max-width: 900px) {
-  .app-shell:has(.commission-report) .app-sidebar,
-  .app-shell:has(.commission-report) .app-sidebar--collapsed {
-    position: static; width: 100%; height: auto; transform: none;
-    border-right: 0; border-bottom: 1px solid var(--line);
-  }
-  .app-shell:has(.commission-report) .app-sidebar-nav {
-    display: flex; flex: none; gap: 8px; overflow-x: auto;
-  }
-  .app-shell:has(.commission-report) .app-sidebar-link {
-    flex: 0 0 auto; margin: 0;
-  }
-  .app-shell:has(.commission-report) .app-sidebar-header { padding: 12px 16px; }
-  .app-shell:has(.commission-report) .app-sidebar-footer {
-    display: flex; gap: 12px; padding: 8px 16px;
-  }
+.commission-stack .app-stat-card small,
+.commission-batch .app-stat-card small,
+.commission-line-reasons {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.5;
 }
+
+.commission-line-reasons {
+  max-width: 280px;
+}
+
+.commission-settlement,
+.commission-batch {
+  margin: 0;
+}
+
+.commission-settlement h2,
+.commission-batch h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.commission-settlement > p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .commission-batch__header {
   display: flex;
   justify-content: space-between;
   gap: 20px;
   align-items: flex-start;
+  margin-bottom: 16px;
 }
-.commission-batch__reason {
-  display: block;
-  margin: 20px 0 12px;
+
+.commission-batch__header p {
+  margin: 0;
 }
-.commission-batch__reason span {
-  display: block;
-  color: #52645c;
-  font-weight: 700;
-  margin-bottom: 8px;
+
+.commission-batch__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
 }
-.commission-batch__reason textarea {
-  width: 100%;
-  min-height: 100px;
-  border: 1px solid #d7dfd8;
+
+.commission-batch .workspace-field {
+  margin-top: 4px;
+}
+
+.commission-settlement button:not(.crm-btn-primary):not(.crm-btn-secondary) {
+  padding: 10px 18px;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 12px;
-  font: inherit;
-  color: #233d34;
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 4px 8px 4px 0;
 }
-.commission-batch__table {
-  margin-top: 20px;
+
+.commission-settlement button:not(.crm-btn-primary):not(.crm-btn-secondary):hover {
+  background: var(--surface);
 }
+
+.commission-settlement button:disabled,
+.commission-batch button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .commission-batch__result {
   margin-top: 18px;
   padding: 16px;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #f7f5ee;
+  background: var(--surface);
 }
+
+.commission-batch__result h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.commission-batch__result p {
+  margin: 0 0 6px;
+}
+
+.commission-stack .crm-table tbody tr,
+.commission-batch .crm-table tbody tr {
+  cursor: default;
+}
+
 @media (max-width: 640px) {
   .commission-batch__header {
     flex-direction: column;

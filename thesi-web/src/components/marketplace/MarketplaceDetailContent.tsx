@@ -1,6 +1,5 @@
 "use client";
 
-import { CreatorTrackingLink } from "@/components/brand/campaigns/CreatorTrackingLink";
 import type { PromotedProduct } from "@/lib/brand-campaigns/types";
 import {campaignProducts} from "@/components/brand/campaigns/CampaignProductSelection";
 import { PromotedProductDetails } from "@/components/brand/campaigns/PromotedProductDetails";
@@ -647,8 +646,19 @@ export function MarketplaceDetailContent() {
         )}
         <div className="marketplace-detail-grid">
           <div className="marketplace-detail-main">
-            {!isBrand && acceptanceSnapshot?.paymentSnapshot.promotedProduct && process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true" && campaignProducts(acceptanceSnapshot.paymentSnapshot).map(p=><CreatorTrackingLink key={p.productId} campaignId={acceptanceSnapshot.campaignId} productId={p.productId} productTitle={p.title}/>)}
-            {campaignProducts(acceptanceSnapshot ? acceptanceSnapshot.paymentSnapshot : listing.payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
+            {campaignProducts(acceptanceSnapshot ? acceptanceSnapshot.paymentSnapshot : listing.payment).map(p=>(
+              <PromotedProductDetails
+                key={p.productId}
+                product={p}
+                trackingCampaignId={
+                  !isBrand &&
+                  acceptanceSnapshot?.paymentSnapshot.model === "commission" &&
+                  process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true"
+                    ? acceptanceSnapshot.campaignId
+                    : undefined
+                }
+              />
+            ))}
             <section className="marketplace-panel">
               <div className="marketplace-detail-badges">
                 <span className={`marketplace-status marketplace-status--${effectiveStatus}`}>
