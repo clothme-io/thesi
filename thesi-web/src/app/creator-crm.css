@@ -505,8 +505,32 @@
   color: #047857;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1400px) {
   .crm-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .crm-topbar-actions {
+    width: 100%;
+  }
+
+  .crm-filters .crm-form-field {
+    min-width: 0;
+  }
+
+  .crm-pipeline,
+  .crm-pipeline--contracts {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .crm-pipeline-column {
+    flex: 0 0 min(240px, 80vw);
+    min-height: 200px;
+    scroll-snap-align: start;
   }
 }
