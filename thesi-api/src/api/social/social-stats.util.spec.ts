@@ -1,5 +1,6 @@
 import {
   connectedAvgViews,
+  engagementRateFromPosts,
   mergePlatformStats,
   totalFollowersFrom,
   upsertConnectedPlatform,
@@ -75,5 +76,14 @@ describe('social-stats.util', () => {
     expect(next).toHaveLength(1);
     expect(next[0].followers).toBe(5000);
     expect(next[0].source).toBe('tiktok');
+  });
+
+  it('computes engagement from likes and comments over views', () => {
+    expect(
+      engagementRateFromPosts([{ views: 1000, likes: 80, comments: 20 }]),
+    ).toBe(10);
+    expect(
+      engagementRateFromPosts([{ views: 0, likes: 10, comments: 1 }]),
+    ).toBe(0);
   });
 });

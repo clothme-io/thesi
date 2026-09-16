@@ -37,6 +37,60 @@ export function parseTikTokHandle(raw: string): string | null {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+export type SocialContentRef = {
+  provider: 'youtube' | 'tiktok' | 'instagram';
+  mediaId: string;
+};
+
+export function parseYouTubeVideoId(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.hostname.includes('youtu.be')) {
+      const id = url.pathname.split('/').filter(Boolean)[0];
+      return id && !id.startsWith('@') ? id : null;
+    }
+    if (url.hostname.includes('youtube.com')) {
+      const watch = url.searchParams.get('v');
+      if (watch) return watch;
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (parts[0] === 'shorts' || parts[0] === 'embed' || parts[0] === 'live') {
+        return parts[1] || null;
+      }
+    }
+  } catch {
+    if (/^[\w-]{6,20}$/.test(value)) return value;
+  }
+  return null;
+}
+
+export function parseTikTokVideoId(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  const match = value.match(/tiktok\.com\/@[^/?#]+\/video\/(\d+)/i);
+  return match?.[1] ?? null;
+}
+
+export function parseInstagramShortcode(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  const match = value.match(
+    /instagram\.com\/(?:reel|reels|p)\/([A-Za-z0-9_-]+)/i,
+  );
+  return match?.[1] ?? null;
+}
+
+export function parseSocialContentUrl(raw: string): SocialContentRef | null {
+  const youtube = parseYouTubeVideoId(raw);
+  if (youtube) return { provider: 'youtube', mediaId: youtube };
+  const tiktok = parseTikTokVideoId(raw);
+  if (tiktok) return { provider: 'tiktok', mediaId: tiktok };
+  const instagram = parseInstagramShortcode(raw);
+  if (instagram) return { provider: 'instagram', mediaId: instagram };
+  return null;
+}
+
 export function parseInstagramHandle(raw: string): string | null {
   const value = raw.trim();
   if (!value) return null;

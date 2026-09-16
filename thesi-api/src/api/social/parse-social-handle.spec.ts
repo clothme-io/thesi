@@ -1,7 +1,11 @@
 import {
   parseInstagramHandle,
+  parseInstagramShortcode,
+  parseSocialContentUrl,
   parseTikTokHandle,
+  parseTikTokVideoId,
   parseYouTubeChannelRef,
+  parseYouTubeVideoId,
 } from './parse-social-handle';
 
 describe('parseYouTubeChannelRef', () => {
@@ -44,5 +48,46 @@ describe('parseInstagramHandle', () => {
 
   it('ignores Instagram content paths', () => {
     expect(parseInstagramHandle('https://instagram.com/reel/abc')).toBeNull();
+  });
+});
+
+describe('parseSocialContentUrl', () => {
+  it('reads a YouTube watch URL, short URL, and shorts URL', () => {
+    expect(parseYouTubeVideoId('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe(
+      'dQw4w9WgXcQ',
+    );
+    expect(parseYouTubeVideoId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ');
+    expect(parseYouTubeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe(
+      'dQw4w9WgXcQ',
+    );
+    expect(parseSocialContentUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toEqual(
+      { provider: 'youtube', mediaId: 'dQw4w9WgXcQ' },
+    );
+  });
+
+  it('reads a TikTok video URL', () => {
+    expect(
+      parseTikTokVideoId('https://www.tiktok.com/@ava.chen/video/7123456789012345678'),
+    ).toBe('7123456789012345678');
+    expect(
+      parseSocialContentUrl(
+        'https://www.tiktok.com/@ava.chen/video/7123456789012345678',
+      ),
+    ).toEqual({ provider: 'tiktok', mediaId: '7123456789012345678' });
+  });
+
+  it('reads Instagram reel and post URLs', () => {
+    expect(parseInstagramShortcode('https://www.instagram.com/reel/AbC_12-xy/')).toBe(
+      'AbC_12-xy',
+    );
+    expect(parseSocialContentUrl('https://www.instagram.com/p/AbC_12-xy/')).toEqual({
+      provider: 'instagram',
+      mediaId: 'AbC_12-xy',
+    });
+  });
+
+  it('returns null for non-content URLs', () => {
+    expect(parseSocialContentUrl('https://instagram.com/ava.chen')).toBeNull();
+    expect(parseSocialContentUrl('not a url')).toBeNull();
   });
 });

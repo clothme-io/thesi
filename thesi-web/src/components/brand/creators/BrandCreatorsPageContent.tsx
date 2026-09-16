@@ -148,7 +148,7 @@ export function BrandCreatorsPageContent() {
                           className="marketplace-badge marketplace-badge--applied"
                           style={{ marginLeft: 8, fontSize: 10 }}
                         >
-                          Connected
+                          Verified
                         </span>
                       )}
                     </h2>

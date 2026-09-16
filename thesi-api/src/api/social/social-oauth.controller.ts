@@ -55,6 +55,26 @@ export class SocialOauthController {
     return { url, statusCode: 302 };
   }
 
+  @Get('youtube/callback')
+  @Redirect()
+  @ApiOperation({
+    summary: 'Google OAuth callback for YouTube (no JWT; state is signed)',
+  })
+  async youtubeCallback(
+    @Query('code') code?: string,
+    @Query('state') state?: string,
+    @Query('error') error?: string,
+    @Query('error_description') errorDescription?: string,
+  ) {
+    const url = await this.social.handleOauthCallback(
+      'youtube',
+      code,
+      state,
+      errorDescription || error,
+    );
+    return { url, statusCode: 302 };
+  }
+
   @Post('cron')
   @UseGuards(AdminApiKeyGuard)
   @ApiHeader({ name: 'X-Admin-Api-Key', required: true })

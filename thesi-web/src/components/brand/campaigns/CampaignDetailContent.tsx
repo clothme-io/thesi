@@ -38,6 +38,7 @@ import {
   useDraftForm,
 } from "./DraftCampaignEditForm";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
+import { CampaignPublishedContent } from "@/components/inbox/CampaignPublishedContent";
 
 function toCampaignInput(campaign: BrandCampaign): CampaignInput {
   return {
@@ -516,6 +517,7 @@ export function CampaignDetailContent() {
           <div className="crm-detail-grid">
             <div className="crm-detail-panel">
               {campaignProducts(campaign.payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
+              <CampaignPublishedContent campaignId={campaign.id} canAttach={false} />
               {hasLimitedPostPublishEditing && (
                 <div style={{ marginBottom: 24 }}>
                   <h3>

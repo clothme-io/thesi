@@ -25,6 +25,7 @@ export type SocialConnectionRow = {
 };
 
 export type SyncedUgcPost = {
+  id?: string;
   title: string;
   platform: string;
   url: string;
@@ -34,6 +35,22 @@ export type SyncedUgcPost = {
   comments: number;
   shares: number;
   source: SocialProvider;
+  externalMediaId?: string;
+};
+
+export type CampaignContentRow = {
+  id: string;
+  campaignId: string;
+  creatorUserId: string;
+  provider: SocialProvider;
+  externalMediaId: string;
+  url: string;
+  title: string;
+  views: number;
+  likes: number;
+  comments: number;
+  lastSyncedAt: Date | null;
+  lastError: string | null;
 };
 
 export type CreatorSocialContext = {
@@ -84,6 +101,34 @@ export interface SocialRepository {
     source: SocialProvider,
     posts: SyncedUgcPost[],
   ): Promise<void>;
+  listSyncedPosts(creatorUserId: string): Promise<SyncedUgcPost[]>;
+  upsertSyncedPost(creatorUserId: string, post: SyncedUgcPost): Promise<SyncedUgcPost & { id: string }>;
+  getSyncedPost(
+    creatorUserId: string,
+    postId: string,
+  ): Promise<(SyncedUgcPost & { id: string }) | null>;
+  creatorAcceptedCampaign(
+    creatorUserId: string,
+    campaignId: string,
+  ): Promise<boolean>;
+  brandOwnsCampaign(ownerUserId: string, campaignId: string): Promise<boolean>;
+  listCampaignContent(campaignId: string): Promise<CampaignContentRow[]>;
+  listCampaignContentForSync(): Promise<CampaignContentRow[]>;
+  upsertCampaignContent(
+    row: Omit<CampaignContentRow, 'id' | 'lastSyncedAt' | 'lastError'> & {
+      lastSyncedAt?: Date | null;
+      lastError?: string | null;
+    },
+  ): Promise<CampaignContentRow>;
+  getCampaignContent(
+    campaignId: string,
+    contentId: string,
+  ): Promise<CampaignContentRow | null>;
+  deleteCampaignContent(
+    campaignId: string,
+    contentId: string,
+    creatorUserId?: string,
+  ): Promise<boolean>;
 }
 
 @Injectable()
@@ -250,17 +295,66 @@ export class PostgresSocialRepository implements SocialRepository {
     source: SocialProvider,
     posts: SyncedUgcPost[],
   ): Promise<void> {
-    await this.db
-      .delete(schema.creatorUgcPost)
-      .where(
-        and(
-          eq(schema.creatorUgcPost.creatorUserId, creatorUserId),
-          eq(schema.creatorUgcPost.source, source),
-        ),
-      );
-    if (posts.length === 0) return;
-    await this.db.insert(schema.creatorUgcPost).values(
-      posts.map((post) => ({
+    if (posts.length === 0) {
+      await this.db
+        .delete(schema.creatorUgcPost)
+        .where(
+          and(
+            eq(schema.creatorUgcPost.creatorUserId, creatorUserId),
+            eq(schema.creatorUgcPost.source, source),
+          ),
+        );
+      return;
+    }
+    for (const post of posts) {
+      await this.upsertSyncedPost(creatorUserId, { ...post, source });
+    }
+  }
+
+  async listSyncedPosts(creatorUserId: string): Promise<SyncedUgcPost[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.creatorUgcPost)
+      .where(eq(schema.creatorUgcPost.creatorUserId, creatorUserId));
+    return rows
+      .filter((row) => row.source !== 'manual')
+      .map((row) => mapUgcPost(row));
+  }
+
+  async upsertSyncedPost(creatorUserId: string, post: SyncedUgcPost) {
+    const mediaId = post.externalMediaId || '';
+    const existing = mediaId
+      ? await this.db
+          .select()
+          .from(schema.creatorUgcPost)
+          .where(
+            and(
+              eq(schema.creatorUgcPost.creatorUserId, creatorUserId),
+              eq(schema.creatorUgcPost.source, post.source),
+              eq(schema.creatorUgcPost.externalMediaId, mediaId),
+            ),
+          )
+          .limit(1)
+      : [];
+    if (existing[0]) {
+      await this.db
+        .update(schema.creatorUgcPost)
+        .set({
+          title: post.title,
+          platform: post.platform,
+          url: post.url || null,
+          postedAt: post.postedAt,
+          views: post.views,
+          likes: post.likes,
+          comments: post.comments,
+          shares: post.shares,
+        })
+        .where(eq(schema.creatorUgcPost.id, existing[0].id));
+      return { ...post, id: existing[0].id };
+    }
+    const [inserted] = await this.db
+      .insert(schema.creatorUgcPost)
+      .values({
         creatorUserId,
         title: post.title,
         platform: post.platform,
@@ -270,9 +364,155 @@ export class PostgresSocialRepository implements SocialRepository {
         likes: post.likes,
         comments: post.comments,
         shares: post.shares,
-        source,
-      })),
-    );
+        source: post.source,
+        externalMediaId: mediaId,
+      })
+      .returning({ id: schema.creatorUgcPost.id });
+    return { ...post, id: inserted.id };
+  }
+
+  async getSyncedPost(creatorUserId: string, postId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.creatorUgcPost)
+      .where(
+        and(
+          eq(schema.creatorUgcPost.id, postId),
+          eq(schema.creatorUgcPost.creatorUserId, creatorUserId),
+        ),
+      )
+      .limit(1);
+    return row && row.source !== 'manual' ? { ...mapUgcPost(row), id: row.id } : null;
+  }
+
+  async creatorAcceptedCampaign(creatorUserId: string, campaignId: string) {
+    const [row] = await this.db
+      .select({ id: schema.campaignAcceptanceSnapshot.id })
+      .from(schema.campaignAcceptanceSnapshot)
+      .where(
+        and(
+          eq(schema.campaignAcceptanceSnapshot.campaignId, campaignId),
+          eq(schema.campaignAcceptanceSnapshot.creatorUserId, creatorUserId),
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async brandOwnsCampaign(ownerUserId: string, campaignId: string) {
+    const [row] = await this.db
+      .select({ id: schema.campaign.id })
+      .from(schema.campaign)
+      .where(
+        and(
+          eq(schema.campaign.id, campaignId),
+          eq(schema.campaign.ownerUserId, ownerUserId),
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
+  async listCampaignContent(campaignId: string) {
+    const rows = await this.db
+      .select()
+      .from(schema.campaignContentMetric)
+      .where(eq(schema.campaignContentMetric.campaignId, campaignId));
+    return rows.map(mapCampaignContent);
+  }
+
+  async listCampaignContentForSync() {
+    const rows = await this.db.select().from(schema.campaignContentMetric);
+    return rows.map(mapCampaignContent);
+  }
+
+  async upsertCampaignContent(
+    row: Omit<CampaignContentRow, 'id' | 'lastSyncedAt' | 'lastError'> & {
+      lastSyncedAt?: Date | null;
+      lastError?: string | null;
+    },
+  ) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.campaignContentMetric)
+      .where(
+        and(
+          eq(schema.campaignContentMetric.campaignId, row.campaignId),
+          eq(schema.campaignContentMetric.creatorUserId, row.creatorUserId),
+          eq(schema.campaignContentMetric.provider, row.provider),
+          eq(schema.campaignContentMetric.externalMediaId, row.externalMediaId),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      const [updated] = await this.db
+        .update(schema.campaignContentMetric)
+        .set({
+          url: row.url,
+          title: row.title,
+          views: row.views,
+          likes: row.likes,
+          comments: row.comments,
+          lastSyncedAt:
+            row.lastSyncedAt === undefined ? new Date() : row.lastSyncedAt,
+          lastError: row.lastError ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.campaignContentMetric.id, existing.id))
+        .returning();
+      return mapCampaignContent(updated);
+    }
+    const [inserted] = await this.db
+      .insert(schema.campaignContentMetric)
+      .values({
+        campaignId: row.campaignId,
+        creatorUserId: row.creatorUserId,
+        provider: row.provider,
+        externalMediaId: row.externalMediaId,
+        url: row.url,
+        title: row.title,
+        views: row.views,
+        likes: row.likes,
+        comments: row.comments,
+        lastSyncedAt:
+          row.lastSyncedAt === undefined ? new Date() : row.lastSyncedAt,
+        lastError: row.lastError ?? null,
+      })
+      .returning();
+    return mapCampaignContent(inserted);
+  }
+
+  async getCampaignContent(campaignId: string, contentId: string) {
+    const [row] = await this.db
+      .select()
+      .from(schema.campaignContentMetric)
+      .where(
+        and(
+          eq(schema.campaignContentMetric.id, contentId),
+          eq(schema.campaignContentMetric.campaignId, campaignId),
+        ),
+      )
+      .limit(1);
+    return row ? mapCampaignContent(row) : null;
+  }
+
+  async deleteCampaignContent(
+    campaignId: string,
+    contentId: string,
+    creatorUserId?: string,
+  ) {
+    const filters = [
+      eq(schema.campaignContentMetric.id, contentId),
+      eq(schema.campaignContentMetric.campaignId, campaignId),
+    ];
+    if (creatorUserId) {
+      filters.push(eq(schema.campaignContentMetric.creatorUserId, creatorUserId));
+    }
+    const deleted = await this.db
+      .delete(schema.campaignContentMetric)
+      .where(and(...filters))
+      .returning({ id: schema.campaignContentMetric.id });
+    return deleted.length > 0;
   }
 }
 
@@ -291,6 +531,43 @@ function mapConnection(
     tokenExpiresAt: row.tokenExpiresAt,
     scopes: Array.isArray(row.scopes) ? row.scopes : [],
     lastSyncAt: row.lastSyncAt,
+    lastError: row.lastError,
+  };
+}
+
+function mapUgcPost(
+  row: typeof schema.creatorUgcPost.$inferSelect,
+): SyncedUgcPost {
+  return {
+    id: row.id,
+    title: row.title,
+    platform: row.platform,
+    url: row.url || '',
+    postedAt: String(row.postedAt).slice(0, 10),
+    views: row.views,
+    likes: row.likes,
+    comments: row.comments,
+    shares: row.shares,
+    source: row.source as SocialProvider,
+    externalMediaId: row.externalMediaId || '',
+  };
+}
+
+function mapCampaignContent(
+  row: typeof schema.campaignContentMetric.$inferSelect,
+): CampaignContentRow {
+  return {
+    id: row.id,
+    campaignId: row.campaignId,
+    creatorUserId: row.creatorUserId,
+    provider: row.provider as SocialProvider,
+    externalMediaId: row.externalMediaId,
+    url: row.url,
+    title: row.title,
+    views: row.views,
+    likes: row.likes,
+    comments: row.comments,
+    lastSyncedAt: row.lastSyncedAt,
     lastError: row.lastError,
   };
 }

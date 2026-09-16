@@ -116,8 +116,8 @@ export function CreatorSettingsPageContent() {
             </div>
             <div className="settings-security" style={{ marginTop: 12 }}>
               <div>
-                <strong>Connected accounts</strong>
-                <p>Sync YouTube, TikTok, and Instagram stats for brands to see.</p>
+                <strong>Verified accounts</strong>
+                <p>Connect YouTube, TikTok, and Instagram so brands see live stats.</p>
               </div>
               <Link href="/app/settings/social" className="crm-btn-secondary">
                 Manage accounts

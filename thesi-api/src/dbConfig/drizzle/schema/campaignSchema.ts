@@ -8,6 +8,7 @@ import {
   pgSchema,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { thesiUser } from './userSchema';
@@ -270,4 +271,40 @@ export const campaignAcceptanceSnapshot = thesiSchema.table(
       .notNull()
       .defaultNow(),
   },
+);
+
+export const campaignContentMetric = thesiSchema.table(
+  'campaign_content_metric',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaign.id, { onDelete: 'cascade' }),
+    creatorUserId: text('creator_user_id')
+      .notNull()
+      .references(() => thesiUser.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    externalMediaId: text('external_media_id').notNull(),
+    url: text('url').notNull(),
+    title: text('title').notNull().default(''),
+    views: integer('views').notNull().default(0),
+    likes: integer('likes').notNull().default(0),
+    comments: integer('comments').notNull().default(0),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique('campaign_content_metric_unique').on(
+      table.campaignId,
+      table.creatorUserId,
+      table.provider,
+      table.externalMediaId,
+    ),
+  ],
 );

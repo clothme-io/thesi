@@ -1,6 +1,7 @@
 import {
   fetchYouTubeChannelStats,
   fetchYouTubeRecentVideos,
+  youtubeAuthorizeUrl,
 } from './youtube.client';
 
 describe('youtube.client', () => {
@@ -49,5 +50,17 @@ describe('youtube.client', () => {
         fetchFn as unknown as typeof fetch,
       ),
     ).resolves.toEqual([]);
+  });
+
+  it('builds a readonly Google OAuth URL', () => {
+    const url = youtubeAuthorizeUrl({
+      clientId: 'client',
+      redirectUri: 'http://localhost:5010/v1/social/youtube/callback',
+      state: 'signed',
+    });
+    expect(url).toContain('https://accounts.google.com/o/oauth2/v2/auth');
+    expect(url).toContain(encodeURIComponent('youtube.readonly'));
+    expect(url).not.toContain('youtube.upload');
+    expect(url).toContain('access_type=offline');
   });
 });

@@ -29,11 +29,18 @@ const LABELS: Record<SocialProvider, string> = {
 
 const SETUP_COPY: Record<SocialProvider, string> = {
   youtube:
-    "Add YOUTUBE_API_KEY to the API environment. Sync uses the YouTube URL on your Profile — no Google login.",
+    "Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and YOUTUBE_REDIRECT_URI. Connect uses Google OAuth with youtube.readonly — Thesi never posts.",
   tiktok:
     "Add TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET. Redirect URI should match TIKTOK_REDIRECT_URI (default http://localhost:5010/v1/social/tiktok/callback).",
   instagram:
     "Add INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET for Instagram Login. Redirect URI should match INSTAGRAM_REDIRECT_URI. A professional Instagram account is required.",
+};
+
+const STATUS_LABELS: Record<SocialAccountStatus["status"], string> = {
+  connected: "Verified",
+  disconnected: "Not connected",
+  error: "Error",
+  needs_setup: "Needs setup",
 };
 
 export function CreatorSocialAccountsContent() {
@@ -118,9 +125,9 @@ export function CreatorSocialAccountsContent() {
           <Link href="/app/settings" className="auth-link" style={{ fontSize: 13 }}>
             ← Settings
           </Link>
-          <h1 style={{ marginTop: 4 }}>Connected accounts</h1>
+          <h1 style={{ marginTop: 4 }}>Verified accounts</h1>
           <span className="workspace-subtitle">
-            Live follower counts for brands — official APIs only
+            Official APIs only — views, likes, and comments. Thesi never posts.
           </span>
         </div>
       </header>
@@ -138,12 +145,9 @@ export function CreatorSocialAccountsContent() {
         )}
 
         <p className="workspace-hint" style={{ marginTop: 0 }}>
-          YouTube syncs from the channel URL on your{" "}
-          <Link href="/app/profile" className="auth-link">
-            Profile
-          </Link>
-          . TikTok and Instagram use OAuth. Nothing is faked if a provider is
-          down or not configured yet.
+          Connect YouTube, TikTok, and Instagram with official login. Ownership
+          is required before stats or post metrics appear. Nothing is posted or
+          scheduled.
         </p>
 
         <div className="crm-brand-grid" style={{ marginTop: 20 }}>
@@ -159,7 +163,7 @@ export function CreatorSocialAccountsContent() {
                 <span
                   className={`crm-status ${connected ? "crm-status--active" : ""}`}
                 >
-                  {account.status.replace("_", " ")}
+                  {STATUS_LABELS[account.status]}
                 </span>
                 <h3>{label}</h3>
                 <p>
@@ -180,64 +184,44 @@ export function CreatorSocialAccountsContent() {
                   </p>
                 ) : null}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-                  {account.provider === "youtube" ? (
+                  <button
+                    type="button"
+                    className="crm-btn-primary"
+                    disabled={needsSetup || Boolean(busy)}
+                    onClick={() =>
+                      void run(`${account.provider}-connect`, async () => {
+                        const { url } = await authenticatedRequest<{
+                          url: string;
+                        }>(`/api/social/${account.provider}/connect`, {
+                          method: "GET",
+                        });
+                        window.location.href = url;
+                        return data;
+                      })
+                    }
+                  >
+                    {connecting
+                      ? "Redirecting…"
+                      : connected
+                        ? "Reconnect"
+                        : `Connect ${label}`}
+                  </button>
+                  {connected && (
                     <button
                       type="button"
-                      className="crm-btn-primary"
-                      disabled={needsSetup || Boolean(busy)}
+                      className="crm-btn-secondary"
+                      disabled={Boolean(busy)}
                       onClick={() =>
-                        void run("youtube-sync", () =>
+                        void run(`${account.provider}-sync`, () =>
                           authenticatedRequest<SocialAccountsResponse>(
-                            "/api/social/youtube/sync",
+                            `/api/social/${account.provider}/sync`,
                             { method: "POST" },
                           ),
                         )
                       }
                     >
-                      {syncing ? "Syncing…" : "Sync YouTube"}
+                      {syncing ? "Syncing…" : "Sync"}
                     </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="crm-btn-primary"
-                        disabled={needsSetup || Boolean(busy)}
-                        onClick={() =>
-                          void run(`${account.provider}-connect`, async () => {
-                            const { url } = await authenticatedRequest<{
-                              url: string;
-                            }>(`/api/social/${account.provider}/connect`, {
-                              method: "GET",
-                            });
-                            window.location.href = url;
-                            return data;
-                          })
-                        }
-                      >
-                        {connecting
-                          ? "Redirecting…"
-                          : connected
-                            ? "Reconnect"
-                            : `Connect ${label}`}
-                      </button>
-                      {connected && (
-                        <button
-                          type="button"
-                          className="crm-btn-secondary"
-                          disabled={Boolean(busy)}
-                          onClick={() =>
-                            void run(`${account.provider}-sync`, () =>
-                              authenticatedRequest<SocialAccountsResponse>(
-                                `/api/social/${account.provider}/sync`,
-                                { method: "POST" },
-                              ),
-                            )
-                          }
-                        >
-                          {syncing ? "Syncing…" : "Sync"}
-                        </button>
-                      )}
-                    </>
                   )}
                   {connected && (
                     <button

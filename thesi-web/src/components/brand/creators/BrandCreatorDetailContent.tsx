@@ -64,7 +64,7 @@ export function BrandCreatorDetailContent() {
                 className="marketplace-badge marketplace-badge--applied"
                 style={{ marginLeft: 10, verticalAlign: "middle" }}
               >
-                Connected
+                Verified
               </span>
             )}
           </h1>
@@ -190,8 +190,8 @@ export function BrandCreatorDetailContent() {
               <h3>Performance stats</h3>
               <p className="workspace-hint" style={{ marginTop: 0 }}>
                 {connected
-                  ? "Followers and views include connected social accounts. Campaigns done and response rate come from Thesi invites."
-                  : "Followers and views are self-reported until social accounts are connected. Campaigns done and response rate come from Thesi invites."}
+                  ? "Followers and views include verified social accounts. Campaigns done and response rate come from Thesi invites."
+                  : "Followers and views are self-reported until social accounts are verified. Campaigns done and response rate come from Thesi invites."}
                 {syncedAgo ? ` ${syncedAgo}.` : ""}
               </p>
               <div className="brand-creator-stats-grid">
@@ -246,7 +246,7 @@ export function BrandCreatorDetailContent() {
                           className="marketplace-badge marketplace-badge--applied"
                           style={{ marginLeft: 8 }}
                         >
-                          Connected
+                          Verified
                         </span>
                       )}
                     </strong>

@@ -17,6 +17,7 @@ export type TikTokUserStats = {
 };
 
 export type TikTokVideoStats = {
+  id: string;
   title: string;
   url: string;
   postedAt: string;
@@ -212,8 +213,64 @@ export async function fetchTikTokRecentVideos(
       ? new Date(video.create_time * 1000).toISOString().slice(0, 10)
       : new Date().toISOString().slice(0, 10);
     return {
+      id: video.id || '',
       title: video.title || 'TikTok video',
       url: video.share_url || (video.id ? `https://www.tiktok.com/video/${video.id}` : ''),
+      postedAt: created,
+      views: asCount(video.view_count),
+      likes: asCount(video.like_count),
+      comments: asCount(video.comment_count),
+      shares: asCount(video.share_count),
+    };
+  });
+}
+
+export async function fetchTikTokVideosByIds(
+  accessToken: string,
+  videoIds: string[],
+  fetchFn: FetchLike = fetch,
+): Promise<TikTokVideoStats[]> {
+  if (videoIds.length === 0) return [];
+  const params = new URLSearchParams({
+    fields:
+      'id,title,share_url,create_time,view_count,like_count,comment_count,share_count',
+  });
+  const response = await fetchFn(
+    `https://open.tiktokapis.com/v2/video/query/?${params.toString()}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filters: { video_ids: videoIds } }),
+    },
+  );
+  if (!response.ok) return [];
+  const json = (await response.json()) as {
+    data?: {
+      videos?: Array<{
+        id?: string;
+        title?: string;
+        share_url?: string;
+        create_time?: number;
+        view_count?: number;
+        like_count?: number;
+        comment_count?: number;
+        share_count?: number;
+      }>;
+    };
+  };
+  return (json.data?.videos ?? []).map((video) => {
+    const created = video.create_time
+      ? new Date(video.create_time * 1000).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
+    return {
+      id: video.id || '',
+      title: video.title || 'TikTok video',
+      url:
+        video.share_url ||
+        (video.id ? `https://www.tiktok.com/video/${video.id}` : ''),
       postedAt: created,
       views: asCount(video.view_count),
       likes: asCount(video.like_count),

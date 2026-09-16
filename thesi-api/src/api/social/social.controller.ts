@@ -1,7 +1,10 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   HttpStatus,
+  Param,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -11,6 +14,7 @@ import {
   type AuthJwtPayload,
   JwtAuthGuard,
 } from 'src/shared/auth/jwt-auth.guard';
+import { SocialContentUrlDto } from './dto/social.dto';
 import { SocialService } from './social.service';
 
 @ApiTags('social')
@@ -27,8 +31,17 @@ export class SocialController {
     return { status: HttpStatus.OK, error: null, data };
   }
 
+  @Get('youtube/connect')
+  @ApiOperation({
+    summary: 'Return the Google OAuth authorize URL for YouTube (readonly)',
+  })
+  async youtubeConnect(@CurrentUser() user: AuthJwtPayload) {
+    const data = await this.social.youtubeConnectUrl(user.sub);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
   @Post('youtube/sync')
-  @ApiOperation({ summary: 'Sync YouTube stats from the public Data API' })
+  @ApiOperation({ summary: 'Sync YouTube stats from the connected Google account' })
   async syncYouTube(@CurrentUser() user: AuthJwtPayload) {
     const data = await this.social.syncYouTube(user.sub);
     return { status: HttpStatus.OK, error: null, data };
@@ -77,7 +90,7 @@ export class SocialController {
   }
 
   @Post('youtube/disconnect')
-  @ApiOperation({ summary: 'Clear YouTube synced stats' })
+  @ApiOperation({ summary: 'Disconnect YouTube' })
   async disconnectYouTube(@CurrentUser() user: AuthJwtPayload) {
     const data = await this.social.disconnect(user.sub, 'youtube');
     return { status: HttpStatus.OK, error: null, data };
@@ -87,6 +100,105 @@ export class SocialController {
   @ApiOperation({ summary: 'Sync every connected social account' })
   async syncAll(@CurrentUser() user: AuthJwtPayload) {
     const data = await this.social.syncAllForUser(user.sub);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Get('content')
+  @ApiOperation({ summary: 'List imported posts with live views, likes, comments' })
+  async listContent(@CurrentUser() user: AuthJwtPayload) {
+    const data = await this.social.listImportedContent(user.sub);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('content/lookup')
+  @ApiOperation({ summary: 'Look up views, likes, and comments for a post URL' })
+  async lookupContent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() body: SocialContentUrlDto,
+  ) {
+    const data = await this.social.lookupContent(user.sub, body.url);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('content/import')
+  @ApiOperation({ summary: 'Import a published post into the creator portfolio' })
+  async importContent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() body: SocialContentUrlDto,
+  ) {
+    const data = await this.social.importContent(user.sub, body.url);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('content/:postId/refresh')
+  @ApiOperation({ summary: 'Refresh metrics for an imported post' })
+  async refreshContent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('postId') postId: string,
+  ) {
+    const data = await this.social.refreshImportedContent(user.sub, postId);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Get('campaigns/:campaignId/content')
+  @ApiOperation({ summary: 'List published posts attached to a campaign' })
+  async listCampaignContent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('campaignId') campaignId: string,
+  ) {
+    const data = await this.social.listCampaignContent(
+      user.sub,
+      user.role,
+      campaignId,
+    );
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('campaigns/:campaignId/content')
+  @ApiOperation({ summary: 'Attach a published post to an accepted campaign' })
+  async attachCampaignContent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('campaignId') campaignId: string,
+    @Body() body: SocialContentUrlDto,
+  ) {
+    const data = await this.social.attachCampaignContent(
+      user.sub,
+      user.role,
+      campaignId,
+      body.url,
+    );
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post('campaigns/:campaignId/content/:contentId/refresh')
+  @ApiOperation({ summary: 'Refresh metrics for a campaign-attached post' })
+  async refreshCampaignContent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('campaignId') campaignId: string,
+    @Param('contentId') contentId: string,
+  ) {
+    const data = await this.social.refreshCampaignContent(
+      user.sub,
+      user.role,
+      campaignId,
+      contentId,
+    );
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Delete('campaigns/:campaignId/content/:contentId')
+  @ApiOperation({ summary: 'Detach a published post from a campaign' })
+  async detachCampaignContent(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('campaignId') campaignId: string,
+    @Param('contentId') contentId: string,
+  ) {
+    const data = await this.social.detachCampaignContent(
+      user.sub,
+      user.role,
+      campaignId,
+      contentId,
+    );
     return { status: HttpStatus.OK, error: null, data };
   }
 }

@@ -16,3 +16,8 @@ export async function POST(request: Request, { params }: Params) {
   const { path } = await params;
   return proxySocial(request, backendPath(path, request), "POST");
 }
+
+export async function DELETE(request: Request, { params }: Params) {
+  const { path } = await params;
+  return proxySocial(request, backendPath(path, request), "DELETE");
+}
