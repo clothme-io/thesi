@@ -193,6 +193,7 @@ export interface BrandCampaign {
   creatorCapacity?: number;
   creatorDisclosureEnabled?: boolean;
   postToMarketplace: boolean;
+  currentRevisionId?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -40,6 +40,10 @@ import {
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { CampaignPublishedContent } from "@/components/inbox/CampaignPublishedContent";
 import { CampaignContentReview } from "./CampaignContentReview";
+import {
+  campaignFromRevision,
+  type CampaignRevision,
+} from "@/lib/brand-campaigns/revisions";
 
 function toCampaignInput(campaign: BrandCampaign): CampaignInput {
   return {
@@ -93,6 +97,7 @@ export function CampaignDetailContent() {
     updateCampaign,
     uploadCampaignFile,
     deleteCampaignFile,
+    reload,
   } = useBrandCampaigns(authenticatedRequest);
   const {
     data: inviteData,
@@ -110,20 +115,37 @@ export function CampaignDetailContent() {
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
-  const [limitedEndDate, setLimitedEndDate] = useState("");
-  const [limitedCreatorCapacity, setLimitedCreatorCapacity] = useState("");
-  const [newExampleVideoLinks, setNewExampleVideoLinks] = useState<string[]>([""]);
+  const [revisions, setRevisions] = useState<CampaignRevision[]>([]);
+  const [viewingRevisionId, setViewingRevisionId] = useState<string | null>(null);
+  const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(
+    null,
+  );
 
   const campaign = useMemo(
     () => (ready && id ? getCampaignById(data, id) : null),
     [ready, id, data],
   );
-  const requiredTasks = campaign?.requiredTasks ?? [];
-  const creatorBenefits = campaign?.creatorBenefits ?? EMPTY_CREATOR_BENEFITS;
-  const contentRights = campaign?.contentRights ?? EMPTY_CONTENT_RIGHTS;
-  const productsProvided = campaign?.productsProvided ?? [];
+  const viewingRevision = useMemo(
+    () => revisions.find((revision) => revision.id === viewingRevisionId) ?? null,
+    [revisions, viewingRevisionId],
+  );
+  const displayedCampaign = useMemo(() => {
+    if (!campaign) return null;
+    if (!viewingRevision || viewingRevision.isCurrent) return campaign;
+    return campaignFromRevision(campaign, viewingRevision);
+  }, [campaign, viewingRevision]);
+  const viewingCurrent = !viewingRevision || viewingRevision.isCurrent;
+  const requiredTasks = displayedCampaign?.requiredTasks ?? [];
+  const creatorBenefits =
+    displayedCampaign?.creatorBenefits ?? EMPTY_CREATOR_BENEFITS;
+  const contentRights =
+    displayedCampaign?.contentRights ?? EMPTY_CONTENT_RIGHTS;
+  const productsProvided = displayedCampaign?.productsProvided ?? [];
   const { form, setForm } = useDraftForm(
-    campaign?.status === "draft" ? campaign : null,
+    campaign?.status === "draft" || (Boolean(campaign) && viewingCurrent)
+      ? campaign
+      : null,
+    { allowPublished: Boolean(campaign && campaign.status !== "draft" && viewingCurrent) },
   );
 
   const loadPayouts = useCallback(async () => {
@@ -151,14 +173,28 @@ export function CampaignDetailContent() {
     };
   }, [ready, id, loadPayouts]);
 
-  useEffect(() => {
-    if (!campaign) return;
-    setLimitedEndDate(toDateInputValue(campaign.endDate));
-    setLimitedCreatorCapacity(
-      campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
+  const loadRevisions = useCallback(async () => {
+    if (!id) return;
+    const result = await authenticatedRequest<{ revisions: CampaignRevision[] }>(
+      `/api/campaigns/${id}/revisions`,
     );
-    setNewExampleVideoLinks([""]);
-  }, [campaign]);
+    setRevisions(result.revisions ?? []);
+  }, [authenticatedRequest, id]);
+
+  useEffect(() => {
+    if (!ready || !id || !campaign || campaign.status === "draft") {
+      setRevisions([]);
+      setViewingRevisionId(null);
+      return;
+    }
+    let active = true;
+    loadRevisions().catch(() => {
+      if (active) setRevisions([]);
+    });
+    return () => {
+      active = false;
+    };
+  }, [ready, id, campaign, loadRevisions]);
 
   if (!ready || !invitesReady) return null;
 
@@ -181,8 +217,8 @@ export function CampaignDetailContent() {
   const acceptedCreatorCount = invites.filter(
     (invite) => invite.status === "accepted",
   ).length;
-  const hasLimitedPostPublishEditing =
-    canEdit && campaign.status === "active" && hasAcceptedCreator;
+  const editingPublishedCurrent =
+    canEdit && !isDraft && viewingCurrent;
   const payoutByCreator = new Map(
     payouts.map((payout) => [payout.creatorUserId, payout]),
   );
@@ -285,22 +321,17 @@ export function CampaignDetailContent() {
     }
   };
 
-  const saveLimitedUpdates = async () => {
+  const savePublishedUpdates = async () => {
+    if (!form) return;
     setSavingDraft(true);
     setLifecycleError("");
     setSaveMessage("");
     try {
-      const linksToAdd = newExampleVideoLinks
-        .map((link) => link.trim())
-        .filter(Boolean)
-        .filter((link) => !campaign.exampleVideoLinks.includes(link));
+      const payload = draftFormToInput(form);
       await updateCampaign(campaign.id, {
-        ...toCampaignInput(campaign),
-        endDate: limitedEndDate,
-        ...(limitedCreatorCapacity.trim()
-          ? { creatorCapacity: Number(limitedCreatorCapacity) }
-          : {}),
-        exampleVideoLinks: [...campaign.exampleVideoLinks, ...linksToAdd],
+        ...payload,
+        status: campaign.status,
+        postToMarketplace: campaign.postToMarketplace,
       });
       let fileUploadFailed = false;
       for (const file of pendingFiles) {
@@ -312,12 +343,14 @@ export function CampaignDetailContent() {
       }
       if (!fileUploadFailed) {
         setPendingFiles([]);
-        setNewExampleVideoLinks([""]);
       }
+      await loadRevisions();
       setSaveMessage(
         fileUploadFailed
-          ? "Campaign updates saved. Some files could not be uploaded."
-          : "Campaign updates saved",
+          ? "New version saved. Some files could not be uploaded."
+          : acceptedCreatorCount > 0
+            ? "New version saved. Accepted creators keep their original terms."
+            : "Campaign updates saved",
       );
     } catch (requestError) {
       setLifecycleError(
@@ -330,20 +363,42 @@ export function CampaignDetailContent() {
     }
   };
 
+  const restoreRevision = async (revisionId: string) => {
+    setRestoringRevisionId(revisionId);
+    setLifecycleError("");
+    setSaveMessage("");
+    try {
+      await authenticatedRequest(`/api/campaigns/${campaign.id}/revisions/${revisionId}/restore`, {
+        method: "POST",
+      });
+      await reload();
+      await loadRevisions();
+      setViewingRevisionId(null);
+      setSaveMessage(
+        "This version is now current for new applicants. Accepted creators keep their original terms.",
+      );
+    } catch (requestError) {
+      setLifecycleError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not restore this version",
+      );
+    } finally {
+      setRestoringRevisionId(null);
+    }
+  };
+
   const canPublish =
     campaign.status === "draft" ||
     (campaign.status === "active" && !campaign.postToMarketplace);
   const canResume = campaign.status === "paused";
-  const canPause =
-    campaign.status === "active" && !hasLimitedPostPublishEditing;
+  const canPause = campaign.status === "active";
   const canComplete =
     (campaign.status === "draft" && campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1) ||
-    (campaign.status === "active" && (!hasLimitedPostPublishEditing || campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1)) ||
+    campaign.status === "active" ||
     campaign.status === "paused";
   const canUnpublish =
-    campaign.postToMarketplace &&
-    campaign.status !== "draft" &&
-    !hasLimitedPostPublishEditing;
+    campaign.postToMarketplace && campaign.status !== "draft";
 
   return (
     <>
@@ -378,14 +433,18 @@ export function CampaignDetailContent() {
               {savingDraft ? "Saving…" : "Save draft"}
             </button>
           )}
-          {canEdit && hasLimitedPostPublishEditing && (
+          {canEdit && editingPublishedCurrent && form && (
             <button
               type="button"
               className="crm-btn-primary"
               disabled={savingDraft || lifecycleBusy}
-              onClick={() => void saveLimitedUpdates()}
+              onClick={() => void savePublishedUpdates()}
             >
-              {savingDraft ? "Saving…" : "Save updates"}
+              {savingDraft
+                ? "Saving…"
+                : acceptedCreatorCount > 0
+                  ? "Save as new version"
+                  : "Save updates"}
             </button>
           )}
           {canEdit && canPublish && (
@@ -472,6 +531,67 @@ export function CampaignDetailContent() {
           </p>
         )}
 
+        {!isDraft && revisions.length > 0 && (
+          <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+            <div className="crm-meta-row">
+              <span>Published versions</span>
+              <select
+                aria-label="Campaign version"
+                value={viewingRevisionId ?? campaign.currentRevisionId ?? revisions.find((row) => row.isCurrent)?.id ?? ""}
+                onChange={(event) =>
+                  setViewingRevisionId(event.target.value || null)
+                }
+              >
+                {revisions.map((revision) => (
+                  <option key={revision.id} value={revision.id}>
+                    Version {revision.version}
+                    {revision.isCurrent ? " · current" : ""}
+                    {` · ${new Date(revision.createdAt).toLocaleDateString()}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {hasAcceptedCreator && viewingCurrent && (
+              <p className="workspace-hint" style={{ marginTop: 10, marginBottom: 0 }}>
+                Edits apply to new applicants. {acceptedCreatorCount} accepted
+                creator{acceptedCreatorCount === 1 ? "" : "s"} keep the version
+                they were accepted on.
+              </p>
+            )}
+            {viewingRevision && !viewingRevision.isCurrent && (
+              <>
+                <p className="workspace-hint" style={{ marginTop: 10 }}>
+                  Viewing version {viewingRevision.version}. Creators only see
+                  the current version, or the version they were accepted on.
+                </p>
+                <p className="workspace-hint" style={{ marginTop: 0 }}>
+                  Applied: {viewingRevision.appliedCount}
+                  {viewingRevision.pendingCount
+                    ? ` · ${viewingRevision.pendingCount} pending`
+                    : ""}
+                  {viewingRevision.acceptedCreators.length
+                    ? ` · accepted: ${viewingRevision.acceptedCreators
+                        .map((creator) => creator.name)
+                        .join(", ")}`
+                    : " · no accepted creators on this version"}
+                </p>
+                {canEdit && (
+                  <button
+                    type="button"
+                    className="crm-btn-secondary"
+                    disabled={restoringRevisionId === viewingRevision.id}
+                    onClick={() => void restoreRevision(viewingRevision.id)}
+                  >
+                    {restoringRevisionId === viewingRevision.id
+                      ? "Restoring…"
+                      : "Use this version for new applicants"}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {canEdit && isDraft && form ? (
           <div className="crm-detail-grid">
             <DraftCampaignEditForm
@@ -514,170 +634,137 @@ export function CampaignDetailContent() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : canEdit && editingPublishedCurrent && form ? (
           <div className="crm-detail-grid">
-            <div className="crm-detail-panel">
-              {campaignProducts(campaign.payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
-              <CampaignContentReview campaignId={campaign.id} canSubmit={false} />
-              <CampaignPublishedContent campaignId={campaign.id} canAttach={false} />
-              {hasLimitedPostPublishEditing && (
-                <div style={{ marginBottom: 24 }}>
-                  <h3>
-                    Limited campaign updates{" "}
-                    <span className="crm-tag" style={{ marginLeft: 8 }}>
-                      Other fields read-only
-                    </span>
-                  </h3>
-                  <p className="workspace-hint" style={{ marginTop: 0 }}>
-                    A creator has accepted this campaign. You can only extend
-                    the closing date, adjust creator capacity, add files, and
-                    add example video links. All other campaign fields below are
-                    read-only.
+            <DraftCampaignEditForm
+              campaign={campaign}
+              form={form}
+              onChange={setForm}
+              pendingFiles={pendingFiles}
+              onPendingFiles={setPendingFiles}
+              onDeleteFile={(fileId) => deleteCampaignFile(campaign.id, fileId)}
+            />
+            <div>
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                <h3>Status</h3>
+                <div className="crm-meta-row">
+                  <span>Status</span>
+                  <span>{BRAND_CAMPAIGN_STATUS_LABELS[campaign.status]}</span>
+                </div>
+                {hasAcceptedCreator ? (
+                  <p className="workspace-hint" style={{ marginTop: 10 }}>
+                    Saving creates a new published version. Accepted creators
+                    keep the terms from the date you accepted them.
                   </p>
-                  <div className="workspace-grid">
-                    <label className="workspace-field">
-                      <span>Closing date</span>
-                      <input
-                        aria-label="Closing date"
-                        type="date"
-                        value={limitedEndDate}
-                        min={toDateInputValue(campaign.endDate)}
-                        onChange={(e) => setLimitedEndDate(e.target.value)}
-                      />
-                    </label>
-                    <label className="workspace-field">
-                      <span>Creator capacity</span>
-                      <input
-                        aria-label="Creator capacity"
-                        type="number"
-                        min={Math.max(1, acceptedCreatorCount)}
-                        value={limitedCreatorCapacity}
-                        onChange={(e) =>
-                          setLimitedCreatorCapacity(e.target.value)
-                        }
-                      />
-                      <span className="workspace-hint" style={{ marginTop: 6 }}>
-                        Cannot be lower than accepted creators ({acceptedCreatorCount}).
-                      </span>
-                    </label>
-                    <label className="workspace-field">
-                      <span>Upload files</span>
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => {
-                          const selected = Array.from(e.target.files ?? []);
-                          if (selected.length === 0) return;
-                          setPendingFiles((prev) => [...prev, ...selected]);
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
-                    <div className="workspace-field workspace-field--full">
-                      <span>Example video links</span>
-                      {campaign.exampleVideoLinks.length > 0 && (
-                        <ul style={{ margin: "8px 0 12px", paddingLeft: 18 }}>
-                          {campaign.exampleVideoLinks.map((link) => (
-                            <li key={link}>
-                              <a href={link} target="_blank" rel="noreferrer">
-                                {link}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {newExampleVideoLinks.map((link, index) => (
-                        <div
-                          key={`new-example-link-${index}`}
-                          style={{ display: "flex", gap: 8, marginTop: 8 }}
+                ) : (
+                  <p className="workspace-hint" style={{ marginTop: 10 }}>
+                    Saving updates the live campaign. Pending applicants are
+                    notified when terms change.
+                  </p>
+                )}
+              </div>
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                <h3>Invites sent</h3>
+                {payoutError && (
+                  <p className="workspace-hint" style={{ marginBottom: 10 }}>
+                    {payoutError}
+                  </p>
+                )}
+                {invites.length === 0 ? (
+                  <p className="workspace-hint">
+                    No invites sent yet. Use Invite creators to match and reach
+                    out.
+                  </p>
+                ) : (
+                  invites.map((invite) => {
+                    const payout = invite.creatorId
+                      ? payoutByCreator.get(invite.creatorId)
+                      : undefined;
+                    const canPay =
+                      canManageFunds && Boolean(invite.creatorId) &&
+                      !invite.external &&
+                      invite.status === "accepted" &&
+                      payout?.status !== "transferred";
+                    return (
+                      <div className="crm-meta-row" key={invite.id}>
+                        <span>
+                          {invite.creatorName}
+                          {invite.external && (
+                            <span
+                              className="crm-tag"
+                              style={{ marginLeft: 8 }}
+                            >
+                              External
+                            </span>
+                          )}
+                          {payout && (
+                            <span
+                              className="crm-tag"
+                              style={{ marginLeft: 8 }}
+                            >
+                              {PAYOUT_STATUS_LABELS[payout.status]}
+                              {payout.status === "transferred"
+                                ? ` · ${formatMoney(payout.amountCents)}`
+                                : ""}
+                            </span>
+                          )}
+                        </span>
+                        <span
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                          }}
                         >
-                          <input
-                            type="url"
-                            placeholder="https://"
-                            value={link}
-                            onChange={(e) => {
-                              const next = [...newExampleVideoLinks];
-                              next[index] = e.target.value;
-                              setNewExampleVideoLinks(next);
-                            }}
-                            style={{ flex: 1 }}
-                          />
-                          {newExampleVideoLinks.length > 1 && (
+                          <span className="crm-tag">
+                            {INVITE_STATUS_LABELS[invite.status]}
+                          </span>
+                          {canPay && invite.creatorId && (
                             <button
                               type="button"
                               className="inbox-btn-text"
-                              onClick={() =>
-                                setNewExampleVideoLinks((prev) =>
-                                  prev.filter((_, i) => i !== index),
-                                )
-                              }
+                              disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
+                              onClick={() => void payCreator(invite.creatorId!)}
                             >
-                              Remove
+                              {campaign.payment.model === "commission"
+                                ? "Commission payouts coming soon"
+                                : payingCreatorId === invite.creatorId
+                                ? "Paying…"
+                                : "Pay creator"}
                             </button>
                           )}
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        className="inbox-btn-text"
-                        style={{ marginTop: 8 }}
-                        onClick={() =>
-                          setNewExampleVideoLinks((prev) => [...prev, ""])
-                        }
-                      >
-                        + Add another link
-                      </button>
-                    </div>
-                    {pendingFiles.length > 0 && (
-                      <div className="workspace-field workspace-field--full">
-                        <span>Pending files ({pendingFiles.length})</span>
-                        <ul className="campaign-file-list">
-                          {pendingFiles.map((file, index) => (
-                            <li key={`${file.name}-${index}`} className="campaign-file-item">
-                              <div>
-                                <strong>{file.name}</strong>
-                                <span className="workspace-hint">
-                                  {" "}
-                                  · {Math.max(1, Math.round(file.size / 1024))} KB
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                className="inbox-btn-text"
-                                onClick={() =>
-                                  setPendingFiles((prev) =>
-                                    prev.filter((_, i) => i !== index),
-                                  )
-                                }
-                              >
-                                Remove
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
+                        </span>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="crm-detail-grid">
+            <div className="crm-detail-panel">
+              {campaignProducts((displayedCampaign ?? campaign).payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
+              <CampaignContentReview campaignId={campaign.id} canSubmit={false} />
+              <CampaignPublishedContent campaignId={campaign.id} canAttach={false} />
               <h3>
                 Campaign summary{" "}
-                {hasLimitedPostPublishEditing && (
+                {!viewingCurrent && (
                   <span className="crm-tag" style={{ marginLeft: 8 }}>
-                    Read-only
+                    Version {viewingRevision?.version}
                   </span>
                 )}
               </h3>
               <div className="crm-meta-row">
                 <span>Campaign type</span>
                 <span>
-                  {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType] ??
-                    campaign.campaignType}
+                  {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[(displayedCampaign ?? campaign).campaignType] ??
+                    (displayedCampaign ?? campaign).campaignType}
                 </span>
               </div>
               <div className="crm-meta-row">
                 <span>Content types</span>
-                <span>{getCampaignContentTypesLabel(campaign.contentTypes)}</span>
+                <span>{getCampaignContentTypesLabel((displayedCampaign ?? campaign).contentTypes)}</span>
               </div>
               <div className="crm-meta-row">
                 <span>Status</span>
@@ -686,8 +773,8 @@ export function CampaignDetailContent() {
               <div className="crm-meta-row">
                 <span>Timeline</span>
                 <span>
-                  {toDateInputValue(campaign.startDate)} →{" "}
-                  {toDateInputValue(campaign.endDate)}
+                  {toDateInputValue((displayedCampaign ?? campaign).startDate)} →{" "}
+                  {toDateInputValue((displayedCampaign ?? campaign).endDate)}
                 </span>
               </div>
               <div className="crm-meta-row">
@@ -701,9 +788,9 @@ export function CampaignDetailContent() {
                 </span>
               </div>
               <h3 style={{ marginTop: 24 }}>Brief</h3>
-              <p>{campaign.brief}</p>
+              <p>{(displayedCampaign ?? campaign).brief}</p>
               <h3 style={{ marginTop: 24 }}>Deliverables</h3>
-              <p>{campaign.deliverables}</p>
+              <p>{(displayedCampaign ?? campaign).deliverables}</p>
               {requiredTasks.length > 0 && (
                 <>
                   <h3 style={{ marginTop: 24 }}>Required tasks</h3>
@@ -783,11 +870,11 @@ export function CampaignDetailContent() {
                   </ul>
                 </>
               )}
-              {(campaign.exampleVideoLinks?.length ?? 0) > 0 && (
+              {((displayedCampaign ?? campaign).exampleVideoLinks?.length ?? 0) > 0 && (
                 <>
                   <h3 style={{ marginTop: 24 }}>Example videos</h3>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {campaign.exampleVideoLinks.map((link) => (
+                    {(displayedCampaign ?? campaign).exampleVideoLinks.map((link) => (
                       <li key={link}>
                         <a href={link} target="_blank" rel="noreferrer">
                           {link}
@@ -824,7 +911,7 @@ export function CampaignDetailContent() {
                 </div>
                 <div className="crm-meta-row">
                   <span>Creator capacity</span>
-                  <span>{campaign.creatorCapacity ?? "—"}</span>
+                  <span>{(displayedCampaign ?? campaign).creatorCapacity ?? "—"}</span>
                 </div>
               </div>
 
@@ -910,17 +997,17 @@ export function CampaignDetailContent() {
                 <div className="crm-meta-row">
                   <span>Model</span>
                   <span>
-                    {BRAND_CAMPAIGN_PAYMENT_LABELS[campaign.payment.model]}
+                    {BRAND_CAMPAIGN_PAYMENT_LABELS[(displayedCampaign ?? campaign).payment.model]}
                   </span>
                 </div>
                 <div className="crm-meta-row">
                   <span>Budget</span>
-                  <span>{getCampaignBudgetLabel(campaign)}</span>
+                  <span>{getCampaignBudgetLabel(displayedCampaign ?? campaign)}</span>
                 </div>
-                {campaign.payment.model === "commission" && (
-                  <CommissionPaymentDetails payment={campaign.payment.hybrid} />
+                {(displayedCampaign ?? campaign).payment.model === "commission" && (
+                  <CommissionPaymentDetails payment={(displayedCampaign ?? campaign).payment.hybrid} />
                 )}
-                {campaign.payment.milestones?.map((milestone) => (
+                {(displayedCampaign ?? campaign).payment.milestones?.map((milestone) => (
                   <div className="crm-meta-row" key={milestone.id}>
                     <span>{milestone.label}</span>
                     <span>
@@ -929,9 +1016,9 @@ export function CampaignDetailContent() {
                     </span>
                   </div>
                 ))}
-                {campaign.payment.notes && (
+                {(displayedCampaign ?? campaign).payment.notes && (
                   <p className="workspace-hint" style={{ marginTop: 10 }}>
-                    {campaign.payment.notes}
+                    {(displayedCampaign ?? campaign).payment.notes}
                   </p>
                 )}
               </div>
@@ -941,10 +1028,10 @@ export function CampaignDetailContent() {
                 {downloadError && (
                   <p className="workspace-hint">{downloadError}</p>
                 )}
-                {campaign.files.length === 0 ? (
+                {(displayedCampaign ?? campaign).files.length === 0 ? (
                   <p className="workspace-hint">No files uploaded.</p>
                 ) : (
-                  campaign.files.map((file) => (
+                  (displayedCampaign ?? campaign).files.map((file) => (
                     <div className="crm-meta-row" key={file.id}>
                       <span>
                         {file.name}
@@ -978,7 +1065,7 @@ export function CampaignDetailContent() {
                         >
                           Download
                         </button>
-                        {!hasLimitedPostPublishEditing && (
+                        {canEdit && viewingCurrent && (
                           <button
                             type="button"
                             className="inbox-btn-text"

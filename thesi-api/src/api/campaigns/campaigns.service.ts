@@ -1,5 +1,4 @@
 import { CampaignFundingService } from '../campaign-funding/campaign-funding.service';
-import { isDeepStrictEqual } from 'node:util';
 import { CampaignProductsService } from './campaign-products.service';
 import { assertCommissionPayment } from './commission-payment';
 import {
@@ -11,6 +10,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { InboxService } from 'src/api/inbox/inbox.service';
 import { BillingService } from 'src/api/billing/billing.service';
 import { ConnectService } from 'src/api/connect/connect.service';
 import {
@@ -34,6 +34,12 @@ import {
   type InvitesRepository,
 } from '../invites/invites.repository';
 import { toFileMeta } from './campaign-file.mapper';
+import {
+  isPublishedCampaignStatus,
+  sameMaterialTerms,
+  termsFromCampaign,
+  termsToCampaignPatch,
+} from './campaign-revision';
 import type {
   CampaignPaymentDto,
   UpsertCampaignDto,
@@ -44,6 +50,7 @@ import {
   type CampaignPlatformFeeRecord,
   type CampaignRecord,
   type CampaignRepository,
+  type CampaignRevisionListItem,
   type CampaignUser,
   type CreatorPayoutRecord,
 } from './campaign.repository';
@@ -76,6 +83,7 @@ export class CampaignsService {
     private readonly marketplaceSync?: MarketplaceCampaignSync,
     @Optional() private readonly products?: CampaignProductsService,
     @Optional() private readonly funding?: CampaignFundingService,
+    @Optional() private readonly inbox?: InboxService,
   ) {}
 
   async list(userId: string): Promise<{ campaigns: CampaignRecord[] }> {
@@ -91,6 +99,50 @@ export class CampaignsService {
       throw new NotFoundException('Campaign not found');
     }
     return campaign;
+  }
+
+  async listRevisions(
+    userId: string,
+    campaignId: string,
+  ): Promise<{ revisions: CampaignRevisionListItem[] }> {
+    await this.requireBrand(userId);
+    const campaign = await this.campaigns.getByIdForOwner(userId, campaignId);
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
+    const revisions = await this.campaigns.listRevisionsForOwner(
+      userId,
+      campaignId,
+    );
+    return { revisions };
+  }
+
+  async restoreRevision(
+    userId: string,
+    campaignId: string,
+    revisionId: string,
+  ): Promise<CampaignRecord> {
+    await this.requireBrand(userId);
+    const existing = await this.campaigns.getByIdForOwner(userId, campaignId);
+    if (!existing) {
+      throw new NotFoundException('Campaign not found');
+    }
+    const revision = await this.campaigns.getRevisionForOwner(
+      userId,
+      campaignId,
+      revisionId,
+    );
+    if (!revision) {
+      throw new NotFoundException('Campaign version not found');
+    }
+    return this.update(userId, campaignId, {
+      ...termsToCampaignPatch(revision.terms),
+      status: existing.status,
+      postToMarketplace: existing.postToMarketplace,
+      ...(existing.creatorCapacity
+        ? { creatorCapacity: existing.creatorCapacity }
+        : {}),
+    } as UpsertCampaignDto);
   }
 
   previewPlatformFee(payment: CampaignPaymentDto) {
@@ -136,6 +188,9 @@ export class CampaignsService {
         throw error;
       }
     }
+    await this.maybeRecordPublishedRevision(userId, campaign, {
+      previousPublished: false,
+    });
     await this.marketplaceSync?.syncFromCampaign(userId, campaign);
     return campaign;
   }
@@ -157,12 +212,11 @@ export class CampaignsService {
     await this.products?.prepare(userId, input, existing, !!funded);
     assertCommissionPayment(input.payment);
     this.assertDateRange(input);
-    const acceptedCreatorCount =
-      existing.status === 'active'
-        ? await this.campaigns.countAcceptedCreators(campaignId)
-        : 0;
+    const acceptedCreatorCount = await this.campaigns.countAcceptedCreators(
+      campaignId,
+    );
     if (acceptedCreatorCount > 0) {
-      this.assertAcceptedCampaignUpdate(existing, input, acceptedCreatorCount);
+      this.assertCreatorCapacity(input, acceptedCreatorCount);
     }
 
     if (this.requiresPlatformFee(input)) {
@@ -177,6 +231,9 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
+    await this.maybeRecordPublishedRevision(userId, campaign, {
+      previousPublished: isPublishedCampaignStatus(existing.status),
+    });
     await this.marketplaceSync?.syncFromCampaign(userId, campaign);
     return campaign;
   }
@@ -393,6 +450,9 @@ export class CampaignsService {
     await this.refreshFilesJson(campaignId);
     const updated = await this.campaigns.getByIdForOwner(userId, campaignId);
     if (updated) {
+      await this.maybeRecordPublishedRevision(userId, updated, {
+        previousPublished: isPublishedCampaignStatus(campaign.status),
+      });
       await this.marketplaceSync?.syncFromCampaign(userId, updated);
     }
     return toFileMeta(row);
@@ -437,14 +497,6 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
-    if (
-      campaign.status === 'active' &&
-      (await this.campaigns.hasAcceptedCreator(campaignId))
-    ) {
-      throw new BadRequestException(
-        'Published campaigns with accepted creators can only add files, add example video links, or extend the closing date.',
-      );
-    }
     const row = await this.campaigns.deleteFile(userId, campaignId, fileId);
     if (!row) {
       throw new NotFoundException('File not found');
@@ -456,6 +508,9 @@ export class CampaignsService {
     await this.refreshFilesJson(campaignId);
     const updated = await this.campaigns.getByIdForOwner(userId, campaignId);
     if (updated) {
+      await this.maybeRecordPublishedRevision(userId, updated, {
+        previousPublished: isPublishedCampaignStatus(campaign.status),
+      });
       await this.marketplaceSync?.syncFromCampaign(userId, updated);
     }
     return { deleted: true };
@@ -530,41 +585,10 @@ export class CampaignsService {
     }
   }
 
-  private assertAcceptedCampaignUpdate(
-    existing: CampaignRecord,
+  private assertCreatorCapacity(
     input: UpsertCampaignDto,
     acceptedCreatorCount: number,
   ): void {
-    const lockedFields: Array<Exclude<keyof UpsertCampaignDto, 'merchantProductId'|'merchantProducts'>> = [
-      'name',
-      'campaignType',
-      'contentTypes',
-      'status',
-      'startDate',
-      'brief',
-      'deliverables',
-      'requirements',
-      'payment',
-      'requiredTasks',
-      'creatorBenefits',
-      'contentRights',
-      'productsProvided',
-      'creatorDisclosureEnabled',
-      'postToMarketplace',
-    ];
-    const changedLockedField = lockedFields.some(
-      (field) => !(field === 'status' && input.status === 'completed' && existing.payment.hybrid?.affiliate?.fundingFlowVersion === 1) && !sameValue(existing[field], input[field]),
-    );
-    if (changedLockedField) {
-      throw new BadRequestException(
-        'Published campaigns with accepted creators can only add files, add example video links, or extend the closing date.',
-      );
-    }
-    if (input.endDate < existing.endDate) {
-      throw new BadRequestException(
-        'Closing date can only be extended after a creator has been accepted.',
-      );
-    }
     if (
       input.creatorCapacity !== undefined &&
       input.creatorCapacity < acceptedCreatorCount
@@ -573,10 +597,57 @@ export class CampaignsService {
         `Creator capacity cannot be lower than accepted creators (${acceptedCreatorCount}).`,
       );
     }
-    if (!keepsExistingLinks(existing.exampleVideoLinks, input.exampleVideoLinks)) {
-      throw new BadRequestException(
-        'Example video links can only be added after a creator has been accepted.',
-      );
+  }
+
+  private async maybeRecordPublishedRevision(
+    userId: string,
+    campaign: CampaignRecord,
+    options: { previousPublished: boolean },
+  ): Promise<void> {
+    if (!isPublishedCampaignStatus(campaign.status)) {
+      return;
+    }
+    const latest = await this.campaigns.getLatestRevision(campaign.id);
+    const nextTerms = termsFromCampaign(campaign);
+    const shouldWrite =
+      !options.previousPublished ||
+      !latest ||
+      !sameMaterialTerms(latest.terms, nextTerms);
+    if (!shouldWrite) {
+      return;
+    }
+    const revision = await this.campaigns.insertRevision({
+      campaignId: campaign.id,
+      createdByUserId: userId,
+      terms: nextTerms,
+    });
+    campaign.currentRevisionId = revision.id;
+    if (!latest) {
+      return;
+    }
+    await this.notifyPendingOfPublishedChange(userId, campaign);
+  }
+
+  private async notifyPendingOfPublishedChange(
+    userId: string,
+    campaign: CampaignRecord,
+  ): Promise<void> {
+    await this.marketplaceSync?.notifyPendingApplicantsOfPublishedChange(
+      userId,
+      campaign,
+    );
+    const openInviteCreatorIds = await this.invites.listOpenInviteCreatorIds(
+      campaign.id,
+    );
+    for (const creatorId of openInviteCreatorIds) {
+      await this.inbox?.notifySelf(creatorId, {
+        type: 'campaign_update',
+        title: `Campaign updated: ${campaign.name}`,
+        body: `"${campaign.name}" was updated. Review the current dates, pay, and deliverables.`,
+        href: '/app/inbox',
+        campaignId: campaign.id,
+        audience: 'creator',
+      });
     }
   }
 
@@ -779,18 +850,6 @@ function normalizeString(
   defaultValue: string,
 ): string {
   return value?.trim() || fallback?.trim() || defaultValue;
-}
-
-function sameValue(left: unknown, right: unknown): boolean {
-  return isDeepStrictEqual(left ?? null, right ?? null);
-}
-
-function keepsExistingLinks(existing: string[], next: string[] = []): boolean {
-  const nextLinks = new Set(next.map((link) => link.trim()).filter(Boolean));
-  return existing
-    .map((link) => link.trim())
-    .filter(Boolean)
-    .every((link) => nextLinks.has(link));
 }
 
 function hasValue<T>(value: T | undefined, fallback: T | undefined): boolean {

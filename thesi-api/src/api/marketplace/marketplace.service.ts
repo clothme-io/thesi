@@ -83,6 +83,31 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     }
   }
 
+  async notifyPendingApplicantsOfPublishedChange(
+    ownerUserId: string,
+    campaign: CampaignRecord,
+  ): Promise<void> {
+    const listing = (await this.marketplace.listByOwner(ownerUserId)).find(
+      (item) => item.campaignId === campaign.id,
+    );
+    if (!listing) return;
+
+    const applications =
+      await this.marketplace.listApplicationsForListing(listing.id);
+    const href = `/app/marketplace/${listing.id}`;
+    for (const application of applications) {
+      if (application.status !== 'pending') continue;
+      await this.inbox.notifySelf(application.creatorUserId, {
+        type: 'campaign_update',
+        title: `Campaign updated: ${campaign.name}`,
+        body: `"${campaign.name}" was updated. Review the current dates, pay, and deliverables before the brand responds to your application.`,
+        href,
+        campaignId: campaign.id,
+        audience: 'creator',
+      });
+    }
+  }
+
   async getMarketplace(userId: string): Promise<{
     listings: MarketplaceListingRecord[];
     applications: MarketplaceApplicationRecord[];

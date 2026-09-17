@@ -71,6 +71,36 @@ export class CampaignsController {
     return { status: HttpStatus.OK, error: null, data };
   }
 
+  @Get(':id/revisions')
+  @ApiOperation({ summary: 'List published versions of a campaign' })
+  async listRevisions(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const data = await this.campaigns.listRevisions(
+      workspaceResourceOwner(user.sub),
+      id,
+    );
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Post(':id/revisions/:revisionId/restore')
+  @ApiOperation({
+    summary: 'Copy a previous published version to become the current terms',
+  })
+  async restoreRevision(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('revisionId', ParseUUIDPipe) revisionId: string,
+  ) {
+    const data = await this.campaigns.restoreRevision(
+      workspaceResourceOwner(user.sub),
+      id,
+      revisionId,
+    );
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
   @Get(':id/platform-fee')
   @ApiOperation({ summary: 'Get platform fee status for a campaign' })
   async getPlatformFee(

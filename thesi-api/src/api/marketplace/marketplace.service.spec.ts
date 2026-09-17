@@ -361,6 +361,56 @@ describe('MarketplaceService', () => {
     expect(inbox.notifySelf).not.toHaveBeenCalled();
   });
 
+  it('notifies pending applicants when published campaign terms change', async () => {
+    repository.user = {
+      id: 'brand-1',
+      role: 'brand',
+      fullName: 'Brand',
+      companyName: 'Acme',
+    };
+    const campaign = sampleCampaign({
+      postToMarketplace: true,
+      status: 'active',
+    });
+    await service.syncFromCampaign('brand-1', campaign);
+    repository.applications.push({
+      id: 'app-1',
+      listingId: repository.listings[0]!.id,
+      pitch: 'Hi',
+      appliedAt: new Date().toISOString(),
+      addedToCrm: false,
+      status: 'pending',
+      creatorUserId: 'creator-pending',
+      creatorName: 'Pat',
+      creatorEmail: 'pat@example.com',
+    });
+    repository.applications.push({
+      id: 'app-2',
+      listingId: repository.listings[0]!.id,
+      pitch: 'Hi',
+      appliedAt: new Date().toISOString(),
+      addedToCrm: false,
+      status: 'accepted',
+      creatorUserId: 'creator-accepted',
+      creatorName: 'Alex',
+      creatorEmail: 'alex@example.com',
+    });
+    inbox.notifySelf.mockClear();
+
+    await service.notifyPendingApplicantsOfPublishedChange('brand-1', campaign);
+
+    expect(inbox.notifySelf).toHaveBeenCalledTimes(1);
+    expect(inbox.notifySelf).toHaveBeenCalledWith(
+      'creator-pending',
+      expect.objectContaining({
+        type: 'campaign_update',
+        campaignId: campaign.id,
+        audience: 'creator',
+        href: `/app/marketplace/${repository.listings[0]!.id}`,
+      }),
+    );
+  });
+
   it('copies campaign creator disclosure visibility to the listing', async () => {
     repository.user = {
       id: 'brand-1',

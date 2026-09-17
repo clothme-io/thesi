@@ -219,6 +219,7 @@ export class InvitesService {
       creatorEmail,
       creatorName: input.creatorName.trim(),
       external,
+      sentRevisionId: owned.currentRevisionId ?? null,
     });
 
     if (!invite.external) {

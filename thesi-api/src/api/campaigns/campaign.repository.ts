@@ -1,3 +1,4 @@
+import type { CampaignRevisionTerms } from './campaign-revision';
 import type {
   CampaignContentRightsDto,
   UpsertCampaignDto,
@@ -49,6 +50,7 @@ export type CampaignRecord = {
   creatorCapacity?: number;
   creatorDisclosureEnabled: boolean;
   postToMarketplace: boolean;
+  currentRevisionId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -164,4 +166,41 @@ export interface CampaignRepository {
     idempotencyKey: string;
     failureReason?: string | null;
   }): Promise<CreatorPayoutRecord>;
+  getLatestRevision(
+    campaignId: string,
+  ): Promise<CampaignRevisionRecord | null>;
+  getRevisionForOwner(
+    ownerUserId: string,
+    campaignId: string,
+    revisionId: string,
+  ): Promise<CampaignRevisionRecord | null>;
+  insertRevision(input: {
+    campaignId: string;
+    createdByUserId: string;
+    terms: CampaignRevisionRecord['terms'];
+  }): Promise<CampaignRevisionRecord>;
+  listRevisionsForOwner(
+    ownerUserId: string,
+    campaignId: string,
+  ): Promise<CampaignRevisionListItem[]>;
 }
+
+export type CampaignRevisionRecord = {
+  id: string;
+  campaignId: string;
+  version: number;
+  terms: CampaignRevisionTerms;
+  createdByUserId: string;
+  createdAt: string;
+};
+
+export type CampaignRevisionListItem = CampaignRevisionRecord & {
+  isCurrent: boolean;
+  appliedCount: number;
+  pendingCount: number;
+  acceptedCreators: Array<{
+    name: string;
+    email: string;
+    acceptedAt: string;
+  }>;
+};

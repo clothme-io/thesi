@@ -63,6 +63,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
         id: schema.campaign.id,
         name: schema.campaign.name,
         payment: schema.campaign.payment,
+        currentRevisionId: schema.campaign.currentRevisionId,
       })
       .from(schema.campaign)
       .where(
@@ -140,6 +141,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
         creatorName: input.creatorName.trim(),
         external: input.external,
         status: 'sent',
+        sentRevisionId: input.sentRevisionId ?? null,
       })
       .returning();
     return this.toCampaignInvite(row);
@@ -246,6 +248,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
         contentRightsSnapshot: campaign.contentRights,
         requiredTasksSnapshot: campaign.requiredTasks,
         creatorCapacitySnapshot: campaign.creatorCapacity,
+        revisionId: campaign.currentRevisionId,
         acceptedAt: input.acceptedAt ?? new Date(),
       })
       .onConflictDoNothing();
@@ -257,8 +260,18 @@ export class PostgresInvitesRepository implements InvitesRepository {
     creatorEmail: string,
   ): Promise<CampaignAcceptanceSnapshotRecord | null> {
     const [row] = await this.db
-      .select()
+      .select({
+        snapshot: schema.campaignAcceptanceSnapshot,
+        revisionVersion: schema.campaignRevision.version,
+      })
       .from(schema.campaignAcceptanceSnapshot)
+      .leftJoin(
+        schema.campaignRevision,
+        eq(
+          schema.campaignRevision.id,
+          schema.campaignAcceptanceSnapshot.revisionId,
+        ),
+      )
       .where(
         and(
           and(workspaceFilter(schema.campaignAcceptanceSnapshot), eq(schema.campaignAcceptanceSnapshot.campaignId, campaignId)),
@@ -269,7 +282,25 @@ export class PostgresInvitesRepository implements InvitesRepository {
         ),
       )
       .limit(1);
-    return row ? this.toAcceptanceSnapshot(row) : null;
+    return row ? this.toAcceptanceSnapshot(row.snapshot, row.revisionVersion) : null;
+  }
+
+  async listOpenInviteCreatorIds(campaignId: string): Promise<string[]> {
+    const rows = await this.db
+      .select({
+        creatorUserId: schema.campaignInvite.creatorUserId,
+      })
+      .from(schema.campaignInvite)
+      .where(
+        and(
+          workspaceFilter(schema.campaignInvite),
+          eq(schema.campaignInvite.campaignId, campaignId),
+          eq(schema.campaignInvite.status, 'sent'),
+        ),
+      );
+    return rows
+      .map((row) => row.creatorUserId)
+      .filter((id): id is string => Boolean(id));
   }
 
   async setCampaignInviteNovuTransactionId(
@@ -349,6 +380,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
       external: row.external,
       status: row.status as InviteStatus,
       sentAt: row.sentAt.toISOString(),
+      ...(row.sentRevisionId ? { sentRevisionId: row.sentRevisionId } : {}),
     } satisfies CampaignInviteRecord;
   }
 
@@ -369,6 +401,7 @@ export class PostgresInvitesRepository implements InvitesRepository {
 
   private toAcceptanceSnapshot(
     row: typeof schema.campaignAcceptanceSnapshot.$inferSelect,
+    revisionVersion?: number | null,
   ) {
     return {
       id: row.id,
@@ -394,6 +427,8 @@ export class PostgresInvitesRepository implements InvitesRepository {
       ...(row.creatorCapacitySnapshot
         ? { creatorCapacitySnapshot: row.creatorCapacitySnapshot }
         : {}),
+      ...(row.revisionId ? { revisionId: row.revisionId } : {}),
+      ...(revisionVersion ? { revisionVersion } : {}),
       acceptedAt: row.acceptedAt.toISOString(),
       createdAt: row.createdAt.toISOString(),
     } satisfies CampaignAcceptanceSnapshotRecord;

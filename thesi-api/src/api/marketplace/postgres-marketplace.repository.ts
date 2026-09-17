@@ -262,6 +262,20 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
     pitch: string;
     addedToCrm: boolean;
   }): Promise<MarketplaceApplicationRecord> {
+    const [listing] = await this.db
+      .select({
+        campaignId: schema.marketplaceListing.campaignId,
+      })
+      .from(schema.marketplaceListing)
+      .where(eq(schema.marketplaceListing.id, input.listingId))
+      .limit(1);
+    const [campaign] = listing
+      ? await this.db
+          .select({ currentRevisionId: schema.campaign.currentRevisionId })
+          .from(schema.campaign)
+          .where(eq(schema.campaign.id, listing.campaignId))
+          .limit(1)
+      : [];
     const [row] = await this.db
       .insert(schema.marketplaceApplication)
       .values({
@@ -269,6 +283,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
         creatorUserId: input.creatorUserId,
         pitch: input.pitch,
         addedToCrm: input.addedToCrm,
+        appliedRevisionId: campaign?.currentRevisionId ?? null,
       })
       .returning();
     if (input.addedToCrm) {

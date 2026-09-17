@@ -167,6 +167,7 @@ export const marketplaceApplication = thesiSchema.table(
     appliedAt: timestamp('applied_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    appliedRevisionId: uuid('applied_revision_id'),
   },
 );
 

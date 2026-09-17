@@ -216,10 +216,46 @@ export const campaign = thesiSchema.table('campaign', {
     .notNull()
     .default(false),
   postToMarketplace: boolean('post_to_marketplace').notNull().default(false),
+  currentRevisionId: uuid('current_revision_id'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type CampaignRevisionTermsJson = {
+  name: string;
+  campaignType: string;
+  contentTypes: string[];
+  startDate: string;
+  endDate: string;
+  brief: string;
+  deliverables: string;
+  exampleVideoLinks: string[];
+  requirements: CampaignRequirementsJson;
+  files: CampaignFileJson[];
+  payment: CampaignPaymentJson;
+  requiredTasks: CampaignRequiredTaskJson[];
+  creatorBenefits: CampaignCreatorBenefitsJson;
+  contentRights: CampaignContentRightsJson;
+  productsProvided: CampaignProductProvidedJson[];
+  creatorDisclosureEnabled: boolean;
+};
+
+export const campaignRevision = thesiSchema.table('campaign_revision', {
+  workspaceId: uuid('workspace_id'),
+  id: uuid('id').primaryKey().defaultRandom(),
+  campaignId: uuid('campaign_id')
+    .notNull()
+    .references(() => campaign.id, { onDelete: 'cascade' }),
+  version: integer('version').notNull(),
+  terms: jsonb('terms').$type<CampaignRevisionTermsJson>().notNull(),
+  createdByUserId: text('created_by_user_id')
+    .notNull()
+    .references(() => thesiUser.id, { onDelete: 'restrict' }),
+  createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
@@ -265,6 +301,9 @@ export const campaignAcceptanceSnapshot = thesiSchema.table(
       .$type<CampaignRequiredTaskJson[]>()
       .notNull(),
     creatorCapacitySnapshot: integer('creator_capacity_snapshot'),
+    revisionId: uuid('revision_id').references(() => campaignRevision.id, {
+      onDelete: 'restrict',
+    }),
     acceptedAt: timestamp('accepted_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -27,6 +27,7 @@ export const campaignInvite = thesiSchema.table('campaign_invite', {
   status: text('status').notNull().default('sent'),
   novuTransactionId: text('novu_transaction_id'),
   sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  sentRevisionId: uuid('sent_revision_id'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
