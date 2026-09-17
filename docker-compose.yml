@@ -81,6 +81,7 @@ services:
       SOCIAL_TOKEN_ENCRYPTION_KEY: thesi-local-social-token-key
       TIKTOK_REDIRECT_URI: http://localhost:5010/v1/social/tiktok/callback
       INSTAGRAM_REDIRECT_URI: http://localhost:5010/v1/social/instagram/callback
+      YOUTUBE_REDIRECT_URI: http://localhost:5010/v1/social/youtube/callback
       BRAND_WORKSPACES_ENABLED: "true"
       BRAND_WORKSPACE_ACCESS_ENABLED: "true"
       MULTI_BRAND_ENABLED: "true"

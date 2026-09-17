@@ -8,6 +8,7 @@ import {
   CREATOR_NICHE_OPTIONS,
 } from "@/lib/profile/creator-types";
 import { getInitials } from "@/lib/profile/shared";
+import { CreatorImportedPosts } from "./CreatorImportedPosts";
 import { CreatorPortfolioBuilder } from "./CreatorPortfolioBuilder";
 
 export function CreatorProfilePageContent() {
@@ -313,6 +314,8 @@ export function CreatorProfilePageContent() {
               />
             </div>
           </section>
+
+          <CreatorImportedPosts />
 
           <section className="workspace-section">
             <h3>Business details</h3>

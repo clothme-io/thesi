@@ -1,6 +1,7 @@
 import type { CommissionRules } from 'src/api/campaigns/commission-rules';
 import type { PromotedProduct } from '../../../api/campaigns/campaign-products.service';
 import {
+  bigint,
   boolean,
   date,
   integer,
@@ -8,6 +9,7 @@ import {
   pgSchema,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { thesiUser } from './userSchema';
@@ -266,6 +268,114 @@ export const campaignAcceptanceSnapshot = thesiSchema.table(
     acceptedAt: timestamp('accepted_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+export const campaignContentMetric = thesiSchema.table(
+  'campaign_content_metric',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaign.id, { onDelete: 'cascade' }),
+    creatorUserId: text('creator_user_id')
+      .notNull()
+      .references(() => thesiUser.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    externalMediaId: text('external_media_id').notNull(),
+    url: text('url').notNull(),
+    title: text('title').notNull().default(''),
+    views: integer('views').notNull().default(0),
+    likes: integer('likes').notNull().default(0),
+    comments: integer('comments').notNull().default(0),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique('campaign_content_metric_unique').on(
+      table.campaignId,
+      table.creatorUserId,
+      table.provider,
+      table.externalMediaId,
+    ),
+  ],
+);
+
+export type CampaignContentReviewStatus =
+  | 'draft'
+  | 'in_review'
+  | 'changes_requested'
+  | 'approved'
+  | 'rejected';
+
+export type CampaignContentReviewEventType =
+  | 'submitted'
+  | 'comment'
+  | 'changes_requested'
+  | 'approved'
+  | 'rejected';
+
+export const campaignContentSubmission = thesiSchema.table(
+  'campaign_content_submission',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaign.id, { onDelete: 'cascade' }),
+    creatorUserId: text('creator_user_id')
+      .notNull()
+      .references(() => thesiUser.id, { onDelete: 'cascade' }),
+    deliverableLabel: text('deliverable_label').notNull().default(''),
+    title: text('title').notNull().default(''),
+    status: text('status').notNull(),
+    version: integer('version').notNull().default(1),
+    originalName: text('original_name').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    contentType: text('content_type').notNull(),
+    storageProvider: text('storage_provider').notNull(),
+    storageKey: text('storage_key').notNull(),
+    reviewedByUserId: text('reviewed_by_user_id').references(() => thesiUser.id, {
+      onDelete: 'set null',
+    }),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique('campaign_content_submission_storage_unique').on(
+      table.storageProvider,
+      table.storageKey,
+    ),
+  ],
+);
+
+export const campaignContentReviewEvent = thesiSchema.table(
+  'campaign_content_review_event',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    submissionId: uuid('submission_id')
+      .notNull()
+      .references(() => campaignContentSubmission.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id')
+      .notNull()
+      .references(() => thesiUser.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    comment: text('comment').notNull().default(''),
+    version: integer('version').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

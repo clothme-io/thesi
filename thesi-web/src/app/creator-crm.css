@@ -497,6 +497,17 @@
   color: var(--ink);
 }
 
+.campaign-review-split {
+  display: grid;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .campaign-review-split {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .crm-money--overdue {
   color: #dc2626;
 }

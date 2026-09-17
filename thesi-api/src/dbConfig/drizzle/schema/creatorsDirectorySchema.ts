@@ -60,6 +60,7 @@ export const creatorUgcPost = thesiSchema.table('creator_ugc_post', {
   postedAt: date('posted_at').notNull(),
   url: text('url'),
   source: text('source').notNull().default('manual'),
+  externalMediaId: text('external_media_id').notNull().default(''),
   views: integer('views').notNull().default(0),
   likes: integer('likes').notNull().default(0),
   comments: integer('comments').notNull().default(0),

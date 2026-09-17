@@ -51,3 +51,16 @@ export function connectedAvgViews(
     connected.reduce((sum, row) => sum + row.avgViews, 0) / connected.length,
   );
 }
+
+export function engagementRateFromPosts(
+  posts: { views: number; likes: number; comments: number }[],
+): number {
+  const withViews = posts.filter((post) => post.views > 0);
+  if (withViews.length === 0) return 0;
+  const interactions = withViews.reduce(
+    (sum, post) => sum + post.likes + post.comments,
+    0,
+  );
+  const views = withViews.reduce((sum, post) => sum + post.views, 0);
+  return Math.round((interactions / views) * 10000) / 100;
+}

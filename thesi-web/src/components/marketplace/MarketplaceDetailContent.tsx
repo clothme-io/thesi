@@ -12,6 +12,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthProvider";
 import { InviteCreatorDrawer } from "@/components/brand/campaigns/InviteCreatorDrawer";
+import { CampaignPublishedContent } from "@/components/inbox/CampaignPublishedContent";
+import { CampaignContentReview } from "@/components/brand/campaigns/CampaignContentReview";
 import {
   useMarketplace,
   getListingById,
@@ -659,6 +661,18 @@ export function MarketplaceDetailContent() {
                 }
               />
             ))}
+            {listing.campaignId && (isBrand || acceptanceSnapshot) ? (
+              <>
+                <CampaignContentReview
+                  campaignId={listing.campaignId}
+                  canSubmit={!isBrand && Boolean(acceptanceSnapshot)}
+                />
+                <CampaignPublishedContent
+                  campaignId={listing.campaignId}
+                  canAttach={!isBrand && Boolean(acceptanceSnapshot)}
+                />
+              </>
+            ) : null}
             <section className="marketplace-panel">
               <div className="marketplace-detail-badges">
                 <span className={`marketplace-status marketplace-status--${effectiveStatus}`}>
