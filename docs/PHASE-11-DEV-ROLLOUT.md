@@ -2,6 +2,8 @@
 
 Status: local/dev-prep workflow. Do not treat this as production approval. Thesi is live, but commission settlement, scheduled settlement and combined-balance payout must stay disabled in production until dev evidence and final approval are complete.
 
+Stripe provider setup, key order, creator onboarding gates and test-mode evidence are tracked in [Stripe payments rollout](./STRIPE-PAYMENTS-ROLLOUT.md).
+
 ## Release principle
 
 Schema changes are owned by `clothme-db` and must reach shared environments only through GitHub Actions and Argo. Do not run Flyway, psql DDL, Drizzle push, Prisma migrate or laptop scripts against clothme-dev or clothme-prod. Local Flyway rehearsal is allowed only against local Docker databases.

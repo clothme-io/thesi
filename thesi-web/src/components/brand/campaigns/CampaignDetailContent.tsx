@@ -141,10 +141,10 @@ export function CampaignDetailContent() {
   const contentRights =
     displayedCampaign?.contentRights ?? EMPTY_CONTENT_RIGHTS;
   const productsProvided = displayedCampaign?.productsProvided ?? [];
+  const editableCampaign: BrandCampaign | null =
+    campaign && (campaign.status === "draft" || viewingCurrent) ? campaign : null;
   const { form, setForm } = useDraftForm(
-    campaign?.status === "draft" || (Boolean(campaign) && viewingCurrent)
-      ? campaign
-      : null,
+    editableCampaign,
     { allowPublished: Boolean(campaign && campaign.status !== "draft" && viewingCurrent) },
   );
 

@@ -45,6 +45,7 @@ import {
   formatListingPayment,
   formatListingContentTypes,
   type MarketplaceBrandApplication,
+  type MarketplaceListing,
   type MarketplacePayment,
 } from "@/lib/marketplace/types";
 

@@ -18,7 +18,8 @@ const EMPTY: ConnectStatus = {
   readyForPayouts: false,
 };
 
-const PAYOUTS_COMING_SOON = true;
+const PAYOUTS_COMING_SOON =
+  process.env.NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED !== "true";
 
 export function CreatorPayoutsSection() {
   const { authenticatedRequest } = useAuth();
