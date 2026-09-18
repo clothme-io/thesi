@@ -191,7 +191,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     });
   });
 
-  it("lets brands edit published campaigns after a creator accepts", async () => {
+  it("limits published campaign edits after a creator accepts", async () => {
     activeCampaign = buildCampaign({
       status: "active",
       endDate: "2026-08-01",
@@ -209,23 +209,39 @@ describe("CampaignDetailContent lifecycle buttons", () => {
       },
     ];
     const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    const user = userEvent.setup();
     render(<CampaignDetailContent />);
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Save as new version" }),
+        screen.getByRole("button", { name: "Save updates" }),
       ).toBeInTheDocument();
     });
     expect(
-      screen.getByText(/Accepted creators keep the terms from the date you accepted them/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Mark complete" }),
+      screen.getByText(/A creator has accepted this campaign/i),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("Limited campaign updates"),
+      screen.queryByRole("button", { name: "Pause" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Unpublish" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Limited campaign updates")).toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("Creator capacity"));
+    await user.type(screen.getByLabelText("Creator capacity"), "7");
+    await user.click(screen.getByRole("button", { name: "Save updates" }));
+
+    await waitFor(() => {
+      expect(updateCampaign).toHaveBeenCalledWith(
+        "campaign-1",
+        expect.objectContaining({
+          creatorCapacity: 7,
+          endDate: "2026-08-01",
+          exampleVideoLinks: ["https://example.com/original"],
+        }),
+      );
+    });
   });
 
   it("publishes a draft campaign to the marketplace", async () => {
