@@ -74,6 +74,17 @@ class FakeInvitesRepository implements InvitesRepository {
     );
   }
 
+  async listOpenInviteCreatorIds(campaignId: string) {
+    return this.campaignInvites
+      .filter(
+        (invite) =>
+          invite.campaignId === campaignId &&
+          invite.status === 'sent' &&
+          Boolean(invite.creatorId),
+      )
+      .map((invite) => invite.creatorId) as string[];
+  }
+
   async createCampaignInvite(input: {
     campaignId: string;
     brandUserId: string;

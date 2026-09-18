@@ -890,15 +890,23 @@ export function DraftCampaignEditForm({
 }
 
 /** Keeps draft form state in sync when the loaded campaign identity/revision changes. */
-export function useDraftForm(campaign: BrandCampaign | null) {
+export function useDraftForm(
+  campaign: BrandCampaign | null,
+  options?: { allowPublished?: boolean },
+) {
   const [form, setForm] = useState<DraftCampaignFormState | null>(null);
+  const allowPublished = options?.allowPublished ?? false;
   const syncKey =
-    campaign && campaign.status === "draft"
+    campaign && (campaign.status === "draft" || allowPublished)
       ? `${campaign.id}:${campaign.updatedAt}`
       : "";
 
   useEffect(() => {
-    if (!syncKey || !campaign || campaign.status !== "draft") {
+    if (!syncKey || !campaign) {
+      setForm(null);
+      return;
+    }
+    if (campaign.status !== "draft" && !allowPublished) {
       setForm(null);
       return;
     }

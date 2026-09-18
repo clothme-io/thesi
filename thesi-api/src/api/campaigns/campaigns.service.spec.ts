@@ -15,6 +15,8 @@ import type {
   CampaignPlatformFeeRecord,
   CampaignRecord,
   CampaignRepository,
+  CampaignRevisionListItem,
+  CampaignRevisionRecord,
   CampaignUser,
   CreateCampaignFileInput,
   CreatorPayoutRecord,
@@ -37,6 +39,7 @@ class FakeCampaignRepository implements CampaignRepository {
   payouts = new Map<string, CreatorPayoutRecord>();
   acceptedCreatorCampaignIds = new Set<string>();
   acceptedCreatorCounts = new Map<string, number>();
+  revisions: CampaignRevisionRecord[] = [];
 
   async getUser() {
     return this.user;
@@ -95,6 +98,63 @@ class FakeCampaignRepository implements CampaignRepository {
     };
     this.rows[index] = updated;
     return updated;
+  }
+
+  async getLatestRevision(campaignId: string) {
+    return (
+      [...this.revisions]
+        .filter((row) => row.campaignId === campaignId)
+        .sort((left, right) => right.version - left.version)[0] ?? null
+    );
+  }
+
+  async getRevisionForOwner(
+    _ownerUserId: string,
+    campaignId: string,
+    revisionId: string,
+  ) {
+    return (
+      this.revisions.find(
+        (row) => row.campaignId === campaignId && row.id === revisionId,
+      ) ?? null
+    );
+  }
+
+  async insertRevision(input: {
+    campaignId: string;
+    createdByUserId: string;
+    terms: CampaignRevisionRecord['terms'];
+  }) {
+    const latest = await this.getLatestRevision(input.campaignId);
+    const row: CampaignRevisionRecord = {
+      id: `rev-${input.campaignId}-${(latest?.version ?? 0) + 1}`,
+      campaignId: input.campaignId,
+      version: (latest?.version ?? 0) + 1,
+      terms: input.terms,
+      createdByUserId: input.createdByUserId,
+      createdAt: new Date().toISOString(),
+    };
+    this.revisions.push(row);
+    const campaign = this.rows.find((item) => item.id === input.campaignId);
+    if (campaign) campaign.currentRevisionId = row.id;
+    return row;
+  }
+
+  async listRevisionsForOwner(
+    _ownerUserId: string,
+    campaignId: string,
+  ): Promise<CampaignRevisionListItem[]> {
+    const current = this.rows.find((row) => row.id === campaignId);
+    return this.revisions
+      .filter((row) => row.campaignId === campaignId)
+      .sort((left, right) => right.version - left.version)
+      .map((row) => ({
+        ...row,
+        isCurrent: row.id === current?.currentRevisionId,
+        appliedCount: 0,
+        pendingCount: 0,
+        acceptedCreators: [],
+      }));
   }
 
   async createFile(input: CreateCampaignFileInput) {
@@ -267,7 +327,12 @@ describe('CampaignsService', () => {
   };
   let stripe: { chargeOffSession: jest.Mock; createTransfer: jest.Mock };
   let connect: { getCreatorPayoutReadiness: jest.Mock };
-  let invites: { listCampaignInvites: jest.Mock };
+  let invites: { listCampaignInvites: jest.Mock; listOpenInviteCreatorIds: jest.Mock };
+  let marketplaceSync: {
+    syncFromCampaign: jest.Mock;
+    notifyPendingApplicantsOfPublishedChange: jest.Mock;
+  };
+  let inbox: { notifySelf: jest.Mock };
 
   beforeEach(() => {
     repository = new FakeCampaignRepository();
@@ -303,7 +368,15 @@ describe('CampaignsService', () => {
           status: 'accepted',
         },
       ]),
+      listOpenInviteCreatorIds: jest.fn().mockResolvedValue([]),
     };
+    marketplaceSync = {
+      syncFromCampaign: jest.fn().mockResolvedValue(undefined),
+      notifyPendingApplicantsOfPublishedChange: jest
+        .fn()
+        .mockResolvedValue(undefined),
+    };
+    inbox = { notifySelf: jest.fn().mockResolvedValue(undefined) };
     service = new CampaignsService(
       repository,
       storage,
@@ -311,6 +384,10 @@ describe('CampaignsService', () => {
       stripe as unknown as StripeService,
       connect as unknown as ConnectService,
       invites as never,
+      marketplaceSync as never,
+      undefined,
+      undefined,
+      inbox as never,
     );
   });
 
@@ -417,33 +494,99 @@ describe('CampaignsService', () => {
     );
   });
 
-  it('only allows closing date extensions and added example links after a creator is accepted', async () => {
+  it('records a published version on first publish and again when terms change after accept', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const draft = await service.create('brand-1', sampleCampaign());
+    expect(repository.revisions).toHaveLength(0);
+
+    const published = await service.update(
+      'brand-1',
+      draft.id,
+      sampleCampaign({ status: 'active', postToMarketplace: true }),
+    );
+    expect(repository.revisions).toHaveLength(1);
+    expect(published.currentRevisionId).toBe(repository.revisions[0]?.id);
+    expect(
+      marketplaceSync.notifyPendingApplicantsOfPublishedChange,
+    ).not.toHaveBeenCalled();
+
+    repository.acceptedCreatorCampaignIds.add(published.id);
+    invites.listOpenInviteCreatorIds.mockResolvedValue(['creator-pending']);
+    const updated = await service.update(
+      'brand-1',
+      published.id,
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        brief: 'Updated brief for new applicants',
+        endDate: '2026-08-01',
+        exampleVideoLinks: [],
+      }),
+    );
+    expect(updated.brief).toBe('Updated brief for new applicants');
+    expect(repository.revisions).toHaveLength(2);
+    expect(repository.revisions[0]?.terms.brief).not.toBe(
+      repository.revisions[1]?.terms.brief,
+    );
+    expect(
+      marketplaceSync.notifyPendingApplicantsOfPublishedChange,
+    ).toHaveBeenCalledTimes(1);
+    expect(inbox.notifySelf).toHaveBeenCalledWith(
+      'creator-pending',
+      expect.objectContaining({
+        type: 'campaign_update',
+        campaignId: published.id,
+        audience: 'creator',
+      }),
+    );
+  });
+
+  it('restores an older published version as a new current version', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const published = await service.create(
+      'brand-1',
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        brief: 'Version one brief',
+      }),
+    );
+    const first = repository.revisions[0];
+    expect(first).toBeDefined();
+
+    await service.update(
+      'brand-1',
+      published.id,
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        brief: 'Version two brief',
+      }),
+    );
+    expect(repository.revisions).toHaveLength(2);
+
+    const restored = await service.restoreRevision(
+      'brand-1',
+      published.id,
+      first!.id,
+    );
+    expect(restored.brief).toBe('Version one brief');
+    expect(repository.revisions).toHaveLength(3);
+    expect(repository.revisions.at(-1)?.terms.brief).toBe('Version one brief');
+  });
+
+  it('allows shortening dates and changing pay after a creator is accepted', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     const campaign = await service.create(
       'brand-1',
       sampleCampaign({
         status: 'active',
         postToMarketplace: true,
-        endDate: '2026-08-01',
-        exampleVideoLinks: ['https://example.com/original'],
+        endDate: '2026-08-15',
+        payment: { model: 'flat_rate', flatRateCents: 50_000 },
       }),
     );
     repository.acceptedCreatorCampaignIds.add(campaign.id);
-
-    await expect(
-      service.update('brand-1', campaign.id, {
-        ...sampleCampaign({
-          status: 'active',
-          postToMarketplace: true,
-          endDate: '2026-08-15',
-          exampleVideoLinks: [
-            'https://example.com/original',
-            'https://example.com/new',
-          ],
-        }),
-        brief: 'Changed brief',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
 
     const updated = await service.update(
       'brand-1',
@@ -451,59 +594,14 @@ describe('CampaignsService', () => {
       sampleCampaign({
         status: 'active',
         postToMarketplace: true,
-        endDate: '2026-08-15',
-        exampleVideoLinks: [
-          'https://example.com/original',
-          'https://example.com/new',
-        ],
+        endDate: '2026-08-01',
+        payment: { model: 'flat_rate', flatRateCents: 75_000 },
+        brief: 'Changed brief',
       }),
     );
-
-    expect(updated.endDate).toBe('2026-08-15');
-    expect(updated.exampleVideoLinks).toEqual([
-      'https://example.com/original',
-      'https://example.com/new',
-    ]);
-  });
-
-  it('rejects shortening closing date or removing example links after a creator is accepted', async () => {
-    repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create(
-      'brand-1',
-      sampleCampaign({
-        status: 'active',
-        postToMarketplace: true,
-        endDate: '2026-08-15',
-        exampleVideoLinks: ['https://example.com/original'],
-      }),
-    );
-    repository.acceptedCreatorCampaignIds.add(campaign.id);
-
-    await expect(
-      service.update(
-        'brand-1',
-        campaign.id,
-        sampleCampaign({
-          status: 'active',
-          postToMarketplace: true,
-          endDate: '2026-08-01',
-          exampleVideoLinks: ['https://example.com/original'],
-        }),
-      ),
-    ).rejects.toThrow('Closing date can only be extended');
-
-    await expect(
-      service.update(
-        'brand-1',
-        campaign.id,
-        sampleCampaign({
-          status: 'active',
-          postToMarketplace: true,
-          endDate: '2026-08-15',
-          exampleVideoLinks: [],
-        }),
-      ),
-    ).rejects.toThrow('Example video links can only be added');
+    expect(updated.endDate).toBe('2026-08-01');
+    expect(updated.payment.flatRateCents).toBe(75_000);
+    expect(updated.brief).toBe('Changed brief');
   });
 
   it('allows creator capacity changes after acceptance when capacity covers accepted creators', async () => {
@@ -616,7 +714,7 @@ describe('CampaignsService', () => {
     );
   });
 
-  it('allows file upload but blocks file deletion after a creator is accepted', async () => {
+  it('allows file upload and deletion after a creator is accepted', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     const campaign = await service.create(
       'brand-1',
@@ -634,7 +732,7 @@ describe('CampaignsService', () => {
     expect(meta.name).toBe('brief.pdf');
     await expect(
       service.deleteFile('brand-1', campaign.id, meta.id),
-    ).rejects.toThrow('Published campaigns with accepted creators');
+    ).resolves.toEqual({ deleted: true });
   });
 
   it('rejects oversized uploads', async () => {

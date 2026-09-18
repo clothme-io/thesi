@@ -45,6 +45,7 @@ import {
   formatListingPayment,
   formatListingContentTypes,
   type MarketplaceBrandApplication,
+  type MarketplaceListing,
   type MarketplacePayment,
 } from "@/lib/marketplace/types";
 
@@ -52,6 +53,17 @@ type AcceptanceSnapshot = {
   id: string;
   campaignId: string;
   campaignName: string;
+  campaignType?: string;
+  contentTypes?: MarketplaceListing["contentTypes"];
+  startDate: string;
+  endDate: string;
+  brief: string;
+  deliverables: string;
+  requiredTasksSnapshot?: MarketplaceListing["requiredTasks"];
+  creatorBenefitsSnapshot?: MarketplaceListing["creatorBenefits"];
+  productsProvidedSnapshot?: MarketplaceListing["productsProvided"];
+  contentRightsSnapshot?: MarketplaceListing["contentRights"];
+  revisionVersion?: number;
   paymentSnapshot: {
     promotedProduct?: PromotedProduct;
   promotedProducts?: PromotedProduct[];
@@ -470,6 +482,29 @@ export function MarketplaceDetailContent() {
     );
   }
 
+  const frozenTerms = !isBrand && acceptanceSnapshot ? acceptanceSnapshot : null;
+  const termsListing = frozenTerms
+    ? {
+        ...listing,
+        name: frozenTerms.campaignName || listing.name,
+        campaignType:
+          (frozenTerms.campaignType as MarketplaceListing["campaignType"]) ||
+          listing.campaignType,
+        startDate: frozenTerms.startDate,
+        endDate: frozenTerms.endDate,
+        brief: frozenTerms.brief,
+        deliverables: frozenTerms.deliverables,
+        requiredTasks: frozenTerms.requiredTasksSnapshot ?? listing.requiredTasks,
+        creatorBenefits:
+          frozenTerms.creatorBenefitsSnapshot ?? listing.creatorBenefits,
+        productsProvided:
+          frozenTerms.productsProvidedSnapshot ?? listing.productsProvided,
+        contentRights:
+          frozenTerms.contentRightsSnapshot ?? listing.contentRights,
+        contentTypes: frozenTerms.contentTypes ?? listing.contentTypes,
+      }
+    : listing;
+
   const applied = hasApplied(data, listing.id);
   const inCrm = isInCrm(data, listing.id);
   const effectiveStatus = getEffectiveListingStatus(listing);
@@ -477,19 +512,22 @@ export function MarketplaceDetailContent() {
   const brandName = session?.user.fullName ?? listing.brandName;
   const inviteCampaignId = listingInviteCampaignId(listing);
   const invites = isBrand ? getInvitesForCampaign(inviteData, inviteCampaignId) : [];
-  const requirementRows = requirementRowsFromListing(listing);
+  const requirementRows = requirementRowsFromListing(termsListing);
   const paymentSummary = formatListingPayment(listing.payment);
   const acceptedPaymentSummary = acceptanceSnapshot
     ? formatAcceptedPayment(acceptanceSnapshot.paymentSnapshot)
     : null;
-  const contentTypesSummary = formatListingContentTypes(listing.contentTypes);
-  const contentRights = listing.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS;
+  const contentTypesSummary = formatListingContentTypes(termsListing.contentTypes);
+  const contentRights = termsListing.contentRights ?? EMPTY_LISTING_CONTENT_RIGHTS;
   const showCreatorDisclosure = !isBrand && (listing.creatorDisclosureEnabled ?? false);
   const paymentCalloutText = acceptanceSnapshot
     ? [
         `${CAMPAIGN_PAYMENT_LABELS[acceptanceSnapshot.paymentSnapshot.model]} terms accepted on ${new Date(
           acceptanceSnapshot.acceptedAt,
         ).toLocaleDateString()}.`,
+        acceptanceSnapshot.revisionVersion
+          ? `Version ${acceptanceSnapshot.revisionVersion}.`
+          : null,
         acceptanceSnapshot.paymentSnapshot.notes,
       ]
         .filter(Boolean)
@@ -593,11 +631,20 @@ export function MarketplaceDetailContent() {
           <Link href={MARKETPLACE_ROUTES.list} className="auth-link" style={{ fontSize: 13 }}>
             ← Marketplace
           </Link>
-          <h1 style={{ marginTop: 4 }}>{listing.name}</h1>
+          <h1 style={{ marginTop: 4 }}>{termsListing.name}</h1>
+          {frozenTerms && (
+            <span className="crm-tag" style={{ marginTop: 8, display: "inline-block" }}>
+              Your accepted terms
+              {frozenTerms.revisionVersion
+                ? ` · version ${frozenTerms.revisionVersion}`
+                : ""}
+              {` · ${new Date(frozenTerms.acceptedAt).toLocaleDateString()}`}
+            </span>
+          )}
           <span className="workspace-subtitle">
             {listing.brandName} ·{" "}
-            {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[listing.campaignType] ??
-              listing.campaignType}{" "}
+            {BRAND_CAMPAIGN_GOAL_TYPE_LABELS[termsListing.campaignType] ??
+              termsListing.campaignType}{" "}
             · {contentTypesSummary}
           </span>
         </div>
@@ -718,7 +765,7 @@ export function MarketplaceDetailContent() {
               <div className="marketplace-section-block">
                 <h3>Campaign brief</h3>
                 <FormattedCampaignText
-                  text={listing.brief}
+                  text={termsListing.brief}
                   fallback="No brief provided."
                 />
               </div>
@@ -726,70 +773,70 @@ export function MarketplaceDetailContent() {
               <div className="marketplace-section-block">
                 <h3>What you’ll create</h3>
                 <FormattedCampaignText
-                  text={listing.deliverables}
+                  text={termsListing.deliverables}
                   fallback="See brief for deliverables."
                 />
               </div>
 
-              {listing.requiredTasks.length > 0 && (
+              {termsListing.requiredTasks.length > 0 && (
                 <div className="marketplace-section-block">
                   <h3>What you’ll do</h3>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {listing.requiredTasks.map((task) => (
+                    {termsListing.requiredTasks.map((task) => (
                       <li key={task.id}>{task.title}</li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {(listing.creatorBenefits.guaranteedPaymentCents ||
-                listing.productsProvided.length > 0 ||
-                listing.creatorBenefits.productsKept ||
-                listing.creatorBenefits.bonusEligibility ||
-                listing.creatorBenefits.creatorPoolEligibility ||
-                listing.creatorBenefits.foundingCreatorRecognition ||
-                listing.creatorBenefits.portfolioUse ||
-                listing.creatorBenefits.priorityFutureCampaigns ||
-                listing.creatorBenefits.brandOpportunityAccess ||
-                listing.creatorBenefits.customBenefits.length > 0) && (
+              {(termsListing.creatorBenefits.guaranteedPaymentCents ||
+                termsListing.productsProvided.length > 0 ||
+                termsListing.creatorBenefits.productsKept ||
+                termsListing.creatorBenefits.bonusEligibility ||
+                termsListing.creatorBenefits.creatorPoolEligibility ||
+                termsListing.creatorBenefits.foundingCreatorRecognition ||
+                termsListing.creatorBenefits.portfolioUse ||
+                termsListing.creatorBenefits.priorityFutureCampaigns ||
+                termsListing.creatorBenefits.brandOpportunityAccess ||
+                termsListing.creatorBenefits.customBenefits.length > 0) && (
                 <div className="marketplace-section-block">
                   <h3>What you’ll receive</h3>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
-                    {listing.creatorBenefits.guaranteedPaymentCents ? (
+                    {termsListing.creatorBenefits.guaranteedPaymentCents ? (
                       <li>
                         {new Intl.NumberFormat("en-US", {
                           style: "currency",
                           currency: "USD",
                         }).format(
-                          listing.creatorBenefits.guaranteedPaymentCents / 100,
+                          termsListing.creatorBenefits.guaranteedPaymentCents / 100,
                         )} guaranteed campaign payment
                       </li>
                     ) : null}
-                    {listing.productsProvided.map((product) => (
+                    {termsListing.productsProvided.map((product) => (
                       <li key={product.id}>
                         {product.name}
                         {product.creatorKeeps ? " — yours to keep" : ""}
                       </li>
                     ))}
-                    {listing.creatorBenefits.foundingCreatorRecognition && (
+                    {termsListing.creatorBenefits.foundingCreatorRecognition && (
                       <li>Founding Creator campaign participation</li>
                     )}
-                    {listing.creatorBenefits.portfolioUse && (
+                    {termsListing.creatorBenefits.portfolioUse && (
                       <li>Portfolio-ready UGC experience</li>
                     )}
-                    {listing.creatorBenefits.priorityFutureCampaigns && (
+                    {termsListing.creatorBenefits.priorityFutureCampaigns && (
                       <li>Priority consideration for upcoming campaigns</li>
                     )}
-                    {listing.creatorBenefits.creatorPoolEligibility && (
+                    {termsListing.creatorBenefits.creatorPoolEligibility && (
                       <li>Eligibility for future Creator Pool campaigns</li>
                     )}
-                    {listing.creatorBenefits.bonusEligibility && (
+                    {termsListing.creatorBenefits.bonusEligibility && (
                       <li>Performance bonus eligibility</li>
                     )}
-                    {listing.creatorBenefits.brandOpportunityAccess && (
+                    {termsListing.creatorBenefits.brandOpportunityAccess && (
                       <li>Future brand and boutique opportunities</li>
                     )}
-                    {listing.creatorBenefits.customBenefits.map((benefit) => (
+                    {termsListing.creatorBenefits.customBenefits.map((benefit) => (
                       <li key={benefit}>{benefit}</li>
                     ))}
                   </ul>
@@ -1029,11 +1076,11 @@ export function MarketplaceDetailContent() {
               </div>
               <div className="crm-meta-row">
                 <span>Campaign starts</span>
-                <span>{listing.startDate}</span>
+                <span>{termsListing.startDate}</span>
               </div>
               <div className="crm-meta-row">
                 <span>Campaign ends</span>
-                <span>{listing.endDate}</span>
+                <span>{termsListing.endDate}</span>
               </div>
               <div className="crm-meta-row">
                 <span>Apply by</span>

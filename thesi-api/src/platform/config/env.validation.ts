@@ -45,6 +45,25 @@ function parseIntBounded(
   return parsed;
 }
 
+function requireNonEmptyString(
+  config: Record<string, unknown>,
+  key: string,
+  reason: string,
+) {
+  if (typeof config[key] !== 'string' || String(config[key]).trim() === '') {
+    throw new Error(`${reason} requires ${key}`);
+  }
+}
+
+function requireStripeMoneyMovement(config: Record<string, unknown>, reason: string) {
+  requireNonEmptyString(config, 'STRIPE_SECRET_KEY', reason);
+  requireNonEmptyString(config, 'STRIPE_WEBHOOK_SECRET', reason);
+  requireNonEmptyString(config, 'STRIPE_PLATFORM_ACCOUNT_ID', reason);
+  if (!/^acct_[A-Za-z0-9]+$/.test(String(config.STRIPE_PLATFORM_ACCOUNT_ID))) {
+    throw new Error(`${reason} requires a verified Stripe platform account`);
+  }
+}
+
 export function validateEnv(config: Record<string, unknown>): AppEnv {
   const validated = { ...config } as AppEnv;
 
@@ -99,14 +118,19 @@ export function validateEnv(config: Record<string, unknown>): AppEnv {
     if (config.EARNINGS_SERVICE_KEY === config.EARNINGS_REPORT_SERVICE_KEY) throw new Error('Earnings delivery and operations reporting require separate keys');
   }
   validated.CAMPAIGN_FUNDING_ENABLED=parseBool(config.CAMPAIGN_FUNDING_ENABLED,false);
-  if(validated.CAMPAIGN_FUNDING_ENABLED && (!validated.BRAND_WORKSPACE_ACCESS_ENABLED || !config.STRIPE_SECRET_KEY)) throw new Error('Campaign funding requires workspace enforcement and real Stripe configuration');
+  if(validated.CAMPAIGN_FUNDING_ENABLED) {
+    if (!validated.BRAND_WORKSPACE_ACCESS_ENABLED) throw new Error('Campaign funding requires workspace enforcement');
+    requireStripeMoneyMovement(config, 'Campaign funding');
+  }
   validated.COMMISSION_SETTLEMENT_ENABLED=parseBool(config.COMMISSION_SETTLEMENT_ENABLED,false);
   validated.COMMISSION_SETTLEMENT_COMBINED_BALANCE_ENABLED=parseBool(config.COMMISSION_SETTLEMENT_COMBINED_BALANCE_ENABLED,false);
   validated.COMMISSION_SETTLEMENT_AUTO_ENABLED=parseBool(config.COMMISSION_SETTLEMENT_AUTO_ENABLED,false);
   validated.COMMISSION_SETTLEMENT_AUTO_INTERVAL_MS=parseIntBounded(config.COMMISSION_SETTLEMENT_AUTO_INTERVAL_MS,3600000,60000,86400000,'COMMISSION_SETTLEMENT_AUTO_INTERVAL_MS');
   validated.COMMISSION_SETTLEMENT_AUTO_WORKSPACE_LIMIT=parseIntBounded(config.COMMISSION_SETTLEMENT_AUTO_WORKSPACE_LIMIT,25,1,100,'COMMISSION_SETTLEMENT_AUTO_WORKSPACE_LIMIT');
   if(validated.COMMISSION_SETTLEMENT_ENABLED){
-    if(!validated.COMMISSION_EARNINGS_ENABLED||!config.STRIPE_SECRET_KEY||!/^acct_[A-Za-z0-9]+$/.test(String(config.SETTLEMENT_PLATFORM_ACCOUNT_ID??'')))throw new Error('Commission settlement requires reporting and a verified Stripe platform account');
+    if(!validated.COMMISSION_EARNINGS_ENABLED)throw new Error('Commission settlement requires reporting');
+    requireStripeMoneyMovement(config, 'Commission settlement');
+    if(String(config.SETTLEMENT_PLATFORM_ACCOUNT_ID)!==String(config.STRIPE_PLATFORM_ACCOUNT_ID))throw new Error('Commission settlement platform account must match STRIPE_PLATFORM_ACCOUNT_ID');
     if(String(config.COMMERCE_SETTLEMENT_SERVICE_KEY??'').length<32)throw new Error('Settlement requires a dedicated service key');
     const u=new URL(String(config.COMMERCE_SETTLEMENT_API_URL??''));
     if(u.username||u.password||u.search||u.hash||u.pathname!=='/'||!(u.protocol==='https:'||(config.NODE_ENV!=='production'&&u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))))throw new Error('Invalid Commerce settlement origin');

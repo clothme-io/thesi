@@ -29,6 +29,7 @@ export type CampaignInviteRecord = {
   external: boolean;
   status: InviteStatus;
   sentAt: string;
+  sentRevisionId?: string;
 };
 
 export type PlatformBrandInviteRecord = {
@@ -53,6 +54,7 @@ export type CreateCampaignInviteInput = {
   creatorEmail: string;
   creatorName: string;
   external: boolean;
+  sentRevisionId?: string | null;
 };
 
 export type CreatePlatformBrandInviteInput = {
@@ -99,6 +101,8 @@ export type CampaignAcceptanceSnapshotRecord = {
   contentRightsSnapshot: CampaignContentRightsJson;
   requiredTasksSnapshot: CampaignRequiredTaskJson[];
   creatorCapacitySnapshot?: number;
+  revisionId?: string;
+  revisionVersion?: number;
   acceptedAt: string;
   createdAt: string;
 };
@@ -109,7 +113,12 @@ export interface InvitesRepository {
   findOwnedCampaign(
     brandUserId: string,
     campaignId: string,
-  ): Promise<{ id: string; name: string; payment?: CampaignPaymentJson } | null>;
+  ): Promise<{
+    id: string;
+    name: string;
+    payment?: CampaignPaymentJson;
+    currentRevisionId?: string | null;
+  } | null>;
   listCampaignInvites(
     brandUserId: string,
     campaignId?: string,
@@ -141,6 +150,7 @@ export interface InvitesRepository {
     creatorUserId: string,
     creatorEmail: string,
   ): Promise<CampaignAcceptanceSnapshotRecord | null>;
+  listOpenInviteCreatorIds(campaignId: string): Promise<string[]>;
   setCampaignInviteNovuTransactionId(
     inviteId: string,
     transactionId: string,

@@ -129,4 +129,8 @@ export interface MarketplaceCampaignSync {
     ownerUserId: string,
     campaign: CampaignRecord,
   ): Promise<void>;
+  notifyPendingApplicantsOfPublishedChange(
+    ownerUserId: string,
+    campaign: CampaignRecord,
+  ): Promise<void>;
 }

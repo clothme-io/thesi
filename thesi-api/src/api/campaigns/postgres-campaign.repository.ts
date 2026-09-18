@@ -2,7 +2,7 @@ import { promotedProducts } from './promoted-products';
 import { isDeepStrictEqual } from 'node:util';
 import { workspaceWrite, workspaceFilter } from '../brand-workspaces/workspace-context';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, max, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
@@ -14,6 +14,8 @@ import type {
   CampaignPlatformFeeRecord,
   CampaignRecord,
   CampaignRepository,
+  CampaignRevisionListItem,
+  CampaignRevisionRecord,
   CampaignUser,
   CreateCampaignFileInput,
   CreatorPayoutRecord,
@@ -516,8 +518,185 @@ export class PostgresCampaignRepository implements CampaignRepository {
       ...(row.creatorCapacity ? { creatorCapacity: row.creatorCapacity } : {}),
       creatorDisclosureEnabled: row.creatorDisclosureEnabled,
       postToMarketplace: row.postToMarketplace,
+      ...(row.currentRevisionId
+        ? { currentRevisionId: row.currentRevisionId }
+        : {}),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  async getLatestRevision(
+    campaignId: string,
+  ): Promise<CampaignRevisionRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(schema.campaignRevision)
+      .where(
+        and(
+          workspaceFilter(schema.campaignRevision),
+          eq(schema.campaignRevision.campaignId, campaignId),
+        ),
+      )
+      .orderBy(desc(schema.campaignRevision.version))
+      .limit(1);
+    return row ? this.toRevision(row) : null;
+  }
+
+  async getRevisionForOwner(
+    ownerUserId: string,
+    campaignId: string,
+    revisionId: string,
+  ): Promise<CampaignRevisionRecord | null> {
+    const campaign = await this.getByIdForOwner(ownerUserId, campaignId);
+    if (!campaign) return null;
+    const [row] = await this.db
+      .select()
+      .from(schema.campaignRevision)
+      .where(
+        and(
+          workspaceFilter(schema.campaignRevision),
+          eq(schema.campaignRevision.campaignId, campaignId),
+          eq(schema.campaignRevision.id, revisionId),
+        ),
+      )
+      .limit(1);
+    return row ? this.toRevision(row) : null;
+  }
+
+  async insertRevision(input: {
+    campaignId: string;
+    createdByUserId: string;
+    terms: CampaignRevisionRecord['terms'];
+  }): Promise<CampaignRevisionRecord> {
+    return this.db.transaction(async (tx) => {
+      const [campaign] = await tx
+        .select()
+        .from(schema.campaign)
+        .where(
+          and(
+            workspaceFilter(schema.campaign),
+            eq(schema.campaign.id, input.campaignId),
+          ),
+        )
+        .limit(1);
+      if (!campaign) {
+        throw new BadRequestException('Campaign not found');
+      }
+      const [latest] = await tx
+        .select({ version: max(schema.campaignRevision.version) })
+        .from(schema.campaignRevision)
+        .where(eq(schema.campaignRevision.campaignId, input.campaignId));
+      const version = (latest?.version ?? 0) + 1;
+      const [row] = await tx
+        .insert(schema.campaignRevision)
+        .values({
+          ...workspaceWrite(),
+          workspaceId: campaign.workspaceId ?? workspaceWrite().workspaceId,
+          campaignId: input.campaignId,
+          version,
+          terms: input.terms,
+          createdByUserId: input.createdByUserId,
+        })
+        .returning();
+      await tx
+        .update(schema.campaign)
+        .set({ currentRevisionId: row.id })
+        .where(
+          and(
+            workspaceFilter(schema.campaign),
+            eq(schema.campaign.id, input.campaignId),
+          ),
+        );
+      return this.toRevision(row);
+    });
+  }
+
+  async listRevisionsForOwner(
+    ownerUserId: string,
+    campaignId: string,
+  ): Promise<CampaignRevisionListItem[]> {
+    const campaign = await this.getByIdForOwner(ownerUserId, campaignId);
+    if (!campaign) return [];
+
+    const rows = await this.db
+      .select()
+      .from(schema.campaignRevision)
+      .where(
+        and(
+          workspaceFilter(schema.campaignRevision),
+          eq(schema.campaignRevision.campaignId, campaignId),
+        ),
+      )
+      .orderBy(desc(schema.campaignRevision.version));
+
+    const snapshots = await this.db
+      .select({
+        revisionId: schema.campaignAcceptanceSnapshot.revisionId,
+        creatorName: schema.campaignAcceptanceSnapshot.creatorName,
+        creatorEmail: schema.campaignAcceptanceSnapshot.creatorEmail,
+        acceptedAt: schema.campaignAcceptanceSnapshot.acceptedAt,
+      })
+      .from(schema.campaignAcceptanceSnapshot)
+      .where(
+        and(
+          workspaceFilter(schema.campaignAcceptanceSnapshot),
+          eq(schema.campaignAcceptanceSnapshot.campaignId, campaignId),
+        ),
+      );
+
+    const applications = await this.db
+      .select({
+        appliedRevisionId: schema.marketplaceApplication.appliedRevisionId,
+        status: schema.marketplaceApplication.status,
+      })
+      .from(schema.marketplaceApplication)
+      .innerJoin(
+        schema.marketplaceListing,
+        eq(
+          schema.marketplaceApplication.listingId,
+          schema.marketplaceListing.id,
+        ),
+      )
+      .where(
+        and(
+          workspaceFilter(schema.marketplaceListing),
+          eq(schema.marketplaceListing.campaignId, campaignId),
+        ),
+      );
+
+    return rows.map((row) => {
+      const applied = applications.filter(
+        (application) => application.appliedRevisionId === row.id,
+      );
+      return {
+        ...this.toRevision(row),
+        isCurrent: row.id === campaign.currentRevisionId,
+        appliedCount: applied.length,
+        pendingCount: applied.filter(
+          (application) => application.status === 'pending',
+        ).length,
+        acceptedCreators: snapshots
+          .filter((snapshot) => snapshot.revisionId === row.id)
+          .map((snapshot) => ({
+            name: snapshot.creatorName,
+            email: snapshot.creatorEmail,
+            acceptedAt: snapshot.acceptedAt.toISOString(),
+          })),
+      };
+    });
+  }
+
+  private toRevision(
+    row: typeof schema.campaignRevision.$inferSelect,
+  ): CampaignRevisionRecord {
+    return {
+      id: row.id,
+      campaignId: row.campaignId,
+      version: row.version,
+      terms: row.terms,
+      createdByUserId: row.createdByUserId,
+      createdAt: row.createdAt.toISOString(),
     };
   }
 }

@@ -121,7 +121,10 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     updateCampaign.mockReset();
     updateCampaign.mockResolvedValue(undefined);
     authenticatedRequest.mockReset();
-    authenticatedRequest.mockResolvedValue({ payouts: [] });
+    authenticatedRequest.mockImplementation(async (url: string) => {
+      if (String(url).includes("/revisions")) return { revisions: [] };
+      return { payouts: [] };
+    });
     activeCampaign = buildCampaign();
     campaignInvites = [];
   });
@@ -188,7 +191,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     });
   });
 
-  it("shows limited updates after a creator accepts", async () => {
+  it("limits published campaign edits after a creator accepts", async () => {
     activeCampaign = buildCampaign({
       status: "active",
       endDate: "2026-08-01",
@@ -209,33 +212,33 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     const user = userEvent.setup();
     render(<CampaignDetailContent />);
 
-    expect(screen.getByText("Limited campaign updates")).toBeInTheDocument();
-    expect(screen.getByText("Other fields read-only")).toBeInTheDocument();
-    expect(screen.getByText("Read-only")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Save updates" }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/A creator has accepted this campaign/i),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Pause" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Mark complete" }),
+      screen.queryByRole("button", { name: "Unpublish" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByText("Limited campaign updates")).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText("Closing date"));
-    await user.type(screen.getByLabelText("Closing date"), "2026-08-15");
     await user.clear(screen.getByLabelText("Creator capacity"));
-    await user.type(screen.getByLabelText("Creator capacity"), "8");
-    await user.type(screen.getByPlaceholderText("https://"), "https://example.com/new");
+    await user.type(screen.getByLabelText("Creator capacity"), "7");
     await user.click(screen.getByRole("button", { name: "Save updates" }));
 
     await waitFor(() => {
       expect(updateCampaign).toHaveBeenCalledWith(
         "campaign-1",
         expect.objectContaining({
-          endDate: "2026-08-15",
-          creatorCapacity: 8,
-          exampleVideoLinks: [
-            "https://example.com/original",
-            "https://example.com/new",
-          ],
+          creatorCapacity: 7,
+          endDate: "2026-08-01",
+          exampleVideoLinks: ["https://example.com/original"],
         }),
       );
     });
