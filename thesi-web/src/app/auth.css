@@ -125,6 +125,24 @@
   cursor: not-allowed;
 }
 
+.auth-merchant {
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.auth-merchant .auth-submit {
+  margin-top: 0;
+}
+
+.auth-merchant-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .auth-footer-text {
   margin-top: 20px;
   text-align: center;
