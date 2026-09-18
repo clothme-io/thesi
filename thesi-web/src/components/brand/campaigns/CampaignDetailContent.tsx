@@ -115,6 +115,9 @@ export function CampaignDetailContent() {
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [limitedEndDate, setLimitedEndDate] = useState("");
+  const [limitedCreatorCapacity, setLimitedCreatorCapacity] = useState("");
+  const [newExampleVideoLinks, setNewExampleVideoLinks] = useState<string[]>([""]);
   const [revisions, setRevisions] = useState<CampaignRevision[]>([]);
   const [viewingRevisionId, setViewingRevisionId] = useState<string | null>(null);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(
@@ -173,6 +176,15 @@ export function CampaignDetailContent() {
     };
   }, [ready, id, loadPayouts]);
 
+  useEffect(() => {
+    if (!campaign) return;
+    setLimitedEndDate(toDateInputValue(campaign.endDate));
+    setLimitedCreatorCapacity(
+      campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
+    );
+    setNewExampleVideoLinks([""]);
+  }, [campaign]);
+
   const loadRevisions = useCallback(async () => {
     if (!id) return;
     const result = await authenticatedRequest<{ revisions: CampaignRevision[] }>(
@@ -219,6 +231,8 @@ export function CampaignDetailContent() {
   ).length;
   const editingPublishedCurrent =
     canEdit && !isDraft && viewingCurrent;
+  const hasLimitedPostPublishEditing =
+    canEdit && campaign.status === "active" && hasAcceptedCreator && viewingCurrent;
   const payoutByCreator = new Map(
     payouts.map((payout) => [payout.creatorUserId, payout]),
   );
@@ -363,6 +377,52 @@ export function CampaignDetailContent() {
     }
   };
 
+  const saveLimitedUpdates = async () => {
+    setSavingDraft(true);
+    setLifecycleError("");
+    setSaveMessage("");
+    try {
+      const linksToAdd = newExampleVideoLinks
+        .map((link) => link.trim())
+        .filter(Boolean)
+        .filter((link) => !campaign.exampleVideoLinks.includes(link));
+      await updateCampaign(campaign.id, {
+        ...toCampaignInput(campaign),
+        endDate: limitedEndDate,
+        ...(limitedCreatorCapacity.trim()
+          ? { creatorCapacity: Number(limitedCreatorCapacity) }
+          : {}),
+        exampleVideoLinks: [...campaign.exampleVideoLinks, ...linksToAdd],
+      });
+      let fileUploadFailed = false;
+      for (const file of pendingFiles) {
+        try {
+          await uploadCampaignFile(campaign.id, file);
+        } catch {
+          fileUploadFailed = true;
+        }
+      }
+      if (!fileUploadFailed) {
+        setPendingFiles([]);
+        setNewExampleVideoLinks([""]);
+      }
+      await loadRevisions();
+      setSaveMessage(
+        fileUploadFailed
+          ? "Campaign updates saved. Some files could not be uploaded."
+          : "Campaign updates saved",
+      );
+    } catch (requestError) {
+      setLifecycleError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Could not save campaign updates",
+      );
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const restoreRevision = async (revisionId: string) => {
     setRestoringRevisionId(revisionId);
     setLifecycleError("");
@@ -392,13 +452,15 @@ export function CampaignDetailContent() {
     campaign.status === "draft" ||
     (campaign.status === "active" && !campaign.postToMarketplace);
   const canResume = campaign.status === "paused";
-  const canPause = campaign.status === "active";
+  const canPause = campaign.status === "active" && !hasLimitedPostPublishEditing;
   const canComplete =
     (campaign.status === "draft" && campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1) ||
-    campaign.status === "active" ||
+    (campaign.status === "active" && (!hasLimitedPostPublishEditing || campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1)) ||
     campaign.status === "paused";
   const canUnpublish =
-    campaign.postToMarketplace && campaign.status !== "draft";
+    campaign.postToMarketplace &&
+    campaign.status !== "draft" &&
+    !hasLimitedPostPublishEditing;
 
   return (
     <>
@@ -433,7 +495,17 @@ export function CampaignDetailContent() {
               {savingDraft ? "Saving…" : "Save draft"}
             </button>
           )}
-          {canEdit && editingPublishedCurrent && form && (
+          {canEdit && hasLimitedPostPublishEditing && (
+            <button
+              type="button"
+              className="crm-btn-primary"
+              disabled={savingDraft || lifecycleBusy}
+              onClick={() => void saveLimitedUpdates()}
+            >
+              {savingDraft ? "Saving…" : "Save updates"}
+            </button>
+          )}
+          {canEdit && editingPublishedCurrent && form && !hasLimitedPostPublishEditing && (
             <button
               type="button"
               className="crm-btn-primary"
@@ -634,7 +706,7 @@ export function CampaignDetailContent() {
               </div>
             </div>
           </div>
-        ) : canEdit && editingPublishedCurrent && form ? (
+        ) : canEdit && editingPublishedCurrent && form && !hasLimitedPostPublishEditing ? (
           <div className="crm-detail-grid">
             <DraftCampaignEditForm
               campaign={campaign}
@@ -645,6 +717,13 @@ export function CampaignDetailContent() {
               onDeleteFile={(fileId) => deleteCampaignFile(campaign.id, fileId)}
             />
             <div>
+              <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
+                {campaignProducts(campaign.payment).map((product) => (
+                  <PromotedProductDetails key={product.productId} product={product} />
+                ))}
+                <CampaignContentReview campaignId={campaign.id} canSubmit={false} />
+                <CampaignPublishedContent campaignId={campaign.id} canAttach={false} />
+              </div>
               <div className="crm-detail-panel" style={{ marginBottom: 16 }}>
                 <h3>Status</h3>
                 <div className="crm-meta-row">
@@ -747,6 +826,146 @@ export function CampaignDetailContent() {
               {campaignProducts((displayedCampaign ?? campaign).payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
               <CampaignContentReview campaignId={campaign.id} canSubmit={false} />
               <CampaignPublishedContent campaignId={campaign.id} canAttach={false} />
+              {hasLimitedPostPublishEditing && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3>
+                    Limited campaign updates{" "}
+                    <span className="crm-tag" style={{ marginLeft: 8 }}>
+                      Other fields read-only
+                    </span>
+                  </h3>
+                  <p className="workspace-hint" style={{ marginTop: 0 }}>
+                    A creator has accepted this campaign. You can only extend
+                    the closing date, adjust creator capacity, add files, and
+                    add example video links. All other campaign fields below are
+                    read-only.
+                  </p>
+                  <div className="workspace-grid">
+                    <label className="workspace-field">
+                      <span>Closing date</span>
+                      <input
+                        aria-label="Closing date"
+                        type="date"
+                        value={limitedEndDate}
+                        min={toDateInputValue(campaign.endDate)}
+                        onChange={(event) => setLimitedEndDate(event.target.value)}
+                      />
+                    </label>
+                    <label className="workspace-field">
+                      <span>Creator capacity</span>
+                      <input
+                        aria-label="Creator capacity"
+                        type="number"
+                        min={Math.max(1, acceptedCreatorCount)}
+                        value={limitedCreatorCapacity}
+                        onChange={(event) =>
+                          setLimitedCreatorCapacity(event.target.value)
+                        }
+                      />
+                      <span className="workspace-hint" style={{ marginTop: 6 }}>
+                        Cannot be lower than accepted creators ({acceptedCreatorCount}).
+                      </span>
+                    </label>
+                    <label className="workspace-field">
+                      <span>Upload files</span>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(event) => {
+                          const selected = Array.from(event.target.files ?? []);
+                          if (selected.length === 0) return;
+                          setPendingFiles((previous) => [...previous, ...selected]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <div className="workspace-field workspace-field--full">
+                      <span>Example video links</span>
+                      {campaign.exampleVideoLinks.length > 0 && (
+                        <ul style={{ margin: "8px 0 12px", paddingLeft: 18 }}>
+                          {campaign.exampleVideoLinks.map((link) => (
+                            <li key={link}>
+                              <a href={link} target="_blank" rel="noreferrer">
+                                {link}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {newExampleVideoLinks.map((link, index) => (
+                        <div
+                          key={`new-example-link-${index}`}
+                          style={{ display: "flex", gap: 8, marginTop: 8 }}
+                        >
+                          <input
+                            type="url"
+                            placeholder="https://"
+                            value={link}
+                            onChange={(event) => {
+                              const next = [...newExampleVideoLinks];
+                              next[index] = event.target.value;
+                              setNewExampleVideoLinks(next);
+                            }}
+                            style={{ flex: 1 }}
+                          />
+                          {newExampleVideoLinks.length > 1 && (
+                            <button
+                              type="button"
+                              className="inbox-btn-text"
+                              onClick={() =>
+                                setNewExampleVideoLinks((previous) =>
+                                  previous.filter((_, i) => i !== index),
+                                )
+                              }
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className="inbox-btn-text"
+                        style={{ marginTop: 8 }}
+                        onClick={() =>
+                          setNewExampleVideoLinks((previous) => [...previous, ""])
+                        }
+                      >
+                        + Add another link
+                      </button>
+                    </div>
+                    {pendingFiles.length > 0 && (
+                      <div className="workspace-field workspace-field--full">
+                        <span>Pending files ({pendingFiles.length})</span>
+                        <ul className="campaign-file-list">
+                          {pendingFiles.map((file, index) => (
+                            <li key={`${file.name}-${index}`} className="campaign-file-item">
+                              <div>
+                                <strong>{file.name}</strong>
+                                <span className="workspace-hint">
+                                  {" "}
+                                  · {Math.max(1, Math.round(file.size / 1024))} KB
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="inbox-btn-text"
+                                onClick={() =>
+                                  setPendingFiles((previous) =>
+                                    previous.filter((_, i) => i !== index),
+                                  )
+                                }
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <h3>
                 Campaign summary{" "}
                 {!viewingCurrent && (
