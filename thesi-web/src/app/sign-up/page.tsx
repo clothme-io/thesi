@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { GuestGuard } from "@/components/auth/GuestGuard";
-import { MerchantHubBrandSignIn } from "@/components/auth/MerchantHubBrandSignIn";
 import { useAuth } from "@/context/AuthProvider";
 import { getPostAuthPath } from "@/lib/auth-storage";
 
@@ -40,7 +39,6 @@ export default function SignUpPage() {
         title="Create a brand account"
         subtitle="Start creating UGC campaigns, inviting creators, and posting to the marketplace."
       >
-        <MerchantHubBrandSignIn disabled={loading} onError={setError} />
         <form onSubmit={handleSubmit}>
           {error && (
             <p className="auth-error" role="alert">
@@ -103,7 +101,7 @@ export default function SignUpPage() {
 
           <p className="auth-footer-text">
             Already have an account?{" "}
-            <Link href="/sign-in" className="auth-link">
+            <Link href="/brand/sign-in" className="auth-link">
               Sign in
             </Link>
           </p>
