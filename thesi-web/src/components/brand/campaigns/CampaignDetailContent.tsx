@@ -39,7 +39,10 @@ import {
 } from "./DraftCampaignEditForm";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { CampaignPublishedContent } from "@/components/inbox/CampaignPublishedContent";
-import { CampaignContentReview } from "./CampaignContentReview";
+import {
+  CampaignContentReview,
+  type CampaignContentReviewItem,
+} from "./CampaignContentReview";
 import {
   campaignFromRevision,
   type CampaignRevision,
@@ -115,10 +118,12 @@ export function CampaignDetailContent() {
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
-  const [limitedStartDate, setLimitedStartDate] = useState("");
-  const [limitedEndDate, setLimitedEndDate] = useState("");
-  const [limitedCreatorCapacity, setLimitedCreatorCapacity] = useState("");
-  const [newExampleVideoLinks, setNewExampleVideoLinks] = useState<string[]>([""]);
+  const [approvedContentCreatorIds, setApprovedContentCreatorIds] = useState<
+    Set<string>
+  >(new Set());
+  const [confirmPayoutCreatorId, setConfirmPayoutCreatorId] = useState<
+    string | null
+  >(null);
   const [revisions, setRevisions] = useState<CampaignRevision[]>([]);
   const [viewingRevisionId, setViewingRevisionId] = useState<string | null>(null);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(
@@ -160,6 +165,20 @@ export function CampaignDetailContent() {
     setPayouts(result.payouts ?? []);
   }, [authenticatedRequest, id,canManageFunds]);
 
+  const loadApprovedContentCreators = useCallback(async () => {
+    if (!id || !canManageFunds) return;
+    const result = await authenticatedRequest<{
+      items?: CampaignContentReviewItem[];
+    }>(`/api/campaigns/${id}/submissions`);
+    setApprovedContentCreatorIds(
+      new Set(
+        (result.items ?? [])
+          .filter((item) => item.status === "approved")
+          .map((item) => item.creatorUserId),
+      ),
+    );
+  }, [authenticatedRequest, id, canManageFunds]);
+
   useEffect(() => {
     if (!ready || !id) return;
     let active = true;
@@ -178,14 +197,15 @@ export function CampaignDetailContent() {
   }, [ready, id, loadPayouts]);
 
   useEffect(() => {
-    if (!campaign) return;
-    setLimitedStartDate(toDateInputValue(campaign.startDate));
-    setLimitedEndDate(toDateInputValue(campaign.endDate));
-    setLimitedCreatorCapacity(
-      campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
-    );
-    setNewExampleVideoLinks([""]);
-  }, [campaign]);
+    if (!ready || !id) return;
+    let active = true;
+    loadApprovedContentCreators().catch(() => {
+      if (active) setApprovedContentCreatorIds(new Set());
+    });
+    return () => {
+      active = false;
+    };
+  }, [ready, id, loadApprovedContentCreators]);
 
   const loadRevisions = useCallback(async () => {
     if (!id) return;
@@ -233,11 +253,15 @@ export function CampaignDetailContent() {
   ).length;
   const editingPublishedCurrent =
     canEdit && !isDraft && viewingCurrent;
-  const hasLimitedPostPublishEditing =
+  const hasAcceptedPublishedCurrent =
     canEdit && campaign.status === "active" && hasAcceptedCreator && viewingCurrent;
   const payoutByCreator = new Map(
     payouts.map((payout) => [payout.creatorUserId, payout]),
   );
+  const confirmPayoutInvite =
+    invites.find((invite) => invite.creatorId === confirmPayoutCreatorId) ??
+    null;
+  const payoutLabel = getCampaignBudgetLabel(campaign);
 
   const refreshInvites = () => {
     void reloadInvites(campaign.id);
@@ -260,6 +284,7 @@ export function CampaignDetailContent() {
       );
     } finally {
       setPayingCreatorId(null);
+      setConfirmPayoutCreatorId(null);
     }
   };
 
@@ -379,57 +404,6 @@ export function CampaignDetailContent() {
     }
   };
 
-  const saveLimitedUpdates = async () => {
-    setSavingDraft(true);
-    setLifecycleError("");
-    setSaveMessage("");
-    try {
-      if (limitedEndDate < limitedStartDate) {
-        setLifecycleError("Closing date must be on or after start date.");
-        return;
-      }
-      const linksToAdd = newExampleVideoLinks
-        .map((link) => link.trim())
-        .filter(Boolean)
-        .filter((link) => !campaign.exampleVideoLinks.includes(link));
-      await updateCampaign(campaign.id, {
-        ...toCampaignInput(campaign),
-        startDate: limitedStartDate,
-        endDate: limitedEndDate,
-        ...(limitedCreatorCapacity.trim()
-          ? { creatorCapacity: Number(limitedCreatorCapacity) }
-          : {}),
-        exampleVideoLinks: [...campaign.exampleVideoLinks, ...linksToAdd],
-      });
-      let fileUploadFailed = false;
-      for (const file of pendingFiles) {
-        try {
-          await uploadCampaignFile(campaign.id, file);
-        } catch {
-          fileUploadFailed = true;
-        }
-      }
-      if (!fileUploadFailed) {
-        setPendingFiles([]);
-        setNewExampleVideoLinks([""]);
-      }
-      await loadRevisions();
-      setSaveMessage(
-        fileUploadFailed
-          ? "Campaign updates saved. Some files could not be uploaded."
-          : "Campaign updates saved",
-      );
-    } catch (requestError) {
-      setLifecycleError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Could not save campaign updates",
-      );
-    } finally {
-      setSavingDraft(false);
-    }
-  };
-
   const restoreRevision = async (revisionId: string) => {
     setRestoringRevisionId(revisionId);
     setLifecycleError("");
@@ -459,15 +433,15 @@ export function CampaignDetailContent() {
     campaign.status === "draft" ||
     (campaign.status === "active" && !campaign.postToMarketplace);
   const canResume = campaign.status === "paused";
-  const canPause = campaign.status === "active" && !hasLimitedPostPublishEditing;
+  const canPause = campaign.status === "active" && !hasAcceptedPublishedCurrent;
   const canComplete =
     (campaign.status === "draft" && campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1) ||
-    (campaign.status === "active" && (!hasLimitedPostPublishEditing || campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1)) ||
+    (campaign.status === "active" && (!hasAcceptedPublishedCurrent || campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1)) ||
     campaign.status === "paused";
   const canUnpublish =
     campaign.postToMarketplace &&
     campaign.status !== "draft" &&
-    !hasLimitedPostPublishEditing;
+    !hasAcceptedPublishedCurrent;
 
   return (
     <>
@@ -502,17 +476,7 @@ export function CampaignDetailContent() {
               {savingDraft ? "Saving…" : "Save draft"}
             </button>
           )}
-          {canEdit && hasLimitedPostPublishEditing && (
-            <button
-              type="button"
-              className="crm-btn-primary"
-              disabled={savingDraft || lifecycleBusy}
-              onClick={() => void saveLimitedUpdates()}
-            >
-              {savingDraft ? "Saving…" : "Save updates"}
-            </button>
-          )}
-          {canEdit && editingPublishedCurrent && form && !hasLimitedPostPublishEditing && (
+          {canEdit && editingPublishedCurrent && form && (
             <button
               type="button"
               className="crm-btn-primary"
@@ -713,7 +677,7 @@ export function CampaignDetailContent() {
               </div>
             </div>
           </div>
-        ) : canEdit && editingPublishedCurrent && form && !hasLimitedPostPublishEditing ? (
+        ) : canEdit && editingPublishedCurrent && form ? (
           <div className="crm-detail-grid">
             <DraftCampaignEditForm
               campaign={campaign}
@@ -766,10 +730,14 @@ export function CampaignDetailContent() {
                     const payout = invite.creatorId
                       ? payoutByCreator.get(invite.creatorId)
                       : undefined;
+                    const hasApprovedContent = invite.creatorId
+                      ? approvedContentCreatorIds.has(invite.creatorId)
+                      : false;
                     const canPay =
                       canManageFunds && Boolean(invite.creatorId) &&
                       !invite.external &&
                       invite.status === "accepted" &&
+                      hasApprovedContent &&
                       payout?.status !== "transferred";
                     return (
                       <div className="crm-meta-row" key={invite.id}>
@@ -794,6 +762,16 @@ export function CampaignDetailContent() {
                                 : ""}
                             </span>
                           )}
+                          {!payout &&
+                            invite.status === "accepted" &&
+                            !hasApprovedContent && (
+                              <span
+                                className="crm-tag"
+                                style={{ marginLeft: 8 }}
+                              >
+                                Awaiting approved content
+                              </span>
+                            )}
                         </span>
                         <span
                           style={{
@@ -810,7 +788,9 @@ export function CampaignDetailContent() {
                               type="button"
                               className="inbox-btn-text"
                               disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
-                              onClick={() => void payCreator(invite.creatorId!)}
+                              onClick={() =>
+                                setConfirmPayoutCreatorId(invite.creatorId!)
+                              }
                             >
                               {campaign.payment.model === "commission"
                                 ? "Commission payouts coming soon"
@@ -833,157 +813,6 @@ export function CampaignDetailContent() {
               {campaignProducts((displayedCampaign ?? campaign).payment).map(p=><PromotedProductDetails key={p.productId} product={p}/>)}
               <CampaignContentReview campaignId={campaign.id} canSubmit={false} />
               <CampaignPublishedContent campaignId={campaign.id} canAttach={false} />
-              {hasLimitedPostPublishEditing && (
-                <div style={{ marginBottom: 24 }}>
-                  <h3>
-                    Limited campaign updates{" "}
-                    <span className="crm-tag" style={{ marginLeft: 8 }}>
-                      Other fields read-only
-                    </span>
-                  </h3>
-                  <p className="workspace-hint" style={{ marginTop: 0 }}>
-                    A creator has accepted this campaign. You can adjust campaign
-                    dates, creator capacity, files, and example video links for
-                    new creators. Accepted creators keep the start and closing
-                    dates from the version they accepted. All other campaign
-                    fields below are read-only.
-                  </p>
-                  <div className="workspace-grid">
-                    <label className="workspace-field">
-                      <span>Start date</span>
-                      <input
-                        aria-label="Start date"
-                        type="date"
-                        value={limitedStartDate}
-                        max={limitedEndDate || undefined}
-                        onChange={(event) => setLimitedStartDate(event.target.value)}
-                      />
-                    </label>
-                    <label className="workspace-field">
-                      <span>Closing date</span>
-                      <input
-                        aria-label="Closing date"
-                        type="date"
-                        value={limitedEndDate}
-                        min={limitedStartDate || undefined}
-                        onChange={(event) => setLimitedEndDate(event.target.value)}
-                      />
-                    </label>
-                    <label className="workspace-field">
-                      <span>Creator capacity</span>
-                      <input
-                        aria-label="Creator capacity"
-                        type="number"
-                        min={Math.max(1, acceptedCreatorCount)}
-                        value={limitedCreatorCapacity}
-                        onChange={(event) =>
-                          setLimitedCreatorCapacity(event.target.value)
-                        }
-                      />
-                      <span className="workspace-hint" style={{ marginTop: 6 }}>
-                        Cannot be lower than accepted creators ({acceptedCreatorCount}).
-                      </span>
-                    </label>
-                    <label className="workspace-field">
-                      <span>Upload files</span>
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(event) => {
-                          const selected = Array.from(event.target.files ?? []);
-                          if (selected.length === 0) return;
-                          setPendingFiles((previous) => [...previous, ...selected]);
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-                    <div className="workspace-field workspace-field--full">
-                      <span>Example video links</span>
-                      {campaign.exampleVideoLinks.length > 0 && (
-                        <ul style={{ margin: "8px 0 12px", paddingLeft: 18 }}>
-                          {campaign.exampleVideoLinks.map((link) => (
-                            <li key={link}>
-                              <a href={link} target="_blank" rel="noreferrer">
-                                {link}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {newExampleVideoLinks.map((link, index) => (
-                        <div
-                          key={`new-example-link-${index}`}
-                          style={{ display: "flex", gap: 8, marginTop: 8 }}
-                        >
-                          <input
-                            type="url"
-                            placeholder="https://"
-                            value={link}
-                            onChange={(event) => {
-                              const next = [...newExampleVideoLinks];
-                              next[index] = event.target.value;
-                              setNewExampleVideoLinks(next);
-                            }}
-                            style={{ flex: 1 }}
-                          />
-                          {newExampleVideoLinks.length > 1 && (
-                            <button
-                              type="button"
-                              className="inbox-btn-text"
-                              onClick={() =>
-                                setNewExampleVideoLinks((previous) =>
-                                  previous.filter((_, i) => i !== index),
-                                )
-                              }
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        className="inbox-btn-text"
-                        style={{ marginTop: 8 }}
-                        onClick={() =>
-                          setNewExampleVideoLinks((previous) => [...previous, ""])
-                        }
-                      >
-                        + Add another link
-                      </button>
-                    </div>
-                    {pendingFiles.length > 0 && (
-                      <div className="workspace-field workspace-field--full">
-                        <span>Pending files ({pendingFiles.length})</span>
-                        <ul className="campaign-file-list">
-                          {pendingFiles.map((file, index) => (
-                            <li key={`${file.name}-${index}`} className="campaign-file-item">
-                              <div>
-                                <strong>{file.name}</strong>
-                                <span className="workspace-hint">
-                                  {" "}
-                                  · {Math.max(1, Math.round(file.size / 1024))} KB
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                className="inbox-btn-text"
-                                onClick={() =>
-                                  setPendingFiles((previous) =>
-                                    previous.filter((_, i) => i !== index),
-                                  )
-                                }
-                              >
-                                Remove
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
               <h3>
                 Campaign summary{" "}
                 {!viewingCurrent && (
@@ -1169,10 +998,14 @@ export function CampaignDetailContent() {
                     const payout = invite.creatorId
                       ? payoutByCreator.get(invite.creatorId)
                       : undefined;
+                    const hasApprovedContent = invite.creatorId
+                      ? approvedContentCreatorIds.has(invite.creatorId)
+                      : false;
                     const canPay =
                       canManageFunds && Boolean(invite.creatorId) &&
                       !invite.external &&
                       invite.status === "accepted" &&
+                      hasApprovedContent &&
                       payout?.status !== "transferred";
                     return (
                       <div className="crm-meta-row" key={invite.id}>
@@ -1197,6 +1030,16 @@ export function CampaignDetailContent() {
                                 : ""}
                             </span>
                           )}
+                          {!payout &&
+                            invite.status === "accepted" &&
+                            !hasApprovedContent && (
+                              <span
+                                className="crm-tag"
+                                style={{ marginLeft: 8 }}
+                              >
+                                Awaiting approved content
+                              </span>
+                            )}
                         </span>
                         <span
                           style={{
@@ -1213,7 +1056,9 @@ export function CampaignDetailContent() {
                               type="button"
                               className="inbox-btn-text"
                               disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
-                              onClick={() => void payCreator(invite.creatorId!)}
+                              onClick={() =>
+                                setConfirmPayoutCreatorId(invite.creatorId!)
+                              }
                             >
                               {campaign.payment.model === "commission"
                                 ? "Commission payouts coming soon"
@@ -1359,6 +1204,54 @@ export function CampaignDetailContent() {
         }
         onInvited={refreshInvites}
       />
+      {confirmPayoutInvite?.creatorId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-payout-title"
+          className="workspace-modal-backdrop"
+        >
+          <div className="workspace-modal">
+            <h3 id="confirm-payout-title">Confirm creator payment</h3>
+            <p className="workspace-hint">
+              Pay {confirmPayoutInvite.creatorName} for approved campaign
+              content on {campaign.name}. This will charge the brand payment
+              method and transfer the creator payout through Stripe.
+            </p>
+            <div className="crm-meta-row">
+              <span>Campaign payout</span>
+              <span>{payoutLabel}</span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: "flex-end",
+                marginTop: 20,
+              }}
+            >
+              <button
+                type="button"
+                className="crm-btn-secondary"
+                disabled={payingCreatorId === confirmPayoutInvite.creatorId}
+                onClick={() => setConfirmPayoutCreatorId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="crm-btn-primary"
+                disabled={payingCreatorId === confirmPayoutInvite.creatorId}
+                onClick={() => void payCreator(confirmPayoutInvite.creatorId!)}
+              >
+                {payingCreatorId === confirmPayoutInvite.creatorId
+                  ? "Paying..."
+                  : "Confirm payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

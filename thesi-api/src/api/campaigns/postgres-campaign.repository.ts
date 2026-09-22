@@ -418,6 +418,24 @@ export class PostgresCampaignRepository implements CampaignRepository {
     return rows.map((row) => this.toCreatorPayout(row));
   }
 
+  async hasApprovedContentSubmission(
+    campaignId: string,
+    creatorUserId: string,
+  ) {
+    const [row] = await this.db
+      .select({ id: schema.campaignContentSubmission.id })
+      .from(schema.campaignContentSubmission)
+      .where(
+        and(
+          eq(schema.campaignContentSubmission.campaignId, campaignId),
+          eq(schema.campaignContentSubmission.creatorUserId, creatorUserId),
+          eq(schema.campaignContentSubmission.status, 'approved'),
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
   async upsertCreatorPayout(input: {
     campaignId: string;
     brandUserId: string;

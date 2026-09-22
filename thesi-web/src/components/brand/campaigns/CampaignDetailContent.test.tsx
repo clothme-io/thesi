@@ -191,13 +191,14 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     });
   });
 
-  it("limits published campaign edits after a creator accepts", async () => {
+  it("saves full campaign edits as a new version after a creator accepts", async () => {
     activeCampaign = buildCampaign({
       status: "active",
       startDate: "2026-07-01",
       endDate: "2026-08-01",
       creatorCapacity: 5,
       exampleVideoLinks: ["https://example.com/original"],
+      payment: { model: "flat_rate", flatRateCents: 50000 },
     });
     campaignInvites = [
       {
@@ -215,11 +216,11 @@ describe("CampaignDetailContent lifecycle buttons", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Save updates" }),
+        screen.getByRole("button", { name: "Save as new version" }),
       ).toBeInTheDocument();
     });
     expect(
-      screen.getByText(/A creator has accepted this campaign/i),
+      screen.getByText(/Saving creates a new published version/i),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Pause" }),
@@ -227,13 +228,24 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     expect(
       screen.queryByRole("button", { name: "Unpublish" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Limited campaign updates")).toBeInTheDocument();
+    expect(screen.queryByText("Limited campaign updates")).not.toBeInTheDocument();
+    expect(screen.getByTestId("campaign-flat-amount-input")).toBeInTheDocument();
+    expect(screen.getByTestId("campaign-deliverables-textarea")).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText("Start date"));
-    await user.type(screen.getByLabelText("Start date"), "2026-07-15");
-    await user.clear(screen.getByLabelText("Creator capacity"));
-    await user.type(screen.getByLabelText("Creator capacity"), "7");
-    await user.click(screen.getByRole("button", { name: "Save updates" }));
+    await user.clear(screen.getByTestId("campaign-start-date-input"));
+    await user.type(screen.getByTestId("campaign-start-date-input"), "2026-07-15");
+    await user.clear(screen.getByTestId("campaign-end-date-input"));
+    await user.type(screen.getByTestId("campaign-end-date-input"), "2026-09-01");
+    await user.clear(screen.getByTestId("campaign-deliverables-textarea"));
+    await user.type(
+      screen.getByTestId("campaign-deliverables-textarea"),
+      "2 videos and usage rights",
+    );
+    await user.clear(screen.getByTestId("campaign-flat-amount-input"));
+    await user.type(screen.getByTestId("campaign-flat-amount-input"), "750.00");
+    await user.clear(screen.getByTestId("campaign-creator-capacity-input"));
+    await user.type(screen.getByTestId("campaign-creator-capacity-input"), "7");
+    await user.click(screen.getByRole("button", { name: "Save as new version" }));
 
     await waitFor(() => {
       expect(updateCampaign).toHaveBeenCalledWith(
@@ -241,8 +253,13 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         expect.objectContaining({
           creatorCapacity: 7,
           startDate: "2026-07-15",
-          endDate: "2026-08-01",
+          endDate: "2026-09-01",
+          deliverables: "2 videos and usage rights",
           exampleVideoLinks: ["https://example.com/original"],
+          payment: expect.objectContaining({
+            model: "flat_rate",
+            flatRateCents: 75000,
+          }),
         }),
       );
     });
@@ -408,7 +425,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("pays an accepted creator invite", async () => {
+  it("confirms payment only after approved creator content", async () => {
     campaignInvites = [
       {
         id: "invite-1",
@@ -422,6 +439,29 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     authenticatedRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
       if (path.includes("/payouts") && options?.method !== "POST") {
         return { payouts: [] };
+      }
+      if (path.includes("/submissions")) {
+        return {
+          items: [
+            {
+              id: "submission-1",
+              campaignId: "campaign-1",
+              creatorUserId: "creator-1",
+              creatorName: "Alex Creator",
+              deliverableLabel: "Draft",
+              title: "Approved video",
+              status: "approved",
+              version: 1,
+              originalName: "video.mp4",
+              sizeLabel: "1 MB",
+              contentType: "video/mp4",
+              mediaKind: "video",
+              submittedAt: "2026-09-22T00:00:00.000Z",
+              reviewedAt: "2026-09-22T00:00:00.000Z",
+              updatedAt: "2026-09-22T00:00:00.000Z",
+            },
+          ],
+        };
       }
       if (path.includes("/pay-creator")) {
         return {
@@ -439,7 +479,16 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     render(<CampaignDetailContent />);
 
     expect(await screen.findByText("Alex Creator")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Pay creator" }));
+    const payButton = await screen.findByRole("button", { name: "Pay creator" });
+    await user.click(payButton);
+    expect(
+      screen.getByRole("dialog", { name: "Confirm creator payment" }),
+    ).toBeInTheDocument();
+    expect(authenticatedRequest).not.toHaveBeenCalledWith(
+      "/api/campaigns/campaign-1/pay-creator",
+      expect.anything(),
+    );
+    await user.click(screen.getByRole("button", { name: "Confirm payment" }));
 
     await waitFor(() => {
       expect(authenticatedRequest).toHaveBeenCalledWith(
@@ -450,6 +499,33 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         }),
       );
     });
+  });
+
+  it("holds pay creator until accepted content is approved", async () => {
+    campaignInvites = [
+      {
+        id: "invite-1",
+        campaignId: "campaign-1",
+        creatorId: "creator-1",
+        creatorName: "Alex Creator",
+        external: false,
+        status: "accepted",
+      },
+    ];
+    authenticatedRequest.mockImplementation(async (path: string) => {
+      if (path.includes("/submissions")) {
+        return { items: [] };
+      }
+      return { payouts: [] };
+    });
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    render(<CampaignDetailContent />);
+
+    expect(await screen.findByText("Alex Creator")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting approved content")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pay creator" }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides pay creator until the invite is accepted", async () => {

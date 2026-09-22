@@ -306,6 +306,16 @@ export class CampaignsService {
         'Creator must accept the campaign invite before they can be paid',
       );
     }
+    const hasApprovedContent =
+      await this.campaigns.hasApprovedContentSubmission(
+        campaignId,
+        creatorUserId,
+      );
+    if (!hasApprovedContent) {
+      throw new BadRequestException(
+        'Approve a submitted draft before paying this creator',
+      );
+    }
 
     const readiness =
       await this.connect.getCreatorPayoutReadiness(creatorUserId);
