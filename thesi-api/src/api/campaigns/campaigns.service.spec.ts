@@ -575,7 +575,7 @@ describe('CampaignsService', () => {
     expect(repository.revisions.at(-1)?.terms.brief).toBe('Version one brief');
   });
 
-  it('creates a new current version when campaign dates change after acceptance', async () => {
+  it('creates a new current version when campaign terms change after acceptance', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     const campaign = await service.create(
       'brand-1',
@@ -584,6 +584,8 @@ describe('CampaignsService', () => {
         postToMarketplace: true,
         startDate: '2026-07-01',
         endDate: '2026-08-15',
+        deliverables: '1 video',
+        payment: { model: 'flat_rate', flatRateCents: 50_000 },
       }),
     );
     const acceptedVersion = repository.revisions[0];
@@ -597,15 +599,27 @@ describe('CampaignsService', () => {
         postToMarketplace: true,
         startDate: '2026-07-15',
         endDate: '2026-09-01',
+        deliverables: '2 videos and usage rights',
+        payment: { model: 'flat_rate', flatRateCents: 75_000 },
       }),
     );
     expect(updated.startDate).toBe('2026-07-15');
     expect(updated.endDate).toBe('2026-09-01');
+    expect(updated.deliverables).toBe('2 videos and usage rights');
+    expect(updated.payment.flatRateCents).toBe(75_000);
     expect(repository.revisions).toHaveLength(2);
     expect(acceptedVersion?.terms.startDate).toBe('2026-07-01');
     expect(acceptedVersion?.terms.endDate).toBe('2026-08-15');
+    expect(acceptedVersion?.terms.deliverables).toBe('1 video');
+    expect(acceptedVersion?.terms.payment.flatRateCents).toBe(50_000);
     expect(repository.revisions.at(-1)?.terms.startDate).toBe('2026-07-15');
     expect(repository.revisions.at(-1)?.terms.endDate).toBe('2026-09-01');
+    expect(repository.revisions.at(-1)?.terms.deliverables).toBe(
+      '2 videos and usage rights',
+    );
+    expect(repository.revisions.at(-1)?.terms.payment.flatRateCents).toBe(
+      75_000,
+    );
     expect(updated.currentRevisionId).toBe(repository.revisions.at(-1)?.id);
   });
 

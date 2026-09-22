@@ -191,13 +191,14 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     });
   });
 
-  it("limits published campaign edits after a creator accepts", async () => {
+  it("saves full campaign edits as a new version after a creator accepts", async () => {
     activeCampaign = buildCampaign({
       status: "active",
       startDate: "2026-07-01",
       endDate: "2026-08-01",
       creatorCapacity: 5,
       exampleVideoLinks: ["https://example.com/original"],
+      payment: { model: "flat_rate", flatRateCents: 50000 },
     });
     campaignInvites = [
       {
@@ -215,11 +216,11 @@ describe("CampaignDetailContent lifecycle buttons", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Save updates" }),
+        screen.getByRole("button", { name: "Save as new version" }),
       ).toBeInTheDocument();
     });
     expect(
-      screen.getByText(/A creator has accepted this campaign/i),
+      screen.getByText(/Saving creates a new published version/i),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Pause" }),
@@ -227,13 +228,24 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     expect(
       screen.queryByRole("button", { name: "Unpublish" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("Limited campaign updates")).toBeInTheDocument();
+    expect(screen.queryByText("Limited campaign updates")).not.toBeInTheDocument();
+    expect(screen.getByTestId("campaign-flat-amount-input")).toBeInTheDocument();
+    expect(screen.getByTestId("campaign-deliverables-textarea")).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText("Start date"));
-    await user.type(screen.getByLabelText("Start date"), "2026-07-15");
-    await user.clear(screen.getByLabelText("Creator capacity"));
-    await user.type(screen.getByLabelText("Creator capacity"), "7");
-    await user.click(screen.getByRole("button", { name: "Save updates" }));
+    await user.clear(screen.getByTestId("campaign-start-date-input"));
+    await user.type(screen.getByTestId("campaign-start-date-input"), "2026-07-15");
+    await user.clear(screen.getByTestId("campaign-end-date-input"));
+    await user.type(screen.getByTestId("campaign-end-date-input"), "2026-09-01");
+    await user.clear(screen.getByTestId("campaign-deliverables-textarea"));
+    await user.type(
+      screen.getByTestId("campaign-deliverables-textarea"),
+      "2 videos and usage rights",
+    );
+    await user.clear(screen.getByTestId("campaign-flat-amount-input"));
+    await user.type(screen.getByTestId("campaign-flat-amount-input"), "750.00");
+    await user.clear(screen.getByTestId("campaign-creator-capacity-input"));
+    await user.type(screen.getByTestId("campaign-creator-capacity-input"), "7");
+    await user.click(screen.getByRole("button", { name: "Save as new version" }));
 
     await waitFor(() => {
       expect(updateCampaign).toHaveBeenCalledWith(
@@ -241,8 +253,13 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         expect.objectContaining({
           creatorCapacity: 7,
           startDate: "2026-07-15",
-          endDate: "2026-08-01",
+          endDate: "2026-09-01",
+          deliverables: "2 videos and usage rights",
           exampleVideoLinks: ["https://example.com/original"],
+          payment: expect.objectContaining({
+            model: "flat_rate",
+            flatRateCents: 75000,
+          }),
         }),
       );
     });
