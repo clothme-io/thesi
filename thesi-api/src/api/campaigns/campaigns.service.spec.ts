@@ -37,6 +37,7 @@ class FakeCampaignRepository implements CampaignRepository {
   files: CampaignFileRow[] = [];
   fees = new Map<string, CampaignPlatformFeeRecord>();
   payouts = new Map<string, CreatorPayoutRecord>();
+  approvedContentSubmissions = new Set<string>();
   acceptedCreatorCampaignIds = new Set<string>();
   acceptedCreatorCounts = new Map<string, number>();
   revisions: CampaignRevisionRecord[] = [];
@@ -257,6 +258,10 @@ class FakeCampaignRepository implements CampaignRepository {
     return [...this.payouts.values()].filter(
       (p) => p.creatorUserId === creatorUserId,
     );
+  }
+
+  async hasApprovedContentSubmission(campaignId: string, creatorUserId: string) {
+    return this.approvedContentSubmissions.has(`${campaignId}:${creatorUserId}`);
   }
 
   async upsertCreatorPayout(input: {
@@ -848,6 +853,7 @@ describe('CampaignsService', () => {
         status: 'accepted',
       },
     ]);
+    repository.approvedContentSubmissions.add(`${campaign.id}:creator-9`);
 
     const payout = await service.payCreator('brand-1', campaign.id, {
       creatorUserId: 'creator-9',
@@ -862,6 +868,33 @@ describe('CampaignsService', () => {
       }),
     );
     expect(billing.recordPlatformFeeInvoice).not.toHaveBeenCalled();
+  });
+
+  it('blocks payouts until the brand approves submitted creator content', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        payment: { model: 'flat_rate', flatRateCents: 80_000 },
+      }),
+    );
+    invites.listCampaignInvites.mockResolvedValue([
+      {
+        id: 'invite-1',
+        campaignId: campaign.id,
+        creatorId: 'creator-9',
+        external: false,
+        status: 'accepted',
+      },
+    ]);
+
+    await expect(
+      service.payCreator('brand-1', campaign.id, {
+        creatorUserId: 'creator-9',
+      }),
+    ).rejects.toThrow('Approve a submitted draft before paying this creator');
+    expect(stripe.chargeOffSession).not.toHaveBeenCalled();
+    expect(stripe.createTransfer).not.toHaveBeenCalled();
   });
 
   it('blocks payouts until the creator accepts the campaign invite', async () => {
@@ -901,6 +934,7 @@ describe('CampaignsService', () => {
         status: 'accepted',
       },
     ]);
+    repository.approvedContentSubmissions.add(`${campaign.id}:creator-9`);
 
     await expect(
       service.payCreator('brand-1', campaign.id, {

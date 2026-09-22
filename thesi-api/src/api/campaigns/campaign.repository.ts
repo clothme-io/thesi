@@ -153,6 +153,10 @@ export interface CampaignRepository {
   listCreatorPayoutsForCreator(
     creatorUserId: string,
   ): Promise<CreatorPayoutRecord[]>;
+  hasApprovedContentSubmission(
+    campaignId: string,
+    creatorUserId: string,
+  ): Promise<boolean>;
   upsertCreatorPayout(input: {
     campaignId: string;
     brandUserId: string;

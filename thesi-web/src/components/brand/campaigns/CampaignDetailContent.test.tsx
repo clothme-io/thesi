@@ -425,7 +425,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("pays an accepted creator invite", async () => {
+  it("confirms payment only after approved creator content", async () => {
     campaignInvites = [
       {
         id: "invite-1",
@@ -439,6 +439,29 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     authenticatedRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
       if (path.includes("/payouts") && options?.method !== "POST") {
         return { payouts: [] };
+      }
+      if (path.includes("/submissions")) {
+        return {
+          items: [
+            {
+              id: "submission-1",
+              campaignId: "campaign-1",
+              creatorUserId: "creator-1",
+              creatorName: "Alex Creator",
+              deliverableLabel: "Draft",
+              title: "Approved video",
+              status: "approved",
+              version: 1,
+              originalName: "video.mp4",
+              sizeLabel: "1 MB",
+              contentType: "video/mp4",
+              mediaKind: "video",
+              submittedAt: "2026-09-22T00:00:00.000Z",
+              reviewedAt: "2026-09-22T00:00:00.000Z",
+              updatedAt: "2026-09-22T00:00:00.000Z",
+            },
+          ],
+        };
       }
       if (path.includes("/pay-creator")) {
         return {
@@ -456,7 +479,16 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     render(<CampaignDetailContent />);
 
     expect(await screen.findByText("Alex Creator")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Pay creator" }));
+    const payButton = await screen.findByRole("button", { name: "Pay creator" });
+    await user.click(payButton);
+    expect(
+      screen.getByRole("dialog", { name: "Confirm creator payment" }),
+    ).toBeInTheDocument();
+    expect(authenticatedRequest).not.toHaveBeenCalledWith(
+      "/api/campaigns/campaign-1/pay-creator",
+      expect.anything(),
+    );
+    await user.click(screen.getByRole("button", { name: "Confirm payment" }));
 
     await waitFor(() => {
       expect(authenticatedRequest).toHaveBeenCalledWith(
@@ -467,6 +499,33 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         }),
       );
     });
+  });
+
+  it("holds pay creator until accepted content is approved", async () => {
+    campaignInvites = [
+      {
+        id: "invite-1",
+        campaignId: "campaign-1",
+        creatorId: "creator-1",
+        creatorName: "Alex Creator",
+        external: false,
+        status: "accepted",
+      },
+    ];
+    authenticatedRequest.mockImplementation(async (path: string) => {
+      if (path.includes("/submissions")) {
+        return { items: [] };
+      }
+      return { payouts: [] };
+    });
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    render(<CampaignDetailContent />);
+
+    expect(await screen.findByText("Alex Creator")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting approved content")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pay creator" }),
+    ).not.toBeInTheDocument();
   });
 
   it("hides pay creator until the invite is accepted", async () => {

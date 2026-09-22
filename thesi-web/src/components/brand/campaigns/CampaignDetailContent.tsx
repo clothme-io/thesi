@@ -39,7 +39,10 @@ import {
 } from "./DraftCampaignEditForm";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { CampaignPublishedContent } from "@/components/inbox/CampaignPublishedContent";
-import { CampaignContentReview } from "./CampaignContentReview";
+import {
+  CampaignContentReview,
+  type CampaignContentReviewItem,
+} from "./CampaignContentReview";
 import {
   campaignFromRevision,
   type CampaignRevision,
@@ -115,6 +118,12 @@ export function CampaignDetailContent() {
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [approvedContentCreatorIds, setApprovedContentCreatorIds] = useState<
+    Set<string>
+  >(new Set());
+  const [confirmPayoutCreatorId, setConfirmPayoutCreatorId] = useState<
+    string | null
+  >(null);
   const [revisions, setRevisions] = useState<CampaignRevision[]>([]);
   const [viewingRevisionId, setViewingRevisionId] = useState<string | null>(null);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(
@@ -156,6 +165,20 @@ export function CampaignDetailContent() {
     setPayouts(result.payouts ?? []);
   }, [authenticatedRequest, id,canManageFunds]);
 
+  const loadApprovedContentCreators = useCallback(async () => {
+    if (!id || !canManageFunds) return;
+    const result = await authenticatedRequest<{
+      items?: CampaignContentReviewItem[];
+    }>(`/api/campaigns/${id}/submissions`);
+    setApprovedContentCreatorIds(
+      new Set(
+        (result.items ?? [])
+          .filter((item) => item.status === "approved")
+          .map((item) => item.creatorUserId),
+      ),
+    );
+  }, [authenticatedRequest, id, canManageFunds]);
+
   useEffect(() => {
     if (!ready || !id) return;
     let active = true;
@@ -172,6 +195,17 @@ export function CampaignDetailContent() {
       active = false;
     };
   }, [ready, id, loadPayouts]);
+
+  useEffect(() => {
+    if (!ready || !id) return;
+    let active = true;
+    loadApprovedContentCreators().catch(() => {
+      if (active) setApprovedContentCreatorIds(new Set());
+    });
+    return () => {
+      active = false;
+    };
+  }, [ready, id, loadApprovedContentCreators]);
 
   const loadRevisions = useCallback(async () => {
     if (!id) return;
@@ -224,6 +258,10 @@ export function CampaignDetailContent() {
   const payoutByCreator = new Map(
     payouts.map((payout) => [payout.creatorUserId, payout]),
   );
+  const confirmPayoutInvite =
+    invites.find((invite) => invite.creatorId === confirmPayoutCreatorId) ??
+    null;
+  const payoutLabel = getCampaignBudgetLabel(campaign);
 
   const refreshInvites = () => {
     void reloadInvites(campaign.id);
@@ -246,6 +284,7 @@ export function CampaignDetailContent() {
       );
     } finally {
       setPayingCreatorId(null);
+      setConfirmPayoutCreatorId(null);
     }
   };
 
@@ -691,10 +730,14 @@ export function CampaignDetailContent() {
                     const payout = invite.creatorId
                       ? payoutByCreator.get(invite.creatorId)
                       : undefined;
+                    const hasApprovedContent = invite.creatorId
+                      ? approvedContentCreatorIds.has(invite.creatorId)
+                      : false;
                     const canPay =
                       canManageFunds && Boolean(invite.creatorId) &&
                       !invite.external &&
                       invite.status === "accepted" &&
+                      hasApprovedContent &&
                       payout?.status !== "transferred";
                     return (
                       <div className="crm-meta-row" key={invite.id}>
@@ -719,6 +762,16 @@ export function CampaignDetailContent() {
                                 : ""}
                             </span>
                           )}
+                          {!payout &&
+                            invite.status === "accepted" &&
+                            !hasApprovedContent && (
+                              <span
+                                className="crm-tag"
+                                style={{ marginLeft: 8 }}
+                              >
+                                Awaiting approved content
+                              </span>
+                            )}
                         </span>
                         <span
                           style={{
@@ -735,7 +788,9 @@ export function CampaignDetailContent() {
                               type="button"
                               className="inbox-btn-text"
                               disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
-                              onClick={() => void payCreator(invite.creatorId!)}
+                              onClick={() =>
+                                setConfirmPayoutCreatorId(invite.creatorId!)
+                              }
                             >
                               {campaign.payment.model === "commission"
                                 ? "Commission payouts coming soon"
@@ -943,10 +998,14 @@ export function CampaignDetailContent() {
                     const payout = invite.creatorId
                       ? payoutByCreator.get(invite.creatorId)
                       : undefined;
+                    const hasApprovedContent = invite.creatorId
+                      ? approvedContentCreatorIds.has(invite.creatorId)
+                      : false;
                     const canPay =
                       canManageFunds && Boolean(invite.creatorId) &&
                       !invite.external &&
                       invite.status === "accepted" &&
+                      hasApprovedContent &&
                       payout?.status !== "transferred";
                     return (
                       <div className="crm-meta-row" key={invite.id}>
@@ -971,6 +1030,16 @@ export function CampaignDetailContent() {
                                 : ""}
                             </span>
                           )}
+                          {!payout &&
+                            invite.status === "accepted" &&
+                            !hasApprovedContent && (
+                              <span
+                                className="crm-tag"
+                                style={{ marginLeft: 8 }}
+                              >
+                                Awaiting approved content
+                              </span>
+                            )}
                         </span>
                         <span
                           style={{
@@ -987,7 +1056,9 @@ export function CampaignDetailContent() {
                               type="button"
                               className="inbox-btn-text"
                               disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
-                              onClick={() => void payCreator(invite.creatorId!)}
+                              onClick={() =>
+                                setConfirmPayoutCreatorId(invite.creatorId!)
+                              }
                             >
                               {campaign.payment.model === "commission"
                                 ? "Commission payouts coming soon"
@@ -1133,6 +1204,54 @@ export function CampaignDetailContent() {
         }
         onInvited={refreshInvites}
       />
+      {confirmPayoutInvite?.creatorId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-payout-title"
+          className="workspace-modal-backdrop"
+        >
+          <div className="workspace-modal">
+            <h3 id="confirm-payout-title">Confirm creator payment</h3>
+            <p className="workspace-hint">
+              Pay {confirmPayoutInvite.creatorName} for approved campaign
+              content on {campaign.name}. This will charge the brand payment
+              method and transfer the creator payout through Stripe.
+            </p>
+            <div className="crm-meta-row">
+              <span>Campaign payout</span>
+              <span>{payoutLabel}</span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: "flex-end",
+                marginTop: 20,
+              }}
+            >
+              <button
+                type="button"
+                className="crm-btn-secondary"
+                disabled={payingCreatorId === confirmPayoutInvite.creatorId}
+                onClick={() => setConfirmPayoutCreatorId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="crm-btn-primary"
+                disabled={payingCreatorId === confirmPayoutInvite.creatorId}
+                onClick={() => void payCreator(confirmPayoutInvite.creatorId!)}
+              >
+                {payingCreatorId === confirmPayoutInvite.creatorId
+                  ? "Paying..."
+                  : "Confirm payment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
