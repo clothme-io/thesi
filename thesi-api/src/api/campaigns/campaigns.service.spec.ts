@@ -575,17 +575,18 @@ describe('CampaignsService', () => {
     expect(repository.revisions.at(-1)?.terms.brief).toBe('Version one brief');
   });
 
-  it('allows shortening dates and changing pay after a creator is accepted', async () => {
+  it('creates a new current version when campaign dates change after acceptance', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     const campaign = await service.create(
       'brand-1',
       sampleCampaign({
         status: 'active',
         postToMarketplace: true,
+        startDate: '2026-07-01',
         endDate: '2026-08-15',
-        payment: { model: 'flat_rate', flatRateCents: 50_000 },
       }),
     );
+    const acceptedVersion = repository.revisions[0];
     repository.acceptedCreatorCampaignIds.add(campaign.id);
 
     const updated = await service.update(
@@ -594,14 +595,18 @@ describe('CampaignsService', () => {
       sampleCampaign({
         status: 'active',
         postToMarketplace: true,
-        endDate: '2026-08-01',
-        payment: { model: 'flat_rate', flatRateCents: 75_000 },
-        brief: 'Changed brief',
+        startDate: '2026-07-15',
+        endDate: '2026-09-01',
       }),
     );
-    expect(updated.endDate).toBe('2026-08-01');
-    expect(updated.payment.flatRateCents).toBe(75_000);
-    expect(updated.brief).toBe('Changed brief');
+    expect(updated.startDate).toBe('2026-07-15');
+    expect(updated.endDate).toBe('2026-09-01');
+    expect(repository.revisions).toHaveLength(2);
+    expect(acceptedVersion?.terms.startDate).toBe('2026-07-01');
+    expect(acceptedVersion?.terms.endDate).toBe('2026-08-15');
+    expect(repository.revisions.at(-1)?.terms.startDate).toBe('2026-07-15');
+    expect(repository.revisions.at(-1)?.terms.endDate).toBe('2026-09-01');
+    expect(updated.currentRevisionId).toBe(repository.revisions.at(-1)?.id);
   });
 
   it('allows creator capacity changes after acceptance when capacity covers accepted creators', async () => {

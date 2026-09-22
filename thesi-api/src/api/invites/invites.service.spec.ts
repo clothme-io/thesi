@@ -8,6 +8,7 @@ import type { InboxService } from 'src/api/inbox/inbox.service';
 import type { NovuService } from 'src/shared/novu/novu.service';
 import type {
   CampaignInviteRecord,
+  CampaignAcceptanceSnapshotRecord,
   CreateAcceptanceSnapshotInput,
   InviteStatus,
   InviteUser,
@@ -18,10 +19,18 @@ import { InvitesService } from './invites.service';
 
 class FakeInvitesRepository implements InvitesRepository {
   users = new Map<string, InviteUser>();
-  campaigns = new Map<string, { id: string; name: string; ownerUserId: string; payment?: CampaignPaymentJson }>();
+  campaigns = new Map<string, {
+    id: string;
+    name: string;
+    ownerUserId: string;
+    payment?: CampaignPaymentJson;
+    startDate?: string;
+    endDate?: string;
+    currentRevisionId?: string | null;
+  }>();
   campaignInvites: CampaignInviteRecord[] = [];
   platformInvites: PlatformBrandInviteRecord[] = [];
-  acceptanceSnapshots: CreateAcceptanceSnapshotInput[] = [];
+  acceptanceSnapshots: CampaignAcceptanceSnapshotRecord[] = [];
 
   async getUser(userId: string) {
     return this.users.get(userId) ?? null;
@@ -173,41 +182,24 @@ class FakeInvitesRepository implements InvitesRepository {
     ) {
       return;
     }
-    this.acceptanceSnapshots.push(input);
-  }
-
-  async getAcceptanceSnapshotForCreator(
-    campaignId: string,
-    creatorUserId: string,
-    creatorEmail: string,
-  ) {
-    const snapshot =
-      this.acceptanceSnapshots.find(
-        (item) =>
-          item.campaignId === campaignId &&
-          (item.creatorUserId === creatorUserId ||
-            item.creatorEmail.toLowerCase() === creatorEmail.toLowerCase()),
-      ) ?? null;
-    if (!snapshot) return null;
-    return {
-      id: 'snapshot-1',
-      campaignId: snapshot.campaignId,
-      brandUserId: snapshot.brandUserId,
-      ...(snapshot.creatorUserId
-        ? { creatorUserId: snapshot.creatorUserId }
-        : {}),
-      creatorEmail: snapshot.creatorEmail,
-      creatorName: snapshot.creatorName,
-      source: snapshot.source,
-      sourceId: snapshot.sourceId,
-      campaignName: 'Summer Drop',
+    const campaign = this.campaigns.get(input.campaignId);
+    this.acceptanceSnapshots.push({
+      id: `snapshot-${this.acceptanceSnapshots.length + 1}`,
+      campaignId: input.campaignId,
+      brandUserId: input.brandUserId,
+      ...(input.creatorUserId ? { creatorUserId: input.creatorUserId } : {}),
+      creatorEmail: input.creatorEmail,
+      creatorName: input.creatorName,
+      source: input.source,
+      sourceId: input.sourceId,
+      campaignName: campaign?.name ?? 'Summer Drop',
       campaignType: 'experience',
       contentTypes: ['tiktok'],
-      startDate: '2026-09-01',
-      endDate: '2026-10-01',
+      startDate: campaign?.startDate ?? '2026-09-01',
+      endDate: campaign?.endDate ?? '2026-10-01',
       brief: 'Brief',
       deliverables: 'Deliverables',
-      paymentSnapshot: { model: 'flat_rate' as const, flatRateCents: 4000 },
+      paymentSnapshot: campaign?.payment ?? { model: 'flat_rate', flatRateCents: 4000 },
       creatorBenefitsSnapshot: {
         productsKept: false,
         bonusEligibility: false,
@@ -227,9 +219,28 @@ class FakeInvitesRepository implements InvitesRepository {
         rawContentAccess: false,
       },
       requiredTasksSnapshot: [],
-      acceptedAt: new Date().toISOString(),
+      ...(campaign?.currentRevisionId
+        ? { revisionId: campaign.currentRevisionId }
+        : {}),
+      acceptedAt: (input.acceptedAt ?? new Date()).toISOString(),
       createdAt: new Date().toISOString(),
-    };
+    });
+  }
+
+  async getAcceptanceSnapshotForCreator(
+    campaignId: string,
+    creatorUserId: string,
+    creatorEmail: string,
+  ) {
+    const snapshot =
+      this.acceptanceSnapshots.find(
+        (item) =>
+          item.campaignId === campaignId &&
+          (item.creatorUserId === creatorUserId ||
+            item.creatorEmail.toLowerCase() === creatorEmail.toLowerCase()),
+      ) ?? null;
+    if (!snapshot) return null;
+    return snapshot;
   }
 
   async setCampaignInviteNovuTransactionId() {}
@@ -306,6 +317,9 @@ describe('InvitesService', () => {
       id: 'camp-1',
       name: 'Summer Drop',
       ownerUserId: 'brand-1',
+      startDate: '2026-09-01',
+      endDate: '2026-10-01',
+      currentRevisionId: 'revision-1',
     });
     inbox = {
       deliverCampaignInvite: jest.fn().mockResolvedValue({ delivered: true }),
@@ -570,6 +584,38 @@ describe('InvitesService', () => {
         campaignId: 'camp-1',
         creatorUserId: 'creator-1',
         paymentSnapshot: { model: 'flat_rate', flatRateCents: 4000 },
+      }),
+    });
+  });
+
+  it('keeps accepted creator dates frozen after campaign dates change', async () => {
+    await service.createCampaignInvite('brand-1', {
+      campaignId: 'camp-1',
+      campaignName: 'Summer Drop',
+      brandName: 'Acme',
+      creatorId: 'creator-1',
+      creatorEmail: 'creator@example.com',
+      creatorName: 'Alex Creator',
+      external: false,
+    });
+
+    await service.respondToCampaignInvite('creator-1', {
+      campaignId: 'camp-1',
+      decision: 'accepted',
+    });
+
+    const campaign = repository.campaigns.get('camp-1')!;
+    campaign.startDate = '2026-09-15';
+    campaign.endDate = '2026-11-01';
+    campaign.currentRevisionId = 'revision-2';
+
+    await expect(
+      service.getAcceptanceSnapshot('creator-1', 'camp-1'),
+    ).resolves.toEqual({
+      snapshot: expect.objectContaining({
+        startDate: '2026-09-01',
+        endDate: '2026-10-01',
+        revisionId: 'revision-1',
       }),
     });
   });

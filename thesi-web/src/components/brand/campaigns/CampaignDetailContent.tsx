@@ -843,8 +843,10 @@ export function CampaignDetailContent() {
                   </h3>
                   <p className="workspace-hint" style={{ marginTop: 0 }}>
                     A creator has accepted this campaign. You can adjust campaign
-                    dates, creator capacity, files, and example video links. All
-                    other campaign fields below are read-only.
+                    dates, creator capacity, files, and example video links for
+                    new creators. Accepted creators keep the start and closing
+                    dates from the version they accepted. All other campaign
+                    fields below are read-only.
                   </p>
                   <div className="workspace-grid">
                     <label className="workspace-field">
