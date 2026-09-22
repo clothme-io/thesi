@@ -5,12 +5,18 @@ interface AuthLayoutProps {
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  variant?: "default" | "wide";
 }
 
-export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
+export function AuthLayout({
+  title,
+  subtitle,
+  children,
+  variant = "default",
+}: AuthLayoutProps) {
   return (
     <div className="auth-page">
-      <div className="auth-shell">
+      <div className={`auth-shell${variant === "wide" ? " auth-shell--wide" : ""}`}>
         <Link href="/" className="auth-brand">
           <img src="/clothme-logo.png" alt="" aria-hidden="true" />
           <span>Thesi</span>

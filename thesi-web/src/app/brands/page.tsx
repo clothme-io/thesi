@@ -24,7 +24,7 @@ export default function BrandsPage() {
               <Link href="/sign-up" className="creator-btn-primary">
                 Get Started
               </Link>
-              <Link href="/sign-in" className="creator-btn-ghost">
+              <Link href="/brand/sign-in" className="creator-btn-ghost">
                 Sign In
               </Link>
             </div>
