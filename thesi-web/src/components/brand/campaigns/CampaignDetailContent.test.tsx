@@ -194,6 +194,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
   it("limits published campaign edits after a creator accepts", async () => {
     activeCampaign = buildCampaign({
       status: "active",
+      startDate: "2026-07-01",
       endDate: "2026-08-01",
       creatorCapacity: 5,
       exampleVideoLinks: ["https://example.com/original"],
@@ -228,6 +229,8 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText("Limited campaign updates")).toBeInTheDocument();
 
+    await user.clear(screen.getByLabelText("Start date"));
+    await user.type(screen.getByLabelText("Start date"), "2026-07-15");
     await user.clear(screen.getByLabelText("Creator capacity"));
     await user.type(screen.getByLabelText("Creator capacity"), "7");
     await user.click(screen.getByRole("button", { name: "Save updates" }));
@@ -237,6 +240,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         "campaign-1",
         expect.objectContaining({
           creatorCapacity: 7,
+          startDate: "2026-07-15",
           endDate: "2026-08-01",
           exampleVideoLinks: ["https://example.com/original"],
         }),
