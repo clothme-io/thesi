@@ -1,93 +1,40 @@
-"use client";
-import { startMerchantSignin } from '@/lib/merchant-signin';
-
-import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { GuestGuard } from "@/components/auth/GuestGuard";
-import { useAuth } from "@/context/AuthProvider";
-import { getPostAuthPath } from "@/lib/auth-storage";
 
 export default function SignInPage() {
-  const router = useRouter();
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const session = await signIn({ email, password });
-      router.push(getPostAuthPath(session));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Sign in failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <GuestGuard>
       <AuthLayout
-        title="Sign in"
-        subtitle="Welcome back. Enter the email and password for your Thesi account."
+        title="Choose your sign-in"
+        subtitle="Pick the workspace you want to open in Thesi."
+        variant="wide"
       >
-        {process.env.NEXT_PUBLIC_MERCHANT_SSO_ENABLED === "true" && <button className="auth-submit" disabled={loading} onClick={() => void startMerchantSignin().catch(e=>setError(e.message))}>Continue with Merchant Hub</button>}
-        <form onSubmit={handleSubmit}>
-          {error && (
-            <p className="auth-error" role="alert">
-              {error}
-            </p>
-          )}
-
-          <div className="auth-field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-            />
-          </div>
-
-          <div className="auth-field">
-            <div className="auth-row">
-              <label htmlFor="password">Password</label>
-              <Link href="/forgot-password" className="auth-link">
-                Forgot password?
-              </Link>
-            </div>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              required
-            />
-          </div>
-
-          <button type="submit" className="auth-submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
-          </button>
-
-          <p className="auth-footer-text">
-            Brand account?{" "}
-            <Link href="/sign-up" className="auth-link">
-              Create one
+        <div className="auth-choice-grid">
+          <section className="auth-choice-card">
+            <div className="auth-choice-icon">UGC</div>
+            <h2>Creator</h2>
+            <p>Manage campaign invites, submit content, and track payouts.</p>
+            <Link href="/creator/sign-in" className="auth-choice-primary">
+              Creator sign in
             </Link>
-          </p>
-        </form>
+            <Link href="/creators/apply" className="auth-choice-secondary">
+              Apply as a creator
+            </Link>
+          </section>
+
+          <section className="auth-choice-card">
+            <div className="auth-choice-icon">BR</div>
+            <h2>Brand</h2>
+            <p>Create campaigns, invite creators, and connect products.</p>
+            <Link href="/brand/sign-in" className="auth-choice-primary">
+              Brand sign in
+            </Link>
+            <Link href="/sign-up" className="auth-choice-secondary">
+              Create brand account
+            </Link>
+          </section>
+        </div>
       </AuthLayout>
     </GuestGuard>
   );

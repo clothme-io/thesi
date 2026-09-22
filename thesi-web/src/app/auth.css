@@ -16,6 +16,10 @@
   width: min(440px, 100%);
 }
 
+.auth-shell--wide {
+  width: min(760px, 100%);
+}
+
 .auth-brand {
   display: flex;
   align-items: center;
@@ -125,11 +129,113 @@
   cursor: not-allowed;
 }
 
+.auth-merchant {
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.auth-merchant .auth-submit {
+  margin-top: 0;
+}
+
+.auth-merchant-hint {
+  margin: 8px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .auth-footer-text {
   margin-top: 20px;
   text-align: center;
   font-size: 14px;
   color: var(--muted);
+}
+
+.auth-footer-text--compact {
+  margin-top: 8px;
+}
+
+.auth-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.auth-choice-card {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.auth-choice-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef7fb;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.auth-choice-card h2 {
+  margin: 18px 0 8px;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.auth-choice-card p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.auth-choice-primary,
+.auth-choice-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.auth-choice-primary {
+  margin-top: auto;
+  background: var(--ink);
+  color: #fff;
+}
+
+.auth-choice-secondary {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.auth-choice-primary:hover,
+.auth-choice-secondary:hover {
+  opacity: 0.86;
+}
+
+@media (max-width: 700px) {
+  .auth-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-choice-card {
+    min-height: 240px;
+  }
 }
 
 .auth-error {
