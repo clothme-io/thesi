@@ -115,6 +115,7 @@ export function CampaignDetailContent() {
   const [payoutError, setPayoutError] = useState("");
   const [payingCreatorId, setPayingCreatorId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+  const [limitedStartDate, setLimitedStartDate] = useState("");
   const [limitedEndDate, setLimitedEndDate] = useState("");
   const [limitedCreatorCapacity, setLimitedCreatorCapacity] = useState("");
   const [newExampleVideoLinks, setNewExampleVideoLinks] = useState<string[]>([""]);
@@ -178,6 +179,7 @@ export function CampaignDetailContent() {
 
   useEffect(() => {
     if (!campaign) return;
+    setLimitedStartDate(toDateInputValue(campaign.startDate));
     setLimitedEndDate(toDateInputValue(campaign.endDate));
     setLimitedCreatorCapacity(
       campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
@@ -382,12 +384,17 @@ export function CampaignDetailContent() {
     setLifecycleError("");
     setSaveMessage("");
     try {
+      if (limitedEndDate < limitedStartDate) {
+        setLifecycleError("Closing date must be on or after start date.");
+        return;
+      }
       const linksToAdd = newExampleVideoLinks
         .map((link) => link.trim())
         .filter(Boolean)
         .filter((link) => !campaign.exampleVideoLinks.includes(link));
       await updateCampaign(campaign.id, {
         ...toCampaignInput(campaign),
+        startDate: limitedStartDate,
         endDate: limitedEndDate,
         ...(limitedCreatorCapacity.trim()
           ? { creatorCapacity: Number(limitedCreatorCapacity) }
@@ -835,19 +842,30 @@ export function CampaignDetailContent() {
                     </span>
                   </h3>
                   <p className="workspace-hint" style={{ marginTop: 0 }}>
-                    A creator has accepted this campaign. You can only extend
-                    the closing date, adjust creator capacity, add files, and
-                    add example video links. All other campaign fields below are
-                    read-only.
+                    A creator has accepted this campaign. You can adjust campaign
+                    dates, creator capacity, files, and example video links for
+                    new creators. Accepted creators keep the start and closing
+                    dates from the version they accepted. All other campaign
+                    fields below are read-only.
                   </p>
                   <div className="workspace-grid">
+                    <label className="workspace-field">
+                      <span>Start date</span>
+                      <input
+                        aria-label="Start date"
+                        type="date"
+                        value={limitedStartDate}
+                        max={limitedEndDate || undefined}
+                        onChange={(event) => setLimitedStartDate(event.target.value)}
+                      />
+                    </label>
                     <label className="workspace-field">
                       <span>Closing date</span>
                       <input
                         aria-label="Closing date"
                         type="date"
                         value={limitedEndDate}
-                        min={toDateInputValue(campaign.endDate)}
+                        min={limitedStartDate || undefined}
                         onChange={(event) => setLimitedEndDate(event.target.value)}
                       />
                     </label>
