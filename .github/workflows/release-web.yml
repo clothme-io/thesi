@@ -189,8 +189,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Warn if PostHog project key is missing
-        if: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY == '' }}
-        run: echo "::warning::NEXT_PUBLIC_POSTHOG_KEY is not set. The web image will build without product analytics."
+        env:
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
+        run: |
+          if [ -z "$NEXT_PUBLIC_POSTHOG_KEY" ]; then
+            echo "::warning::NEXT_PUBLIC_POSTHOG_KEY is not set. The web image will build without product analytics."
+          fi
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
