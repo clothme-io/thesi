@@ -4,7 +4,7 @@ import { getStripe } from "@/lib/stripe/stripe-client";
 import { useAuth } from "@/context/AuthProvider";
 import {useWorkspacePermissions} from '@/context/WorkspacePermissions';
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
-type Funding = {
+export type CampaignFundingStatus = {
   canRecover?: boolean;
   plan: { baseCents: number; slots: number; depositCents: number };
   fund: { state: string } | null;
@@ -34,12 +34,14 @@ const money = (n: number) =>
   );
 export function CampaignFundingPanel({
   campaign,
+  onStatusChange,
 }: {
   campaign: BrandCampaign;
+  onStatusChange?: (status: CampaignFundingStatus | null) => void;
 }) {
   const { authenticatedRequest } = useAuth();
   const {canManageFunds}=useWorkspacePermissions();
-  const [data, setData] = useState<Funding | null>(null);
+  const [data, setData] = useState<CampaignFundingStatus | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [providerId, setProviderId] = useState("");
@@ -47,20 +49,24 @@ export function CampaignFundingPanel({
   const [confirm, setConfirm] = useState(false);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const load = useCallback(async () => {
-    if(!canManageFunds)return;
+    if(!canManageFunds){
+      onStatusChange?.(null);
+      return;
+    }
     try {
-      setData(
-        await authenticatedRequest<Funding>(
-          `/api/campaign-funding/${campaign.id}`,
-        ),
+      const next = await authenticatedRequest<CampaignFundingStatus>(
+        `/api/campaign-funding/${campaign.id}`,
       );
+      setData(next);
+      onStatusChange?.(next);
       setError("");
     } catch (e) {
+      onStatusChange?.(null);
       setError(
         e instanceof Error ? e.message : "Could not load campaign funds",
       );
     }
-  }, [authenticatedRequest, campaign.id,canManageFunds]);
+  }, [authenticatedRequest, campaign.id,canManageFunds,onStatusChange]);
   useEffect(() => {
     void load();
   }, [load, campaign.status]);
@@ -76,12 +82,15 @@ export function CampaignFundingPanel({
     setBusy(true);
     setError("");
     try {
-      const result = await authenticatedRequest<Funding>(
+      const result = await authenticatedRequest<CampaignFundingStatus>(
         `/api/campaign-funding/${campaign.id}/${action}`,
         { method: "POST", body },
       );
       if (["recover", "cancel-obligation"].includes(action)) await load();
-      else setData(result);
+      else {
+        setData(result);
+        onStatusChange?.(result);
+      }
       setConfirm(false);
     } catch (e) {
       setError(

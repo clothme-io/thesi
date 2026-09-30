@@ -86,7 +86,14 @@ export type CreatorPayoutRecord = {
   creatorUserId: string;
   amountCents: number;
   currency: string;
-  status: 'pending' | 'charged' | 'transferred' | 'failed';
+  status:
+    | 'pending'
+    | 'charged'
+    | 'transferred'
+    | 'failed'
+    | 'refunded'
+    | 'disputed'
+    | 'reversed';
   stripePaymentIntentId?: string;
   stripeTransferId?: string;
   stripeDestinationAccountId: string;

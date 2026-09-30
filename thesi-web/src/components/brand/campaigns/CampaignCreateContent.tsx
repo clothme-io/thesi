@@ -16,6 +16,7 @@ import {
   hybridPaymentToForm,
   milestonesToFormRows,
   newMilestoneId,
+  parseMoneyToCents,
   seedMilestonesIfNeeded,
   paymentFormError,
   type HybridPaymentFormState,
@@ -273,6 +274,10 @@ export function CampaignCreateContent() {
   );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
+  const requiresBaseFundingBeforePublish =
+    paymentModel === "commission" &&
+    hybridPayment.baseEnabled &&
+    parseMoneyToCents(hybridPayment.baseAmount) > 0;
 
   const buildCampaignPayload = (status: BrandCampaignStatus) => ({
     name: name.trim() || "Untitled campaign",
@@ -389,7 +394,9 @@ export function CampaignCreateContent() {
       setSaving(false);
       return;
     }
-    const payload = buildCampaignPayload("active");
+    const payload = buildCampaignPayload(
+      requiresBaseFundingBeforePublish ? "draft" : "active",
+    );
     const userId = session?.user.id ?? "dev-user-1";
 
     try {
@@ -401,6 +408,13 @@ export function CampaignCreateContent() {
       draftRef.current = context;
       setInviteContext(context);
       const uploaded = await flushPendingUploads(campaign.id);
+      if (requiresBaseFundingBeforePublish) {
+        setSaveMessage(
+          "Draft saved. Fund the base deposit from the campaign page before publishing.",
+        );
+        router.push(`/app/campaigns/${campaign.id}`);
+        return;
+      }
       await publishCampaignToMarketplace(
         {
           ...campaign,
@@ -959,8 +973,9 @@ export function CampaignCreateContent() {
                     : "Set a creator payout amount to preview the future activation fee."}
                 </p>
                 <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
-                  Payment is turned off for now — Publish will not charge your
-                  card.
+                  {requiresBaseFundingBeforePublish
+                    ? "Publish saves this as a draft first. Fund the base deposit on the campaign page, then publish."
+                    : "No card is charged until the campaign requires funding or billing action."}
                 </p>
               </div>
               <span className="crm-tag">Not charged yet</span>

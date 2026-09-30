@@ -8,7 +8,10 @@ import { useAuth } from "@/context/AuthProvider";
 import {useWorkspacePermissions} from '@/context/WorkspacePermissions';
 import { toDateInputValue } from "@/lib/brand-campaigns/date";
 import { PromotedProductDetails } from "./PromotedProductDetails";
-import { CampaignFundingPanel } from "./CampaignFundingPanel";
+import {
+  CampaignFundingPanel,
+  type CampaignFundingStatus,
+} from "./CampaignFundingPanel";
 import { CommissionPaymentDetails } from "./CommissionPaymentDetails";
 import { paymentFormError } from "@/lib/brand-campaigns/payment-form";
 import {
@@ -76,7 +79,14 @@ type CreatorPayout = {
   id: string;
   creatorUserId: string;
   amountCents: number;
-  status: "pending" | "charged" | "transferred" | "failed";
+  status:
+    | "pending"
+    | "charged"
+    | "transferred"
+    | "failed"
+    | "refunded"
+    | "disputed"
+    | "reversed";
   stripeTransferId?: string;
   failureReason?: string;
 };
@@ -86,6 +96,9 @@ const PAYOUT_STATUS_LABELS: Record<CreatorPayout["status"], string> = {
   charged: "Charged",
   transferred: "Paid",
   failed: "Failed",
+  refunded: "Refunded",
+  disputed: "Disputed",
+  reversed: "Reversed",
 };
 
 export function CampaignDetailContent() {
@@ -124,6 +137,8 @@ export function CampaignDetailContent() {
   const [confirmPayoutCreatorId, setConfirmPayoutCreatorId] = useState<
     string | null
   >(null);
+  const [fundingStatus, setFundingStatus] =
+    useState<CampaignFundingStatus | null>(null);
   const [revisions, setRevisions] = useState<CampaignRevision[]>([]);
   const [viewingRevisionId, setViewingRevisionId] = useState<string | null>(null);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(
@@ -432,6 +447,15 @@ export function CampaignDetailContent() {
   const canPublish =
     campaign.status === "draft" ||
     (campaign.status === "active" && !campaign.postToMarketplace);
+  const usesCampaignFunding =
+    campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1;
+  const fundingRequiresDeposit =
+    usesCampaignFunding && (fundingStatus?.plan.depositCents ?? 0) > 0;
+  const publishBlockedByFunding =
+    canPublish &&
+    campaign.status === "draft" &&
+    fundingRequiresDeposit &&
+    fundingStatus?.fund?.state !== "funded";
   const canResume = campaign.status === "paused";
   const canPause = campaign.status === "active" && !hasAcceptedPublishedCurrent;
   const canComplete =
@@ -494,7 +518,7 @@ export function CampaignDetailContent() {
             <button
               type="button"
               className="crm-btn-primary"
-              disabled={lifecycleBusy || savingDraft}
+              disabled={lifecycleBusy || savingDraft || publishBlockedByFunding}
               onClick={() =>
                 void applyLifecycle({
                   status: "active",
@@ -502,7 +526,11 @@ export function CampaignDetailContent() {
                 })
               }
             >
-              {campaign.status === "draft" ? "Publish" : "Post to marketplace"}
+              {publishBlockedByFunding
+                ? "Fund before publish"
+                : campaign.status === "draft"
+                  ? "Publish"
+                  : "Post to marketplace"}
             </button>
           )}
           {canEdit && canResume && (
@@ -562,7 +590,17 @@ export function CampaignDetailContent() {
         </div>
       </header>
       <div className="app-content">
-        {campaign.payment.hybrid?.affiliate?.fundingFlowVersion === 1 && <CampaignFundingPanel campaign={campaign} />}
+        {usesCampaignFunding && (
+          <CampaignFundingPanel
+            campaign={campaign}
+            onStatusChange={setFundingStatus}
+          />
+        )}
+        {publishBlockedByFunding && (
+          <p className="workspace-hint" style={{ marginBottom: 16 }} role="status">
+            Fund the base deposit before publishing this campaign to the marketplace.
+          </p>
+        )}
         {(lifecycleError || error) && (
           <p className="workspace-hint" style={{ marginBottom: 16 }} role="alert">
             {lifecycleError || error}

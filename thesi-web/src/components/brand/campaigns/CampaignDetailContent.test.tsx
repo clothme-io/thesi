@@ -357,6 +357,68 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("requires campaign base funding before publishing a funded draft", async () => {
+    activeCampaign = buildCampaign({
+      status: "draft",
+      postToMarketplace: false,
+      creatorCapacity: 3,
+      payment: {
+        model: "commission",
+        flatRateCents: 0,
+        royaltyPercent: 0,
+        hybrid: {
+          base: {
+            enabled: true,
+            amountCents: 10000,
+            currency: "USD",
+            trigger: "content_published",
+          },
+          affiliate: {
+            enabled: true,
+            commissionType: "percentage_of_sale",
+            currency: "USD",
+            fundingFlowVersion: 1,
+            payoutHandler: "clothme",
+            fundingSource: "brand",
+          },
+        },
+      },
+    });
+    authenticatedRequest.mockImplementation(async (url: string) => {
+      if (String(url).includes("/campaign-funding/")) {
+        return {
+          plan: { baseCents: 10000, slots: 3, depositCents: 30000 },
+          fund: { state: "awaiting_deposit" },
+          depositedCents: 0,
+          releasedCents: 0,
+          refundedCents: 0,
+          heldCents: 0,
+          unfilledSlotCents: 30000,
+          obligations: [],
+          operations: [],
+        };
+      }
+      if (String(url).includes("/submissions")) return { items: [] };
+      if (String(url).includes("/revisions")) return { revisions: [] };
+      return { payouts: [] };
+    });
+    const { CampaignDetailContent } = await import("./CampaignDetailContent");
+    const user = userEvent.setup();
+    render(<CampaignDetailContent />);
+
+    const publishButton = await screen.findByRole("button", {
+      name: "Fund before publish",
+    });
+    expect(publishButton).toBeDisabled();
+    expect(
+      screen.getByText(/Fund the base deposit before publishing/),
+    ).toBeInTheDocument();
+
+    await user.click(publishButton);
+
+    expect(updateCampaign).not.toHaveBeenCalled();
+  });
+
   it("saves edited draft fields", async () => {
     activeCampaign = buildCampaign({
       status: "draft",
