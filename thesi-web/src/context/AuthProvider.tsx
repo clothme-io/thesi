@@ -19,6 +19,7 @@ import {
 } from "@/lib/auth-storage";
 
 import { workspaceForRequest, WORKSPACE_HEADER } from "@/lib/brand-workspace-storage";
+import { track } from "@/lib/posthog";
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -258,11 +259,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const role = input.email.trim().toLowerCase() === "brand@thesi.dev" ? "brand" : "creator";
         const devSession = createDevSession(input, role);
         persist(devSession);
+        track("user_signed_in", { role, auth_mode: "dev" });
         return devSession;
       }
 
       const data = await callAuthApi<AuthSession>("/api/auth/signin", input);
       persist(data);
+      track("user_signed_in", { role: data.user.role });
       return data;
     },
     [persist],
@@ -273,17 +276,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isAuthDevMode()) {
         const devSession = createDevSession(input, "brand");
         persist(devSession);
+        track("user_signed_up", { role: "brand", auth_mode: "dev" });
         return devSession;
       }
 
       const data = await callAuthApi<AuthSession>("/api/auth/signup", input);
       persist(data);
+      track("user_signed_up", { role: data.user.role });
       return data;
     },
     [persist],
   );
 
   const signOut = useCallback(() => {
+    if (session) {
+      track("user_signed_out", { role: session.user.role });
+    }
     if(session?.refreshToken.startsWith('mh.'))void fetch('/api/merchant-login/logout',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.accessToken}`},body:'{}',keepalive:true}).catch(()=>{});
     persist(null);
   }, [persist, session]);
