@@ -345,6 +345,7 @@ export class CampaignsService {
 
     const idempotencyKey = `creator-payout:${campaignId}:${creatorUserId}`;
     let paymentIntentId = existing?.stripePaymentIntentId ?? null;
+    let sourceTransaction: string | null = null;
 
     try {
       if (existing?.status !== 'charged' || !paymentIntentId) {
@@ -362,6 +363,7 @@ export class CampaignsService {
           },
         });
         paymentIntentId = charge.paymentIntentId;
+        sourceTransaction = charge.chargeId;
         await this.campaigns.upsertCreatorPayout({
           campaignId,
           brandUserId: userId,
@@ -374,12 +376,16 @@ export class CampaignsService {
           idempotencyKey,
           failureReason: null,
         });
+      } else {
+        sourceTransaction =
+          await this.stripe.getPaymentIntentChargeId(paymentIntentId);
       }
 
       const transfer = await this.stripe.createTransfer({
         amountCents,
         destinationAccountId: readiness.accountId,
         idempotencyKey: `creator-payout-transfer:${campaignId}:${creatorUserId}`,
+        sourceTransaction,
         transferGroup: campaignId,
         metadata: {
           campaignId,

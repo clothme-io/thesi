@@ -37,6 +37,16 @@ export class StripeWebhooksService {
           event.data.object as Stripe.PaymentIntent,
         );
         break;
+      case 'charge.refunded':
+        action = await this.onChargeRefunded(
+          event.data.object as Stripe.Charge,
+        );
+        break;
+      case 'charge.dispute.created':
+        action = await this.onChargeDisputeCreated(
+          event.data.object as Stripe.Dispute,
+        );
+        break;
       case 'transfer.created':
       case 'transfer.updated':
         action = await this.onTransferSynced(
@@ -124,6 +134,79 @@ export class StripeWebhooksService {
     return 'pi_failed_unmatched';
   }
 
+  private chargePaymentIntentId(charge: Stripe.Charge): string | null {
+    if (!charge.payment_intent) return null;
+    return typeof charge.payment_intent === 'string'
+      ? charge.payment_intent
+      : charge.payment_intent.id;
+  }
+
+  private disputePaymentIntentId(dispute: Stripe.Dispute): string | null {
+    const expandedPaymentIntent = (dispute as Stripe.Dispute & {
+      payment_intent?: string | Stripe.PaymentIntent | null;
+    }).payment_intent;
+    if (expandedPaymentIntent) {
+      return typeof expandedPaymentIntent === 'string'
+        ? expandedPaymentIntent
+        : expandedPaymentIntent.id;
+    }
+    const charge = dispute.charge;
+    if (!charge || typeof charge === 'string') return null;
+    return this.chargePaymentIntentId(charge);
+  }
+
+  private async onChargeRefunded(charge: Stripe.Charge): Promise<string> {
+    const paymentIntentId = this.chargePaymentIntentId(charge);
+    if (!paymentIntentId) return 'charge_refunded_unmatched';
+
+    const fee = await this.webhooks.findPlatformFeeByPaymentIntent(
+      paymentIntentId,
+    );
+    if (fee && fee.status !== 'waived') {
+      await this.webhooks.updatePlatformFeeStatus(fee.id, 'failed');
+      return 'platform_fee_refunded';
+    }
+
+    const payout =
+      await this.webhooks.findCreatorPayoutByChargePaymentIntent(
+        paymentIntentId,
+      );
+    if (!payout) return 'charge_refunded_unmatched';
+    await this.webhooks.updateCreatorPayoutStatus(
+      payout.id,
+      'refunded',
+      'Stripe charge.refunded',
+    );
+    return 'creator_payout_refunded';
+  }
+
+  private async onChargeDisputeCreated(
+    dispute: Stripe.Dispute,
+  ): Promise<string> {
+    const paymentIntentId = this.disputePaymentIntentId(dispute);
+    if (!paymentIntentId) return 'charge_dispute_unmatched';
+
+    const fee = await this.webhooks.findPlatformFeeByPaymentIntent(
+      paymentIntentId,
+    );
+    if (fee && fee.status !== 'waived') {
+      await this.webhooks.updatePlatformFeeStatus(fee.id, 'failed');
+      return 'platform_fee_disputed';
+    }
+
+    const payout =
+      await this.webhooks.findCreatorPayoutByChargePaymentIntent(
+        paymentIntentId,
+      );
+    if (!payout) return 'charge_dispute_unmatched';
+    await this.webhooks.updateCreatorPayoutStatus(
+      payout.id,
+      'disputed',
+      'Stripe charge.dispute.created',
+    );
+    return 'creator_payout_disputed';
+  }
+
   private async resolvePayoutForTransfer(transfer: Stripe.Transfer) {
     const byTransfer = await this.webhooks.findCreatorPayoutByTransferId(
       transfer.id,
@@ -157,7 +240,7 @@ export class StripeWebhooksService {
     if (!payout) return 'transfer_unmatched';
     await this.webhooks.updateCreatorPayoutStatus(
       payout.id,
-      'failed',
+      'reversed',
       'Stripe transfer.reversed',
       transfer.id,
     );

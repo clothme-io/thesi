@@ -19,7 +19,14 @@ export type CreatorPayoutWebhookRow = {
   creatorUserId: string;
   amountCents: number;
   currency: string;
-  status: 'pending' | 'charged' | 'transferred' | 'failed';
+  status:
+    | 'pending'
+    | 'charged'
+    | 'transferred'
+    | 'failed'
+    | 'refunded'
+    | 'disputed'
+    | 'reversed';
   stripePaymentIntentId: string | null;
   stripeTransferId: string | null;
   stripeDestinationAccountId: string;
@@ -42,6 +49,9 @@ export interface StripeWebhookRepository {
     status: PlatformFeeWebhookRow['status'],
   ): Promise<void>;
   findCreatorPayoutByPaymentIntent(
+    paymentIntentId: string,
+  ): Promise<CreatorPayoutWebhookRow | null>;
+  findCreatorPayoutByChargePaymentIntent(
     paymentIntentId: string,
   ): Promise<CreatorPayoutWebhookRow | null>;
   findCreatorPayoutByTransferId(

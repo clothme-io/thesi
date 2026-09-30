@@ -330,7 +330,11 @@ describe('CampaignsService', () => {
     resolveChargeContext: jest.Mock;
     recordPlatformFeeInvoice: jest.Mock;
   };
-  let stripe: { chargeOffSession: jest.Mock; createTransfer: jest.Mock };
+  let stripe: {
+    chargeOffSession: jest.Mock;
+    createTransfer: jest.Mock;
+    getPaymentIntentChargeId: jest.Mock;
+  };
   let connect: { getCreatorPayoutReadiness: jest.Mock };
   let invites: { listCampaignInvites: jest.Mock; listOpenInviteCreatorIds: jest.Mock };
   let marketplaceSync: {
@@ -354,8 +358,10 @@ describe('CampaignsService', () => {
       chargeOffSession: jest.fn().mockResolvedValue({
         paymentIntentId: 'pi_local_1',
         status: 'succeeded',
+        chargeId: 'ch_local_1',
       }),
       createTransfer: jest.fn().mockResolvedValue({ transferId: 'tr_local_1' }),
+      getPaymentIntentChargeId: jest.fn().mockResolvedValue('ch_local_1'),
     };
     connect = {
       getCreatorPayoutReadiness: jest.fn().mockResolvedValue({
@@ -865,6 +871,7 @@ describe('CampaignsService', () => {
       expect.objectContaining({
         amountCents: 80_000,
         destinationAccountId: 'acct_local_creator',
+        sourceTransaction: 'ch_local_1',
       }),
     );
     expect(billing.recordPlatformFeeInvoice).not.toHaveBeenCalled();

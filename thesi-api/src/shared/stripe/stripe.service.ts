@@ -267,6 +267,7 @@ export class StripeService {
     currency?: string;
     destinationAccountId: string;
     idempotencyKey: string;
+    sourceTransaction?: string | null;
     transferGroup?: string;
     metadata?: Record<string, string>;
   }): Promise<{ transferId: string }> {
@@ -290,6 +291,7 @@ export class StripeService {
         amount: input.amountCents,
         currency: (input.currency || 'usd').toLowerCase(),
         destination: input.destinationAccountId,
+        source_transaction: input.sourceTransaction || undefined,
         transfer_group: input.transferGroup,
         metadata: input.metadata,
       },
@@ -346,9 +348,17 @@ export class StripeService {
     description: string;
     idempotencyKey: string;
     metadata?: Record<string, string>;
-  }): Promise<{ paymentIntentId: string; status: 'succeeded' | 'processing' }> {
+  }): Promise<{
+    paymentIntentId: string;
+    status: 'succeeded' | 'processing';
+    chargeId: string | null;
+  }> {
     if (input.amountCents <= 0) {
-      return { paymentIntentId: `pi_zero_${Date.now()}`, status: 'succeeded' };
+      return {
+        paymentIntentId: `pi_zero_${Date.now()}`,
+        status: 'succeeded',
+        chargeId: null,
+      };
     }
 
     if (
@@ -360,7 +370,7 @@ export class StripeService {
       this.logger.log(
         `[STRIPE] chargeOffSession ${input.customerId} ${input.amountCents} → ${paymentIntentId}`,
       );
-      return { paymentIntentId, status: 'succeeded' };
+      return { paymentIntentId, status: 'succeeded', chargeId: null };
     }
 
     const intent = await this.stripe.paymentIntents.create(
@@ -386,7 +396,24 @@ export class StripeService {
     return {
       paymentIntentId: intent.id,
       status: intent.status === 'succeeded' ? 'succeeded' : 'processing',
+      chargeId: this.paymentIntentChargeId(intent),
     };
+  }
+
+  async getPaymentIntentChargeId(
+    paymentIntentId: string,
+  ): Promise<string | null> {
+    if (!this.stripe || paymentIntentId.startsWith('pi_local_')) {
+      return null;
+    }
+    const intent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+    return this.paymentIntentChargeId(intent);
+  }
+
+  private paymentIntentChargeId(intent: Stripe.PaymentIntent): string | null {
+    const charge = intent.latest_charge;
+    if (!charge) return null;
+    return typeof charge === 'string' ? charge : charge.id;
   }
 
   private mapInvoiceStatus(

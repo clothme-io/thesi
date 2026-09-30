@@ -7,8 +7,6 @@ import { getStripePublishableKey } from "@/lib/stripe/publishable-key";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 import { AddPaymentMethodModal } from "./AddPaymentMethodModal";
 
-const PAYMENTS_COMING_SOON = true;
-
 export function BrandSettingsPaymentMethodsContent() {
   const { authenticatedRequest } = useAuth();
   const {
@@ -29,10 +27,6 @@ export function BrandSettingsPaymentMethodsContent() {
 
   const handleAdd = async () => {
     setActionError("");
-    if (PAYMENTS_COMING_SOON) {
-      setActionError("Payment methods are coming soon.");
-      return;
-    }
     if (!publishableKey) {
       setActionError(
         "Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in thesi-web to add cards.",
@@ -74,13 +68,16 @@ export function BrandSettingsPaymentMethodsContent() {
         )}
         <div className="brand-billing-plan" style={{ marginBottom: 16 }}>
           <div>
-            <strong>Coming soon</strong>
+            <strong>Stripe card setup</strong>
             <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
-              Card capture and automated billing are not live yet. Campaign
-              publishing and creator applications do not charge a card.
+              Add a card with Stripe so campaign base deposits and future
+              invoices can charge the brand’s default payment method. Thesi only
+              stores Stripe ids and card metadata.
             </p>
           </div>
-          <span className="crm-tag">Coming soon</span>
+          <span className="crm-tag">
+            {publishableKey ? "Ready" : "Needs web key"}
+          </span>
         </div>
         {data.paymentMethods.length === 0 ? (
           <p className="workspace-hint">No payment methods on file yet.</p>
@@ -130,17 +127,13 @@ export function BrandSettingsPaymentMethodsContent() {
           className="crm-btn-secondary"
           style={{ marginTop: 16 }}
           onClick={handleAdd}
-          disabled={opening || PAYMENTS_COMING_SOON}
+          disabled={opening}
         >
-          {PAYMENTS_COMING_SOON
-            ? "Payment methods coming soon"
-            : opening
-              ? "Preparing…"
-              : "+ Add payment method"}
+          {opening ? "Preparing…" : "+ Add payment method"}
         </button>
         <p className="workspace-hint" style={{ marginTop: 8 }}>
-          Stripe card setup will be enabled when payments are ready for live
-          billing.
+          Cards are collected by Stripe Elements and saved for off-session
+          campaign funding after the brand confirms the amount.
         </p>
       </section>
 

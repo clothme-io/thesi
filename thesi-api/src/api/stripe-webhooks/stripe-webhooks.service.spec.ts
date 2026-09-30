@@ -47,6 +47,10 @@ class FakeWebhookRepository implements StripeWebhookRepository {
     );
   }
 
+  async findCreatorPayoutByChargePaymentIntent(paymentIntentId: string) {
+    return this.findCreatorPayoutByPaymentIntent(paymentIntentId);
+  }
+
   async findCreatorPayoutByTransferId(transferId: string) {
     return (
       [...this.payouts.values()].find(
@@ -202,5 +206,95 @@ describe('StripeWebhooksService', () => {
     expect(result.action).toBe('creator_payout_failed');
     expect(repo.payouts.get('payout-2')?.status).toBe('failed');
     expect(repo.payouts.get('payout-2')?.failureReason).toBe('Card declined');
+  });
+
+  it('marks creator payout refunded when its charge is refunded', async () => {
+    repo.payouts.set('payout-3', {
+      id: 'payout-3',
+      campaignId: 'camp-3',
+      brandUserId: 'brand-1',
+      creatorUserId: 'creator-3',
+      amountCents: 25_000,
+      currency: 'usd',
+      status: 'transferred',
+      stripePaymentIntentId: 'pi_refunded',
+      stripeTransferId: 'tr_refunded',
+      stripeDestinationAccountId: 'acct_3',
+      idempotencyKey: 'refund-key',
+      failureReason: null,
+    });
+
+    const result = await service.handleEvent(
+      event('charge.refunded', {
+        id: 'ch_1',
+        payment_intent: 'pi_refunded',
+      }),
+    );
+
+    expect(result.action).toBe('creator_payout_refunded');
+    expect(repo.payouts.get('payout-3')?.status).toBe('refunded');
+    expect(repo.payouts.get('payout-3')?.failureReason).toBe(
+      'Stripe charge.refunded',
+    );
+  });
+
+  it('marks creator payout disputed when its charge enters dispute', async () => {
+    repo.payouts.set('payout-4', {
+      id: 'payout-4',
+      campaignId: 'camp-4',
+      brandUserId: 'brand-1',
+      creatorUserId: 'creator-4',
+      amountCents: 30_000,
+      currency: 'usd',
+      status: 'transferred',
+      stripePaymentIntentId: 'pi_disputed',
+      stripeTransferId: 'tr_disputed',
+      stripeDestinationAccountId: 'acct_4',
+      idempotencyKey: 'dispute-key',
+      failureReason: null,
+    });
+
+    const result = await service.handleEvent(
+      event('charge.dispute.created', {
+        id: 'dp_1',
+        payment_intent: 'pi_disputed',
+      }),
+    );
+
+    expect(result.action).toBe('creator_payout_disputed');
+    expect(repo.payouts.get('payout-4')?.status).toBe('disputed');
+    expect(repo.payouts.get('payout-4')?.failureReason).toBe(
+      'Stripe charge.dispute.created',
+    );
+  });
+
+  it('marks creator payout reversed when Stripe reverses the transfer', async () => {
+    repo.payouts.set('payout-5', {
+      id: 'payout-5',
+      campaignId: 'camp-5',
+      brandUserId: 'brand-1',
+      creatorUserId: 'creator-5',
+      amountCents: 35_000,
+      currency: 'usd',
+      status: 'transferred',
+      stripePaymentIntentId: 'pi_reverse',
+      stripeTransferId: 'tr_reverse',
+      stripeDestinationAccountId: 'acct_5',
+      idempotencyKey: 'reverse-key',
+      failureReason: null,
+    });
+
+    const result = await service.handleEvent(
+      event('transfer.reversed', {
+        id: 'tr_reverse',
+        metadata: { campaignId: 'camp-5', creatorUserId: 'creator-5' },
+      }),
+    );
+
+    expect(result.action).toBe('creator_payout_transfer_reversed');
+    expect(repo.payouts.get('payout-5')?.status).toBe('reversed');
+    expect(repo.payouts.get('payout-5')?.failureReason).toBe(
+      'Stripe transfer.reversed',
+    );
   });
 });

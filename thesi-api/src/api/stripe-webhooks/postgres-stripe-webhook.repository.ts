@@ -72,6 +72,10 @@ export class PostgresStripeWebhookRepository
     return row ? this.toPayout(row) : null;
   }
 
+  async findCreatorPayoutByChargePaymentIntent(paymentIntentId: string) {
+    return this.findCreatorPayoutByPaymentIntent(paymentIntentId);
+  }
+
   async findCreatorPayoutByTransferId(transferId: string) {
     const [row] = await this.db
       .select()
