@@ -11,9 +11,18 @@ export function commissionInviteTerms(payment: CampaignPaymentDto): string {
     currency: 'USD',
   }).format((base?.amountCents ?? 0) / 100);
   const basis =
-    commission?.commissionType === 'percentage_of_platform_commission'
-      ? 'platform commission from attributed sales'
-      : 'eligible sales attributed to the creator';
+    commission?.commissionType === 'fixed_amount_per_install'
+      ? 'qualified app install'
+      : commission?.commissionType === 'fixed_amount_per_sale'
+        ? 'attributed product sale'
+        : commission?.commissionType === 'percentage_of_platform_commission'
+          ? 'platform commission from attributed sales'
+          : 'eligible sales attributed to the creator';
+  const variablePay =
+    commission?.commissionType === 'fixed_amount_per_install' ||
+    commission?.commissionType === 'fixed_amount_per_sale'
+      ? `${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((commission.fixedAmountCents ?? 0) / 100)} per ${basis}`
+      : `${commission?.commissionPercent ?? 0}% of ${basis}`;
   const trigger =
     base?.trigger === 'custom'
       ? base.customTrigger
@@ -25,7 +34,7 @@ export function commissionInviteTerms(payment: CampaignPaymentDto): string {
       ...(product.variants?[`Eligible variants: ${product.variants.map(v=>`${v.color} / ${v.size} (${v.currency} ${(v.priceCents/100).toFixed(2)} listed price)`).join('; ')}. Checkout uses current prices.`]:[]),
       'The demo link does not track sales or earn commission.',
     ]),
-    `${base?.enabled ? `Base + Commission: ${amount} base per creator + ` : 'Commission only: '}${commission?.commissionPercent ?? 0}% of ${basis}.`,
+    `${base?.enabled ? `Base + Commission: ${amount} base per creator + ` : 'Commission only: '}${variablePay}.`,
     ...(base?.enabled
       ? [`Base payment earned when: ${trigger}.`]
       : ['No fixed base payment is included.']),
@@ -33,7 +42,9 @@ export function commissionInviteTerms(payment: CampaignPaymentDto): string {
     commission?.terms,
     ...(commission?.rules ? [commissionRulesText(commission.rules)] : []),
     ...(commission?.fundingFlowVersion === 1 ? [
-      'ClothME handles payouts. Qualifying sales fund creator commission.',
+      commission?.commissionType === 'fixed_amount_per_install'
+        ? 'ClothME handles payouts. Install payouts require a funded campaign balance before launch.'
+        : 'ClothME handles payouts. Qualifying sales fund creator commission.',
       ...(base?.enabled ? ['The brand prepays the base for each creator slot. ClothME releases your base after the brand accepts your work. Unused slot funds return to the brand at campaign closure.'] : ['No brand deposit is required.']),
     ] : [
     `Payout handler: ${commission?.payoutHandler === 'clothme' ? 'ClothME' : commission?.payoutHandler === 'brand' ? 'Brand' : 'not specified'}.`,
@@ -53,6 +64,7 @@ export function assertCommissionPayment(payment: CampaignPaymentDto): void {
   const base = payment.hybrid?.base;
   const commission = payment.hybrid?.affiliate;
   const rate = commission?.commissionPercent;
+  const fixed = commission?.fixedAmountCents;
   const days = commission?.attributionWindowDays;
   if(commission?.rules){try{assertCommissionRules(commission.rules);}catch{throw new BadRequestException('Invalid commission payout rules');}}
   if (commission?.fundingFlowVersion === 1 && (commission.payoutHandler !== 'clothme' || commission.fundingSource !== 'brand' || (base?.enabled && base.trigger !== 'content_accepted'))) throw new BadRequestException('Campaign funding requires brand funding, ClothME payouts, and base release after work acceptance.');
@@ -85,26 +97,41 @@ export function assertCommissionPayment(payment: CampaignPaymentDto): void {
     fail('Specify when the base payment is earned.');
   }
   if (
-    !commission?.enabled ||
+    !commission ||
+    !commission.enabled ||
     commission.currency !== 'USD' ||
-    !['percentage_of_sale', 'percentage_of_platform_commission'].includes(
-      commission.commissionType,
-    )
+    ![
+      'percentage_of_sale',
+      'percentage_of_platform_commission',
+      'fixed_amount_per_sale',
+      'fixed_amount_per_install',
+    ].includes(commission.commissionType)
   ) {
-    fail(
-      'Choose eligible sales or platform commission as the commission base.',
-    );
+    fail('Choose product sale, platform commission, or app install as the payout event.');
   }
-  if (
-    typeof rate !== 'number' ||
-    !Number.isFinite(rate) ||
-    rate <= 0 ||
-    rate > 100 ||
-    Math.abs(rate * 100 - Math.round(rate * 100)) > 0.000001
-  ) {
-    fail(
-      'Commission rate must be greater than 0 and at most 100%, with at most two decimal places.',
-    );
+  const accepted = commission!;
+  if (accepted.commissionType === 'fixed_amount_per_sale' || accepted.commissionType === 'fixed_amount_per_install') {
+    if (
+      !Number.isSafeInteger(fixed) ||
+      (fixed ?? 0) <= 0 ||
+      (fixed ?? 0) > 2_147_483_647
+    ) {
+      fail(
+        accepted.commissionType === 'fixed_amount_per_install'
+          ? 'Install payout must be a positive USD cents amount.'
+          : 'Per-sale payout must be a positive USD cents amount.',
+      );
+    }
+  } else if (
+      typeof rate !== 'number' ||
+      !Number.isFinite(rate) ||
+      rate <= 0 ||
+      rate > 100 ||
+      Math.abs(rate * 100 - Math.round(rate * 100)) > 0.000001
+    ) {
+      fail(
+        'Commission rate must be greater than 0 and at most 100%, with at most two decimal places.',
+      );
   }
   if (!Number.isInteger(days) || (days ?? 0) < 1 || (days ?? 0) > 365) {
     fail('Attribution window must be between 1 and 365 days.');
@@ -121,10 +148,13 @@ export function assertCommissionPayment(payment: CampaignPaymentDto): void {
     payment.milestoneStructure !== undefined ||
     payment.hybrid?.milestones ||
     payment.hybrid?.creatorPool ||
-    commission?.fixedAmountCents !== undefined
+    (['percentage_of_sale', 'percentage_of_platform_commission'].includes(accepted.commissionType) &&
+      accepted.fixedAmountCents !== undefined) ||
+    (['fixed_amount_per_sale', 'fixed_amount_per_install'].includes(accepted.commissionType) &&
+      accepted.commissionPercent !== undefined)
   ) {
     fail(
-      'Base + Commission supports only a base payment and percentage commission.',
+      'Base + Commission supports only a base payment and one creator-attribution payout event.',
     );
   }
 }

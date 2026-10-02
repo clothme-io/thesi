@@ -154,6 +154,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         ownerUserId,
         ...workspaceWrite(),
         name: input.name,
+        description: input.description?.trim() || null,
         campaignType: input.campaignType,
         contentTypes: input.contentTypes,
         status: input.status,
@@ -186,6 +187,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
       .update(schema.campaign)
       .set({
         name: input.name,
+        description: input.description?.trim() || null,
         campaignType: input.campaignType,
         contentTypes: input.contentTypes,
         status: input.status,
@@ -518,6 +520,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
     return {
       id: row.id,
       name: row.name,
+      description: row.description,
       campaignType: row.campaignType as CampaignRecord['campaignType'],
       contentTypes: normalizeContentTypes(row.contentTypes),
       status: row.status as CampaignRecord['status'],

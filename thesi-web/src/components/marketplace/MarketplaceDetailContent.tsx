@@ -150,6 +150,7 @@ const AFFILIATE_TYPE_LABELS: Record<string, string> = {
   percentage_of_sale: "of each sale",
   percentage_of_platform_commission: "of platform commission",
   fixed_amount_per_sale: "per sale",
+  fixed_amount_per_install: "per qualified install",
 };
 
 const POOL_DISTRIBUTION_LABELS: Record<string, string> = {
@@ -253,8 +254,9 @@ function HybridPaymentDetails({ payment }: { payment: MarketplacePayment }) {
             </small>
           </span>
           <span>
-            {hybrid.affiliate.commissionType === "fixed_amount_per_sale"
-              ? `${formatCents(hybrid.affiliate.fixedAmountCents)} per sale`
+            {hybrid.affiliate.commissionType === "fixed_amount_per_sale" ||
+            hybrid.affiliate.commissionType === "fixed_amount_per_install"
+              ? `${formatCents(hybrid.affiliate.fixedAmountCents)} ${AFFILIATE_TYPE_LABELS[hybrid.affiliate.commissionType]}`
               : `${hybrid.affiliate.commissionPercent ?? 0}% ${AFFILIATE_TYPE_LABELS[hybrid.affiliate.commissionType]}`}
           </span>
         </div>

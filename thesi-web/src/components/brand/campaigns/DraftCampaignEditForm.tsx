@@ -139,6 +139,7 @@ function centsFromPaymentInput(value: string): number | undefined {
 export type DraftCampaignFormState = {
   merchantProducts?: ProductSelection[];multiProductAgreement?:boolean;
   name: string;
+  description: string;
   campaignType: BrandCampaignGoalType;
   contentTypes: BrandCampaignType[];
   startDate: string;
@@ -170,6 +171,7 @@ export function draftFormFromCampaign(
 ): DraftCampaignFormState {
   return {
     name: campaign.name,
+    description: campaign.description ?? "",
     campaignType: campaign.campaignType,
     contentTypes: campaign.contentTypes ?? [],
     startDate: toDateInputValue(campaign.startDate),
@@ -206,6 +208,7 @@ export function draftFormFromCampaign(
 export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
   return {
     name: form.name.trim() || "Untitled campaign",
+    description: form.description.trim() || null,
     campaignType: form.campaignType,
     contentTypes: form.contentTypes,
     status: "draft",
@@ -365,6 +368,18 @@ export function DraftCampaignEditForm({
               type="date"
               value={form.endDate}
               onChange={(e) => set("endDate", e.target.value)}
+            />
+          </label>
+          <label className="workspace-field workspace-field--full">
+            <span>Description</span>
+            <textarea
+              id="campaign-description"
+              name="campaignDescription"
+              data-testid="campaign-description-textarea"
+              rows={2}
+              maxLength={1000}
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
             />
           </label>
           <label className="workspace-field workspace-field--full">

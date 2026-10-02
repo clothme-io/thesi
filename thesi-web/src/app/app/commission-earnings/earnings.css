@@ -4,6 +4,28 @@
   gap: 24px;
 }
 
+.crm-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.crm-metric-grid > div {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.crm-metric-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
 .commission-stack .app-stat-card small,
 .commission-batch .app-stat-card small,
 .commission-line-reasons {
@@ -106,6 +128,10 @@
 }
 
 @media (max-width: 640px) {
+  .crm-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
   .commission-batch__header {
     flex-direction: column;
   }

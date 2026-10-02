@@ -168,6 +168,7 @@ export function CampaignCreateContent() {
   const [initialProducts,setInitialProducts]=useState<PromotedProduct[]>([]);
   const [merchantProducts, setMerchantProducts] = useState<ProductSelection[]>([]);
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [campaignType, setCampaignType] =
     useState<BrandCampaignGoalType>("experience");
   const [contentTypes, setContentTypes] = useState<BrandCampaignType[]>(["tiktok"]);
@@ -221,6 +222,7 @@ export function CampaignCreateContent() {
     }
     hydratedRef.current = true;
     setName(`${source.name} (copy)`);
+    setDescription(source.description ?? "");
     setCampaignType(source.campaignType);
     setContentTypes(source.contentTypes);
     setStartDate(source.startDate.slice(0, 10));
@@ -281,6 +283,7 @@ export function CampaignCreateContent() {
 
   const buildCampaignPayload = (status: BrandCampaignStatus) => ({
     name: name.trim() || "Untitled campaign",
+    description: description.trim() || null,
     campaignType,
     contentTypes,
     status,
@@ -581,6 +584,19 @@ export function CampaignCreateContent() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
+                />
+              </label>
+              <label className="workspace-field workspace-field--full">
+                <span>Description</span>
+                <textarea
+                  id="campaign-description"
+                  name="campaignDescription"
+                  data-testid="campaign-description-textarea"
+                  rows={2}
+                  maxLength={1000}
+                  placeholder="Short public summary for campaign cards and context."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </label>
               <label className="workspace-field workspace-field--full">

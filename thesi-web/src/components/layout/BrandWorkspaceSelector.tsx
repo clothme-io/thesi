@@ -20,7 +20,9 @@ export function BrandWorkspaceSelector() {
       if (!current) return;
       setWorkspaces(rows);
       const saved = selectedWorkspace(session.user.id);
-      setSelected(saved || rows.find(row => row.isDefault)?.id || '');
+      const inferred = saved || rows.find(row => row.isDefault)?.id || '';
+      setSelected(inferred);
+      if (!saved && inferred) selectWorkspace(session.user.id, inferred);
       if (saved && !rows.some(row => row.id === saved)) setError('This brand is no longer available. Choose a brand to continue.');
     }).catch(() => { /* Discovery may be disabled. Never silently change brands. */ });
     return () => { current = false; };

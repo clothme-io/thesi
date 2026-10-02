@@ -49,17 +49,7 @@ export function CommissionPaymentBuilder({
           </>
         )}
         <label className="workspace-field">
-          <span>Commission rate (%)</span>
-          <input
-            name="commissionRate"
-            inputMode="decimal"
-            placeholder="10"
-            value={value.affiliatePercent}
-            onChange={(e) => set("affiliatePercent", e.target.value)}
-          />
-        </label>
-        <label className="workspace-field">
-          <span>Commission calculated on</span>
+          <span>Creator earns when</span>
           <select
             name="commissionBasis"
             value={value.affiliateType}
@@ -74,13 +64,47 @@ export function CommissionPaymentBuilder({
               Select a commission base
             </option>
             <option value="percentage_of_sale">
-              Eligible sales attributed to the creator
+              Percentage of attributed product sale
             </option>
             <option value="percentage_of_platform_commission">
-              Platform commission from attributed sales
+              Percentage of platform commission
+            </option>
+            <option value="fixed_amount_per_sale">
+              Fixed amount per attributed product sale
+            </option>
+            <option value="fixed_amount_per_install">
+              Fixed amount per qualified app install
             </option>
           </select>
         </label>
+        {value.affiliateType === "fixed_amount_per_sale" ||
+        value.affiliateType === "fixed_amount_per_install" ? (
+          <label className="workspace-field">
+            <span>
+              {value.affiliateType === "fixed_amount_per_install"
+                ? "Payout per qualified install (USD)"
+                : "Payout per attributed sale (USD)"}
+            </span>
+            <input
+              name="commissionFixedAmount"
+              inputMode="decimal"
+              placeholder="2.00"
+              value={value.affiliateFixedAmount}
+              onChange={(e) => set("affiliateFixedAmount", e.target.value)}
+            />
+          </label>
+        ) : (
+          <label className="workspace-field">
+            <span>Commission rate (%)</span>
+            <input
+              name="commissionRate"
+              inputMode="decimal"
+              placeholder="10"
+              value={value.affiliatePercent}
+              onChange={(e) => set("affiliatePercent", e.target.value)}
+            />
+          </label>
+        )}
         <label className="workspace-field">
           <span>Attribution window (days)</span>
           <input
@@ -175,13 +199,13 @@ export function CommissionPaymentBuilder({
         {value.baseEnabled
           ? `Base deposit before launch: ${Number(creatorCapacity) > 0 && Number(value.baseAmount) > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Math.round(Number(value.baseAmount) * 100) * Number(creatorCapacity)) / 100) : "set a base amount and creator slots"}. Base per creator × creator slots. ClothME holds the deposit, releases each creator’s base after your acceptance of their work, and returns unused slot funds when you close the campaign.`
           : "No deposit is required. Qualifying sales fund creator commission."}{" "}
-        ClothME handles payouts. Commission is funded from sales, including when
-        a base is enabled.
+        ClothME handles payouts. Sale payouts are funded from sales. Install
+        payouts require a funded campaign balance before launch.
       </p>
       <p className="workspace-hint">
         The optional base is a fixed amount per creator. Commission varies with
-        qualifying sales. Platform commission means revenue the platform earns
-        from those sales, not Thesi’s campaign service fee.
+        qualifying sales or installs. Platform commission means revenue the
+        platform earns from those sales, not Thesi’s campaign service fee.
       </p>
       <p className="workspace-hint">
         These fields record the agreed terms. Commission estimates require

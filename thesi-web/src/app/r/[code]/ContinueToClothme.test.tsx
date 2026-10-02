@@ -19,6 +19,14 @@ describe('creator installation continuation',()=>{
     expect(await screen.findByRole('status')).toHaveTextContent('Reopen it after installation');
     expect(writeText).toHaveBeenCalledWith(`https://get-thesi.com/r/${code}`);
   });
+  it('copies the install public link when used from the install landing page',async()=>{
+    const writeText=vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
+    render(<ContinueToClothme code={code} durable originalPath="i" />);
+    fireEvent.click(screen.getByRole('button',{name:'Copy original creator link'}));
+    expect(await screen.findByRole('status')).toHaveTextContent('Reopen it after installation');
+    expect(writeText).toHaveBeenCalledWith(`https://get-thesi.com/i/${code}`);
+  });
   it('preserves the old explicit handoff when the new mobile route is disabled',async()=>{
     vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({data:{deepLink:`clothme://creator-link/${code}`}})}));
     render(<ContinueToClothme code={code} />);

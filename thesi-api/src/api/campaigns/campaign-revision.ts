@@ -15,6 +15,7 @@ export function termsFromCampaign(
   campaign: Pick<
     CampaignRecord,
     | 'name'
+    | 'description'
     | 'campaignType'
     | 'contentTypes'
     | 'startDate'
@@ -34,6 +35,7 @@ export function termsFromCampaign(
 ): CampaignRevisionTerms {
   return {
     name: campaign.name,
+    description: campaign.description ?? null,
     campaignType: campaign.campaignType,
     contentTypes: campaign.contentTypes,
     startDate: campaign.startDate,
@@ -64,6 +66,7 @@ export function termsToCampaignPatch(
 ): Pick<
   UpsertCampaignDto,
   | 'name'
+  | 'description'
   | 'campaignType'
   | 'contentTypes'
   | 'startDate'
@@ -82,6 +85,7 @@ export function termsToCampaignPatch(
 > {
   return {
     name: terms.name,
+    description: terms.description ?? null,
     campaignType: terms.campaignType as UpsertCampaignDto['campaignType'],
     contentTypes: terms.contentTypes as UpsertCampaignDto['contentTypes'],
     startDate: terms.startDate,

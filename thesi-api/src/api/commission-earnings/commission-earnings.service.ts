@@ -131,6 +131,7 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
         event,
         affiliate.commissionType,
         affiliate.commissionPercent,
+        affiliate.fixedAmountCents,
       );
       await tx.execute(sql`INSERT INTO thesi.commission_earning_event(event_id,order_line_id,revision,receipt_id,creator_user_id,workspace_id,campaign_id,vendor_id,brand_id,source,currency,accrued_cents,adjustment_cents,state,reasons)
         VALUES(${event.eventId}::uuid,${event.orderLineId}::uuid,${event.revision},${event.receiptId}::uuid,${r.creator_user_id},${p.workspaceId}::uuid,${r.campaign_id}::uuid,${p.vendorId}::uuid,${p.brandId}::uuid,${JSON.stringify(event)}::jsonb,${event.currency},${result.accruedCents},${result.accruedCents - Number(prior?.accrued_cents ?? 0)},${result.state},${JSON.stringify(result.reasons)}::jsonb)`);
@@ -145,6 +146,7 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
         this.db,
         sql`false`,
         sql`o.creator_user_id=${user.sub}`,
+        sql`i.creator_user_id=${user.sub}`,
       );
     const w = workspaceContext.getStore();
     if (
@@ -159,6 +161,7 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
       this.db,
       sql`f.workspace_id=${w.workspaceId}::uuid`,
       sql`f.workspace_id=${w.workspaceId}::uuid`,
+      sql`i.workspace_id=${w.workspaceId}::uuid`,
     );
   }
   async merchant(vendorId: string, brandId: string) {
@@ -175,18 +178,20 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
         tx,
         sql`f.workspace_id=${link.workspace_id}::uuid`,
         sql`f.workspace_id=${link.workspace_id}::uuid`,
+        sql`false`,
       );
     });
   }
   async operations() {
     this.enabled();
-    return this.report(sql`true`, this.db, sql`true`, sql`true`);
+    return this.report(sql`true`, this.db, sql`true`, sql`true`, sql`true`);
   }
   private async report(
     scope: SQL,
     db: Pick<NodePgDatabase<typeof schema>, 'execute'> = this.db,
     baseFundScope: SQL = sql`false`,
     baseObligationScope: SQL = sql`false`,
+    installScope: SQL = sql`false`,
   ) {
     // Aggregate the entire scope; the line list is a bounded recent preview, never the basis of totals.
     const cte = sql`WITH latest AS (SELECT DISTINCT ON(e.order_line_id) e.* FROM thesi.commission_earning_event e WHERE ${scope} ORDER BY e.order_line_id,e.revision DESC)`;
@@ -198,6 +203,11 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
     const hasFunding = (
       await db.execute(
         sql`SELECT to_regclass('thesi.campaign_base_fund') IS NOT NULL AS ready`,
+      )
+    ).rows[0]?.ready;
+    const hasInstallEvents = (
+      await db.execute(
+        sql`SELECT to_regclass('thesi.commission_install_event') IS NOT NULL AS ready`,
       )
     ).rows[0]?.ready;
     const totals = (
@@ -248,15 +258,43 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
         sql`${cte} SELECT order_line_id AS "orderLineId",campaign_id AS "campaignId",currency,accrued_cents::text AS "accruedCents",state,reasons,received_at AS "updatedAt" FROM latest ORDER BY received_at DESC,order_line_id LIMIT 100`,
       )
     ).rows;
+    const installTotals = hasInstallEvents
+      ? (
+          await db.execute(sql`
+            SELECT currency,
+              count(*)::int AS "installEvents",
+              coalesce(sum(accrued_cents) FILTER (WHERE state='under_review'),0)::text AS "underReviewCents",
+              coalesce(sum(accrued_cents) FILTER (WHERE state='held'),0)::text AS "heldCents",
+              count(*) FILTER (WHERE state='held')::int AS "heldEvents",
+              count(*) FILTER (WHERE state='reversed')::int AS "reversedEvents"
+            FROM thesi.commission_install_event i
+            WHERE ${installScope}
+            GROUP BY currency
+            ORDER BY currency`)
+        ).rows
+      : [];
+    const installLines = hasInstallEvents
+      ? (
+          await db.execute(sql`
+            SELECT event_id AS "eventId",campaign_id AS "campaignId",creator_user_id AS "creatorUserId",
+              currency,accrued_cents::text AS "accruedCents",state,reasons,received_at AS "updatedAt"
+            FROM thesi.commission_install_event i
+            WHERE ${installScope}
+            ORDER BY received_at DESC,event_id
+            LIMIT 100`)
+        ).rows
+      : [];
     return {
       totals,
+      installTotals,
       settlementTotals,
       baseTotals,
       lines,
+      installLines,
       limit: 100,
       settlement: hasSettlement ? 'confirmed_totals_available' : 'not_enabled',
       notice:
-        'Commission estimates, confirmed settlement movement and base content payments are separate. Held amounts need reconciliation before payout decisions.',
+        'Commission estimates, install rewards, confirmed settlement movement and base content payments are separate. Held amounts need reconciliation before payout decisions.',
     };
   }
 }

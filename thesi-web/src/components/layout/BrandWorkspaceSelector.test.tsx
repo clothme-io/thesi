@@ -45,4 +45,10 @@ describe('owner brand selector', () => {
     await screen.findByRole('combobox', { name: 'Active brand' });
     expect(screen.queryByRole('button', { name: 'Add brand' })).not.toBeInTheDocument();
   });
+  it('persists the default brand when no saved selection exists', async () => {
+    request.mockResolvedValueOnce(rows);
+    render(<BrandWorkspaceSelector />);
+    expect(await screen.findByRole('combobox', { name: 'Active brand' })).toHaveValue(rows[0].id);
+    expect(sessionStorage.getItem('thesi_workspace:owner')).toBe(rows[0].id);
+  });
 });

@@ -684,6 +684,10 @@ export class CampaignsService {
       merchantProductId: dto.merchantProductId,
       merchantProducts: dto.merchantProducts,
       name: normalizeString(dto.name, existing?.name, 'Untitled campaign'),
+      description:
+        dto.description !== undefined
+          ? dto.description?.trim() || null
+          : existing?.description ?? null,
       campaignType: dto.campaignType ?? existing?.campaignType ?? 'experience',
       contentTypes: dto.contentTypes ?? existing?.contentTypes ?? ['tiktok'],
       status: dto.status,

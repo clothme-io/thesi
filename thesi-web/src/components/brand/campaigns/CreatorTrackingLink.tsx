@@ -5,10 +5,12 @@ export function CreatorTrackingLink({
   campaignId,
   productId,
   productTitle,
+  install,
 }: {
   campaignId: string;
   productId?: string;
   productTitle?: string;
+  install?: boolean;
 }) {
   const { authenticatedRequest } = useAuth();
   const [url, setUrl] = useState("");
@@ -17,8 +19,9 @@ export function CreatorTrackingLink({
   return (
     <div style={{ marginTop: 16 }}>
       <p className="workspace-hint">
-        Share your personal product link for this commission. Shopper attribution
-        follows the accepted campaign terms.
+        {install
+          ? "Share your personal app install link for this campaign. Install attribution follows the accepted campaign terms."
+          : "Share your personal product link for this commission. Shopper attribution follows the accepted campaign terms."}
       </p>
       {!url ? (
         <button
@@ -54,7 +57,9 @@ export function CreatorTrackingLink({
             <span>
               {productTitle
                 ? `Commission link for ${productTitle}`
-                : "Personal product link"}
+                : install
+                  ? "Personal app install link"
+                  : "Personal product link"}
             </span>
             <input readOnly value={url} onFocus={(e) => e.target.select()} />
           </label>

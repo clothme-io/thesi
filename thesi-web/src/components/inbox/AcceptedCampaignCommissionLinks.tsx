@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthProvider";
 import type { PromotedProduct } from "@/lib/brand-campaigns/types";
 import { campaignProducts } from "@/components/brand/campaigns/CampaignProductSelection";
 import { PromotedProductDetails } from "@/components/brand/campaigns/PromotedProductDetails";
+import { CreatorTrackingLink } from "@/components/brand/campaigns/CreatorTrackingLink";
 
 type Snapshot = {
   campaignId: string;
@@ -11,6 +12,11 @@ type Snapshot = {
     model: string;
     promotedProduct?: PromotedProduct;
     promotedProducts?: PromotedProduct[];
+    hybrid?: {
+      affiliate?: {
+        commissionType?: string;
+      };
+    };
   };
 };
 
@@ -43,6 +49,19 @@ export function AcceptedCampaignCommissionLinks({
   )
     return null;
   const products = campaignProducts(snapshot.paymentSnapshot);
+  const installCampaign =
+    !snapshot.paymentSnapshot.promotedProduct &&
+    !snapshot.paymentSnapshot.promotedProducts &&
+    snapshot.paymentSnapshot.hybrid?.affiliate?.commissionType ===
+      "fixed_amount_per_install";
+  if (!products.length && installCampaign) {
+    return (
+      <div style={{ marginTop: 16 }}>
+        <h3>App install link</h3>
+        <CreatorTrackingLink campaignId={snapshot.campaignId} install />
+      </div>
+    );
+  }
   if (!products.length) return null;
   return (
     <div style={{ marginTop: 16 }}>

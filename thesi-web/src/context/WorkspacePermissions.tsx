@@ -1,7 +1,7 @@
 'use client';
 import {createContext,useContext,useEffect,useState} from 'react';
 import {useAuth} from './AuthProvider';
-import {selectedWorkspace} from '@/lib/brand-workspace-storage';
+import {selectedWorkspace,selectWorkspace} from '@/lib/brand-workspace-storage';
 import {usePathname} from 'next/navigation';
 type Permissions={ready:boolean;canEdit:boolean;canManageFunds:boolean;merchantManaged:boolean};
 const legacy:Permissions={ready:true,canEdit:true,canManageFunds:true,merchantManaged:false};
@@ -25,6 +25,7 @@ export function WorkspacePermissionsProvider({children}:{children:React.ReactNod
   authenticatedRequest<{id:string;role:string;isDefault:boolean}[]>('/api/brand-workspaces').then(rows=>{
    const selected=selectedWorkspace(session!.user.id);
    const row=rows.find(r=>selected?r.id===selected:r.isDefault)||(!selected&&rows.length===1?rows[0]:undefined);
+   if(!selected&&row?.id)selectWorkspace(session!.user.id,row.id);
    if(active)setAccess({ready:true,canEdit:row?.role==='owner'||row?.role==='member',canManageFunds:row?.role==='owner',merchantManaged:session!.refreshToken.startsWith('mh.')});
   }).catch(()=>{if(active)setAccess({ready:true,canEdit:false,canManageFunds:false,merchantManaged:session!.refreshToken.startsWith('mh.')});});
   return()=>{active=false;};
