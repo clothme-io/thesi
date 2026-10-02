@@ -1,9 +1,9 @@
 "use client";
 import { useState } from 'react';
-export function ContinueToClothme({ code, durable=false, stores={}, installLink }: { code:string;durable?:boolean;stores?:{ios?:string;android?:string};installLink?:string }) {
+export function ContinueToClothme({ code, durable=false, stores={}, installLink, originalPath='r' }: { code:string;durable?:boolean;stores?:{ios?:string;android?:string};installLink?:string;originalPath?:'r'|'i' }) {
   const [busy,setBusy] = useState(false); const [deepLink,setDeepLink] = useState('');const [message,setMessage] = useState('');
   const [copied,setCopied]=useState(false);
-  const original=`https://get-thesi.com/r/${code}`;
+  const original=`https://get-thesi.com/${originalPath}/${code}`;
   return <section style={{padding:24,marginTop:20,border:'1px solid #d8d9ce',borderRadius:12,lineHeight:1.65}}>
     <h2 style={{fontSize:22,fontWeight:600,marginBottom:12}}>Continue in ClothME</h2>
     <p>{durable ? "Open ClothME, sign in and tap Continue to product to connect your visit to this creator. You can install or sign in before continuing." : "Opening the app connects this product visit to its creator. Sign in and continue within 15 minutes."} Purchasing requires the ClothME app; this website has no checkout.</p>

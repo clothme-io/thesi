@@ -103,6 +103,9 @@ describe('commission terms', () => {
     ).toThrow(/only/i);
     const fixed = commissionFixture();
     fixed.hybrid!.affiliate!.commissionType = 'fixed_amount_per_sale';
-    expect(() => assertCommissionPayment(fixed)).toThrow(/commission base/i);
+    fixed.hybrid!.affiliate!.commissionPercent = undefined;
+    fixed.hybrid!.affiliate!.fixedAmountCents = 250;
+    expect(() => assertCommissionPayment(fixed)).not.toThrow();
+    expect(commissionInviteTerms(fixed)).toContain('$2.50 per attributed product sale');
   });
 });

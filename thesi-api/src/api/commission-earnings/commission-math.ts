@@ -11,7 +11,8 @@ export type CommissionFacts = {
 export function commissionResult(
   facts: CommissionFacts,
   type: string,
-  percent: number,
+  percent: number | undefined,
+  fixedAmountCents?: number,
 ) {
   const reasons = [...facts.holdReasons];
   if (facts.currency !== 'USD') reasons.push('unsupported_currency');
@@ -44,26 +45,36 @@ export function commissionResult(
   const basis =
     type === 'percentage_of_sale'
       ? facts.netSaleCents - refundedNet
+      : type === 'fixed_amount_per_sale'
+        ? facts.netSaleCents - refundedNet
       : facts.platformFeeCents === null
         ? null
         : facts.platformFeeCents - refundedFee;
   if (basis === null) reasons.push('platform_fee_unavailable');
-  if (
-    !['percentage_of_sale', 'percentage_of_platform_commission'].includes(
-      type,
-    ) ||
-    !Number.isFinite(percent) ||
-    percent <= 0 ||
-    percent > 100 ||
-    Math.abs(percent * 100 - Math.round(percent * 100)) > 0.000001
-  )
-    throw new Error('Invalid accepted commission terms');
+  if (type === 'fixed_amount_per_sale') {
+    if (
+      !Number.isSafeInteger(fixedAmountCents) ||
+      (fixedAmountCents ?? 0) <= 0
+    )
+      throw new Error('Invalid accepted commission terms');
+  } else if (
+      !['percentage_of_sale', 'percentage_of_platform_commission'].includes(
+        type,
+      ) ||
+      !Number.isFinite(percent) ||
+      (percent ?? 0) <= 0 ||
+      (percent ?? 0) > 100 ||
+      Math.abs((percent ?? 0) * 100 - Math.round((percent ?? 0) * 100)) > 0.000001
+    )
+      throw new Error('Invalid accepted commission terms');
   for (const n of [facts.netSaleCents, facts.platformFeeCents ?? 0])
     if (!Number.isSafeInteger(n) || n < 0)
       throw new Error('Invalid monetary facts');
   const accruedCents = reversed
     ? 0
-    : Number((BigInt(basis ?? 0) * BigInt(Math.round(percent * 100))) / 10000n);
+    : type === 'fixed_amount_per_sale'
+      ? fixedAmountCents!
+      : Number((BigInt(basis ?? 0) * BigInt(Math.round((percent ?? 0) * 100))) / 10000n);
   return {
     accruedCents,
     state: reversed ? 'reversed' : reasons.length ? 'held' : 'under_review',

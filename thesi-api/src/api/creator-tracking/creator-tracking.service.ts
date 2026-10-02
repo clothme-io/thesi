@@ -115,6 +115,28 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
         selected =
           products.find((p) => p.productId === productId) ??
           (!productId ? products[0] : undefined);
+      const installCampaign =
+        payment.model === 'commission' &&
+        payment.hybrid?.affiliate?.commissionType ===
+          'fixed_amount_per_install';
+      if (installCampaign && !products.length) {
+        if (productId)
+          throw new ForbiddenException(
+            'App install campaigns do not have product links',
+          );
+        await tx.execute(
+          sql`INSERT INTO thesi.creator_tracking_link(acceptance_snapshot_id,public_code) VALUES (${snapshotId}::uuid,${token()}) ON CONFLICT DO NOTHING`,
+        );
+        const row = await tx.execute(
+          sql`SELECT public_code FROM thesi.creator_tracking_link WHERE acceptance_snapshot_id=${snapshotId}::uuid AND product_id IS NULL`,
+        );
+        return {
+          url: new URL(
+            `/i/${row.rows[0].public_code}`,
+            this.config.getOrThrow<string>('THESI_WEB_URL'),
+          ).toString(),
+        };
+      }
       if (!selected)
         throw new ForbiddenException(
           'Product was not included in your accepted campaign',
@@ -215,6 +237,60 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
       );
       await this.products.preview(c.product.brandId, c.product.productId);
       return this.receipt(c, grant);
+    });
+  }
+  async claimInstall(code: string, buyerKey: string) {
+    this.enabled();
+    return this.db.transaction(async (tx) => {
+      const result =
+        await tx.execute(sql`SELECT l.id AS tracking_link_id,s.id AS snapshot_id,s.creator_user_id,s.campaign_id,c.workspace_id,s.payment_snapshot AS payment
+        FROM thesi.creator_tracking_link l
+        JOIN thesi.campaign_acceptance_snapshot s ON s.id=l.acceptance_snapshot_id
+        JOIN thesi.campaign c ON c.id=s.campaign_id
+        JOIN thesi.brand_workspace w ON w.id=c.workspace_id
+        JOIN public.thesi_users u ON u.id=s.creator_user_id
+        WHERE l.public_code=${code}
+          AND l.revoked_at IS NULL
+          AND to_jsonb(l)->>'product_id' IS NULL
+          AND w.status='active'
+          AND u.role='creator'
+          AND c.status='active'
+          AND c.start_date<=CURRENT_DATE
+          AND c.end_date>=CURRENT_DATE
+          AND s.payment_snapshot->>'model'='commission'
+          AND s.payment_snapshot#>>'{hybrid,affiliate,commissionType}'='fixed_amount_per_install'
+        FOR SHARE OF l,s,c,w,u`);
+      const row = result.rows[0] as
+        | {
+            tracking_link_id: string;
+            snapshot_id: string;
+            creator_user_id: string;
+            campaign_id: string;
+            workspace_id: string;
+            payment: CampaignPaymentDto;
+          }
+        | undefined;
+      if (!row) throw new NotFoundException('This creator install link is unavailable');
+      assertCommissionPayment(row.payment);
+      const affiliate = row.payment.hybrid!.affiliate!;
+      const fixedAmountCents = affiliate.fixedAmountCents ?? 0;
+      await tx.execute(sql`INSERT INTO thesi.commission_install_event(tracking_link_id,acceptance_snapshot_id,buyer_key,creator_user_id,workspace_id,campaign_id,source,currency,accrued_cents,state,reasons)
+        VALUES(${row.tracking_link_id}::uuid,${row.snapshot_id}::uuid,${buyerKey},${row.creator_user_id},${row.workspace_id}::uuid,${row.campaign_id}::uuid,${JSON.stringify({code,buyerKey,commission:affiliate})}::jsonb,${affiliate.currency},${fixedAmountCents},'under_review',${JSON.stringify(['qualified_install_pending_review'])}::jsonb)
+        ON CONFLICT (campaign_id,buyer_key) DO NOTHING`);
+      const stored = (
+        await tx.execute(
+          sql`SELECT event_id,accrued_cents::text AS accrued_cents,state,received_at FROM thesi.commission_install_event WHERE campaign_id=${row.campaign_id}::uuid AND buyer_key=${buyerKey}`,
+        )
+      ).rows[0] as any;
+      return {
+        eventId: stored.event_id,
+        campaignId: row.campaign_id,
+        creatorId: row.creator_user_id,
+        currency: affiliate.currency,
+        accruedCents: Number(stored.accrued_cents),
+        state: stored.state,
+        receivedAt: new Date(stored.received_at).toISOString(),
+      };
     });
   }
   private receipt(

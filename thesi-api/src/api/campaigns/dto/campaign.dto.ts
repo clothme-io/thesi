@@ -90,6 +90,7 @@ export const CAMPAIGN_HYBRID_AFFILIATE_TYPES = [
   'percentage_of_sale',
   'percentage_of_platform_commission',
   'fixed_amount_per_sale',
+  'fixed_amount_per_install',
 ] as const;
 
 export const CAMPAIGN_HYBRID_POOL_DISTRIBUTIONS = [
@@ -596,6 +597,14 @@ export class UpsertCampaignDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsIn(CAMPAIGN_GOAL_TYPES)
   campaignType: (typeof CAMPAIGN_GOAL_TYPES)[number];
+
+  @ApiPropertyOptional({
+    description: 'Short campaign description for list/detail context',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  description?: string | null;
 
   @ApiProperty({
     enum: CAMPAIGN_TYPES,

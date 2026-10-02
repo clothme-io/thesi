@@ -8,6 +8,7 @@ import { CreatorTrackingService } from './creator-tracking.service';
 class CodeDto { @Matches(/^[A-Za-z0-9_-]{43}$/) code!: string; }
 class IssueDto { @IsUUID() campaignId!: string; @IsOptional() @IsUUID() productId?:string; }
 class ClaimDto extends CodeDto { @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string; }
+class InstallClaimDto extends CodeDto { @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string; }
 class ValidateDto { @IsUUID() receiptId!: string; @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string; }
 @Injectable()
 export class AttributionServiceGuard implements CanActivate {
@@ -37,5 +38,6 @@ export class CreatorTrackingController {
 export class CreatorAttributionController {
   constructor(private readonly tracking: CreatorTrackingService) {}
   @Post('claim') async claim(@Body() dto: ClaimDto) { return { data: await this.tracking.claim(dto.code, dto.buyerKey) }; }
+  @Post('install') async install(@Body() dto: InstallClaimDto) { return { data: await this.tracking.claimInstall(dto.code, dto.buyerKey) }; }
   @Post('validate') async validate(@Body() dto: ValidateDto) { return { data: await this.tracking.validate(dto.receiptId, dto.buyerKey) }; }
 }

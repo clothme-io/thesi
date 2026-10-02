@@ -66,6 +66,19 @@ describe('commission amounts', () => {
       commissionResult(facts, 'percentage_of_platform_commission', 50)
         .accruedCents,
     ).toBe(100));
+  it('supports fixed per-sale payouts and reverses them on full refund', () => {
+    expect(
+      commissionResult(facts, 'fixed_amount_per_sale', undefined, 250),
+    ).toMatchObject({ accruedCents: 250, state: 'under_review' });
+    expect(
+      commissionResult(
+        { ...facts, fullyRefunded: true },
+        'fixed_amount_per_sale',
+        undefined,
+        250,
+      ),
+    ).toMatchObject({ accruedCents: 0, state: 'reversed' });
+  });
   it('does not invent a missing fee', () =>
     expect(
       commissionResult(

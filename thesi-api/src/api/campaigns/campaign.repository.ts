@@ -32,6 +32,7 @@ export type CampaignFileRow = {
 export type CampaignRecord = {
   id: string;
   name: string;
+  description?: string | null;
   campaignType: UpsertCampaignDto['campaignType'];
   contentTypes: UpsertCampaignDto['contentTypes'];
   status: UpsertCampaignDto['status'];

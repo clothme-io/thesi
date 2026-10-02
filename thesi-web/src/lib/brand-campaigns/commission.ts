@@ -8,6 +8,12 @@ const formatMoney = (cents: number) =>
 export function commissionSummary(
   payment?: BrandCampaignHybridPayment,
 ): string {
+  if (payment?.affiliate?.commissionType === "fixed_amount_per_install") {
+    return `${payment?.base?.enabled ? `${formatMoney(payment.base.amountCents ?? 0)} base per creator + ` : ""}${formatMoney(payment.affiliate.fixedAmountCents ?? 0)} per qualified app install`;
+  }
+  if (payment?.affiliate?.commissionType === "fixed_amount_per_sale") {
+    return `${payment?.base?.enabled ? `${formatMoney(payment.base.amountCents ?? 0)} base per creator + ` : ""}${formatMoney(payment.affiliate.fixedAmountCents ?? 0)} per attributed product sale`;
+  }
   const basis =
     payment?.affiliate?.commissionType === "percentage_of_platform_commission"
       ? "platform commission from attributed sales"
@@ -25,6 +31,9 @@ export function commissionTerms(payment?: BrandCampaignHybridPayment): string {
     base?.enabled
       ? `Base payment earned when: ${trigger || "not specified"}.`
       : "No fixed base payment is included.",
+    payment?.affiliate?.commissionType === "fixed_amount_per_install"
+      ? "Install payout applies once per qualified new ClothME install/account according to the attribution rules."
+      : undefined,
     `Attribution window: ${payment?.affiliate?.attributionWindowDays ?? "not specified"} days.`,
     payment?.affiliate?.terms,
     ...(payment?.affiliate?.fundingFlowVersion === 1 ? [

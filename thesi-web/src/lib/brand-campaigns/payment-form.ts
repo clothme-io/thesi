@@ -367,11 +367,17 @@ export function paymentFormError(
     }
     if(hybrid.commissionRules){try{assertCommissionRules(hybrid.commissionRules);}catch{return 'Check the review period, payout schedule and minimum.';}}
     const rate = Number(hybrid.affiliatePercent);
-    if (!/^\d+(?:\.\d{1,2})?$/.test(hybrid.affiliatePercent.trim()) || rate <= 0 || rate > 100) {
-      return "Enter a commission rate greater than 0 and no more than 100%, with at most two decimal places.";
+    if (!["percentage_of_sale", "percentage_of_platform_commission", "fixed_amount_per_sale", "fixed_amount_per_install"].includes(hybrid.affiliateType)) {
+      return "Choose product sale, platform commission, or app install as the payout event.";
     }
-    if (!["percentage_of_sale", "percentage_of_platform_commission"].includes(hybrid.affiliateType)) {
-      return "Choose eligible sales or platform commission as the commission base.";
+    if (hybrid.affiliateType === "fixed_amount_per_install" || hybrid.affiliateType === "fixed_amount_per_sale") {
+      if (!/^\$?\d+(?:\.\d{1,2})?$/.test(hybrid.affiliateFixedAmount.trim()) || parseMoneyToCents(hybrid.affiliateFixedAmount) <= 0 || parseMoneyToCents(hybrid.affiliateFixedAmount) > 2_147_483_647) {
+        return hybrid.affiliateType === "fixed_amount_per_install"
+          ? "Enter a positive payout per qualified app install."
+          : "Enter a positive payout per attributed product sale.";
+      }
+    } else if (!/^\d+(?:\.\d{1,2})?$/.test(hybrid.affiliatePercent.trim()) || rate <= 0 || rate > 100) {
+      return "Enter a commission rate greater than 0 and no more than 100%, with at most two decimal places.";
     }
     if (!/^\d+$/.test(hybrid.affiliateAttributionDays.trim()) || Number(hybrid.affiliateAttributionDays) < 1 || Number(hybrid.affiliateAttributionDays) > 365) {
       return "Enter an attribution window between 1 and 365 days.";
@@ -456,7 +462,10 @@ export function buildCampaignPayment(input: {
       model: "commission",
       hybrid: {
         ...(form.baseEnabled ? { base: { ...hybrid.base!, enabled: true, trigger: "content_accepted", customTrigger: undefined } } : {}),
-        affiliate: { ...hybrid.affiliate!, enabled: true, fixedAmountCents: undefined,
+        affiliate: { ...hybrid.affiliate!, enabled: true,
+          ...(form.affiliateType === "fixed_amount_per_sale" || form.affiliateType === "fixed_amount_per_install"
+            ? { commissionPercent: undefined }
+            : { fixedAmountCents: undefined }),
           ...(form.commissionRules?{rules:form.commissionRules}:{}),
           fundingFlowVersion: 1, payoutHandler: 'clothme', fundingSource: 'brand',
           fundingTerms: 'Commission is funded by qualifying sales; an enabled base is prepaid per creator slot.',

@@ -35,6 +35,7 @@ export function CampaignsPageContent() {
       if (!q) return true;
       return (
         campaign.name.toLowerCase().includes(q) ||
+        (campaign.description ?? "").toLowerCase().includes(q) ||
         campaign.brief.toLowerCase().includes(q) ||
         BRAND_CAMPAIGN_GOAL_TYPE_LABELS[campaign.campaignType]
           ?.toLowerCase()

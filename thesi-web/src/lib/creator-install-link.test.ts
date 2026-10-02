@@ -17,4 +17,8 @@ describe('optional deferred install destination',()=>{
     expect(url.searchParams.get('fallback_ios')).toBe('itunes-appstore');
     expect(url.searchParams.get('fallback_desktop')).toBe(`https://get-thesi.com/r/${code}`);
   });
+  it('can use the install landing page as the desktop fallback',()=>{
+    const url=new URL(creatorInstallLink(code,env,'i')!);
+    expect(url.searchParams.get('fallback_desktop')).toBe(`https://get-thesi.com/i/${code}`);
+  });
 });

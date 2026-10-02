@@ -44,7 +44,8 @@ export type BrandCampaignHybridMilestoneAmountType =
 export type BrandCampaignHybridAffiliateType =
   | "percentage_of_sale"
   | "percentage_of_platform_commission"
-  | "fixed_amount_per_sale";
+  | "fixed_amount_per_sale"
+  | "fixed_amount_per_install";
 export type BrandCampaignHybridPoolDistribution =
   | "impact_score"
   | "proportional_performance"
@@ -160,6 +161,7 @@ export type PromotedProduct = {
 export interface BrandCampaign {
   id: string;
   name: string;
+  description?: string | null;
   campaignType: BrandCampaignGoalType;
   contentTypes: BrandCampaignType[];
   status: BrandCampaignStatus;

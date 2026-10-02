@@ -891,6 +891,12 @@ export function CampaignDetailContent() {
                       : marketplaceLabel}
                 </span>
               </div>
+              {(displayedCampaign ?? campaign).description ? (
+                <>
+                  <h3 style={{ marginTop: 24 }}>Description</h3>
+                  <p>{(displayedCampaign ?? campaign).description}</p>
+                </>
+              ) : null}
               <h3 style={{ marginTop: 24 }}>Brief</h3>
               <p>{(displayedCampaign ?? campaign).brief}</p>
               <h3 style={{ marginTop: 24 }}>Deliverables</h3>

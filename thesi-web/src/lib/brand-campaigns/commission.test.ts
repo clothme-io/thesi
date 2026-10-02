@@ -118,7 +118,13 @@ describe("Commission with optional base", () => {
         ...form(),
         affiliateType: "fixed_amount_per_sale",
       }),
-    ).toMatch(/commission base/i);
+    ).toMatch(/attributed product sale/i);
+    expect(
+      paymentFormError("commission", [], {
+        ...form(),
+        affiliateType: "fixed_amount_per_install",
+      }),
+    ).toMatch(/app install/i);
     expect(
       paymentFormError("commission", [], {
         ...form(),

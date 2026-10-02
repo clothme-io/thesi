@@ -48,6 +48,9 @@ type Link = {
   merchant_brand_id: string;
   workspace_id: string;
 };
+const isInstallCommission = (input: UpsertCampaignDto) =>
+  input.payment.model === 'commission' &&
+  input.payment.hybrid?.affiliate?.commissionType === 'fixed_amount_per_install';
 @Injectable()
 export class CampaignProductsService {
   constructor(
@@ -345,6 +348,13 @@ export class CampaignProductsService {
         );
       return;
     }
+    if (isInstallCommission(input)) {
+      if (requested)
+        throw new BadRequestException(
+          'App install campaigns do not use a Merchant product',
+        );
+      return;
+    }
     if (!this.enabled()) {
       if (requested !== previous?.productId && requested)
         throw new BadRequestException('Product selection is paused');
@@ -428,6 +438,13 @@ export class CampaignProductsService {
       if (requested.length)
         throw new BadRequestException(
           'Promoted products require Commission payment',
+        );
+      return;
+    }
+    if (isInstallCommission(input)) {
+      if (requested.length)
+        throw new BadRequestException(
+          'App install campaigns do not use Merchant products',
         );
       return;
     }

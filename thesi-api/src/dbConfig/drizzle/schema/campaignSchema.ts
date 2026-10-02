@@ -89,7 +89,8 @@ export type CampaignPaymentJson = {
       commissionType:
         | 'percentage_of_sale'
         | 'percentage_of_platform_commission'
-        | 'fixed_amount_per_sale';
+        | 'fixed_amount_per_sale'
+        | 'fixed_amount_per_install';
       commissionPercent?: number;
       fixedAmountCents?: number;
       currency: 'USD';
@@ -155,6 +156,7 @@ export const campaign = thesiSchema.table('campaign', {
     .notNull()
     .references(() => thesiUser.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
+  description: text('description'),
   campaignType: text('campaign_type').notNull().default('experience'),
   contentTypes: jsonb('content_types').$type<string[]>().notNull().default([]),
   status: text('status').notNull(),
@@ -227,6 +229,7 @@ export const campaign = thesiSchema.table('campaign', {
 
 export type CampaignRevisionTermsJson = {
   name: string;
+  description?: string | null;
   campaignType: string;
   contentTypes: string[];
   startDate: string;
