@@ -452,6 +452,31 @@ describe('CampaignsService', () => {
     });
   });
 
+  it('saves and lists a name-only draft with server defaults', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+
+    const campaign = await service.create('brand-1', {
+      name: 'Name only draft',
+      status: 'draft',
+    } as UpsertCampaignDto);
+
+    expect(campaign).toEqual(
+      expect.objectContaining({
+        name: 'Name only draft',
+        status: 'draft',
+        campaignType: 'experience',
+        contentTypes: ['tiktok'],
+        brief: '',
+        deliverables: '',
+        payment: { model: 'flat_rate' },
+        postToMarketplace: false,
+      }),
+    );
+    await expect(service.list('brand-1')).resolves.toEqual({
+      campaigns: [expect.objectContaining({ id: campaign.id, name: 'Name only draft' })],
+    });
+  });
+
   it('lists campaigns for a brand', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     await service.create('brand-1', sampleCampaign({ name: 'Summer UGC' }));
