@@ -171,7 +171,9 @@ export class CampaignsService {
     const input = this.normalizeCampaignInput(dto);
     await this.funding?.beforeSave(input);
     await this.products?.prepare(userId, input);
-    assertCommissionPayment(input.payment);
+    if (isPublishedCampaignStatus(input.status)) {
+      assertCommissionPayment(input.payment);
+    }
     this.assertDateRange(input);
     const needsFee = this.requiresPlatformFee(input);
     const createDto = needsFee
@@ -210,7 +212,9 @@ export class CampaignsService {
     if (input.payment.hybrid?.affiliate?.fundingFlowVersion === 1 && existing.payment.hybrid?.affiliate?.fundingFlowVersion !== 1 && (existing.status !== 'draft' || await this.campaigns.countAcceptedCreators(campaignId) > 0)) throw new BadRequestException('Existing published or accepted terms cannot switch funding flow. Create a new campaign.');
     const funded = await this.funding?.beforeSave(input,campaignId);
     await this.products?.prepare(userId, input, existing, !!funded);
-    assertCommissionPayment(input.payment);
+    if (isPublishedCampaignStatus(input.status)) {
+      assertCommissionPayment(input.payment);
+    }
     this.assertDateRange(input);
     const acceptedCreatorCount = await this.campaigns.countAcceptedCreators(
       campaignId,
