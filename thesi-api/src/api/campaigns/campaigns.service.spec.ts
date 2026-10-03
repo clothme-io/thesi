@@ -419,13 +419,37 @@ describe('CampaignsService', () => {
     await expect(service.payCreator('brand-1', campaign.id, { creatorUserId: 'creator-9' })).rejects.toThrow(/settlements are not available/);
     expect(stripe.chargeOffSession).not.toHaveBeenCalled();
     expect(stripe.createTransfer).not.toHaveBeenCalled();
-    await expect(service.update('brand-1', campaign.id, sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/payout event/i);
+    await expect(service.update('brand-1', campaign.id, sampleCampaign({ status: 'active', payment: { model: 'commission' } }))).rejects.toThrow(/payout event/i);
   });
 
   it('rejects incomplete commission terms before persisting a campaign', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    await expect(service.create('brand-1', sampleCampaign({ payment: { model: 'commission' } }))).rejects.toThrow(/payout event/i);
+    await expect(service.create('brand-1', sampleCampaign({ status: 'active', payment: { model: 'commission' } }))).rejects.toThrow(/payout event/i);
     expect(repository.rows).toHaveLength(0);
+  });
+
+  it('persists incomplete commission drafts and returns them in the brand campaign list', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        name: 'Draft commission campaign',
+        status: 'draft',
+        payment: { model: 'commission' },
+      }),
+    );
+
+    expect(campaign).toEqual(
+      expect.objectContaining({
+        name: 'Draft commission campaign',
+        status: 'draft',
+        payment: { model: 'commission' },
+      }),
+    );
+    await expect(service.list('brand-1')).resolves.toEqual({
+      campaigns: [expect.objectContaining({ id: campaign.id })],
+    });
   });
 
   it('lists campaigns for a brand', async () => {
