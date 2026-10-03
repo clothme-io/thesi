@@ -28,6 +28,24 @@ function campaignRequest(input: CampaignInput) {
 }
 
 const EMPTY_DATA: BrandCampaignData = { campaigns: [] };
+const CAMPAIGNS_CHANGED_EVENT = "thesi:campaigns-changed";
+const CAMPAIGNS_STALE_KEY = "thesi_campaigns_changed_at";
+
+function markCampaignsChanged() {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(CAMPAIGNS_STALE_KEY, String(Date.now()));
+  window.dispatchEvent(new Event(CAMPAIGNS_CHANGED_EVENT));
+}
+
+function clearCampaignsChanged() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(CAMPAIGNS_STALE_KEY);
+}
+
+function campaignsChanged() {
+  if (typeof window === "undefined") return false;
+  return Boolean(sessionStorage.getItem(CAMPAIGNS_STALE_KEY));
+}
 
 export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
   const [data, setData] = useState<BrandCampaignData>(EMPTY_DATA);
@@ -38,6 +56,7 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
     setError("");
     const next = await authenticatedRequest<BrandCampaignData>("/api/campaigns");
     setData(next);
+    clearCampaignsChanged();
     return next;
   }, [authenticatedRequest]);
 
@@ -47,7 +66,10 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
     setError("");
     authenticatedRequest<BrandCampaignData>("/api/campaigns")
       .then((next) => {
-        if (active) setData(next);
+        if (active) {
+          setData(next);
+          clearCampaignsChanged();
+        }
       })
       .catch((requestError) => {
         if (active) {
@@ -67,6 +89,39 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
     };
   }, [authenticatedRequest]);
 
+  useEffect(() => {
+    let active = true;
+    let reloading = false;
+
+    const reloadIfNeeded = () => {
+      if (!active || reloading || !campaignsChanged()) return;
+      reloading = true;
+      reload().finally(() => {
+        reloading = false;
+      });
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") reloadIfNeeded();
+    };
+
+    window.addEventListener(CAMPAIGNS_CHANGED_EVENT, reloadIfNeeded);
+    window.addEventListener("focus", reloadIfNeeded);
+    window.addEventListener("pageshow", reloadIfNeeded);
+    window.addEventListener("popstate", reloadIfNeeded);
+    document.addEventListener("visibilitychange", handleVisibility);
+    reloadIfNeeded();
+
+    return () => {
+      active = false;
+      window.removeEventListener(CAMPAIGNS_CHANGED_EVENT, reloadIfNeeded);
+      window.removeEventListener("focus", reloadIfNeeded);
+      window.removeEventListener("pageshow", reloadIfNeeded);
+      window.removeEventListener("popstate", reloadIfNeeded);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [reload]);
+
   const createCampaign = useCallback(
     async (input: CampaignInput) => {
       setError("");
@@ -77,6 +132,7 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
       setData((prev) => ({
         campaigns: [campaign, ...prev.campaigns.filter((c) => c.id !== campaign.id)],
       }));
+      markCampaignsChanged();
       return campaign;
     },
     [authenticatedRequest],
@@ -92,6 +148,7 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
       setData((prev) => ({
         campaigns: prev.campaigns.map((c) => (c.id === id ? campaign : c)),
       }));
+      markCampaignsChanged();
       return campaign;
     },
     [authenticatedRequest],
@@ -119,6 +176,7 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
             : campaign,
         ),
       }));
+      markCampaignsChanged();
       return meta;
     },
     [authenticatedRequest],
@@ -141,6 +199,7 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
             : campaign,
         ),
       }));
+      markCampaignsChanged();
     },
     [authenticatedRequest],
   );
