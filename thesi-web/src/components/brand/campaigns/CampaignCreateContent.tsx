@@ -396,6 +396,10 @@ export function CampaignCreateContent() {
     }
   };
 
+  const handleSaveDraftClick = () => {
+    void handleSaveDraft();
+  };
+
   const handlePublish = async () => {
     setSaving(true);
     setError("");
@@ -448,6 +452,10 @@ export function CampaignCreateContent() {
     }
   };
 
+  const handlePublishClick = () => {
+    void handlePublish();
+  };
+
   const handleInvite = async () => {
     setSaving(true);
     setError("");
@@ -472,6 +480,10 @@ export function CampaignCreateContent() {
     }
   };
 
+  const handleInviteClick = () => {
+    void handleInvite();
+  };
+
   return (
     <>
       <header className="app-topbar">
@@ -487,7 +499,7 @@ export function CampaignCreateContent() {
           <button
             className="crm-btn-secondary"
             type="button"
-            onClick={handleSaveDraft}
+            onClick={handleSaveDraftClick}
             disabled={saving}
           >
             {saving ? "Saving…" : "Save draft"}
@@ -495,7 +507,7 @@ export function CampaignCreateContent() {
           <button
             className="crm-btn-primary"
             type="button"
-            onClick={handlePublish}
+            onClick={handlePublishClick}
             disabled={saving}
           >
             {saving ? "Working…" : "Publish"}
@@ -1136,7 +1148,7 @@ export function CampaignCreateContent() {
             <button
               className="crm-btn-secondary"
               type="button"
-              onClick={handleInvite}
+              onClick={handleInviteClick}
               disabled={saving}
             >
               Invite creators
@@ -1144,7 +1156,7 @@ export function CampaignCreateContent() {
             <button
               className="crm-btn-secondary"
               type="button"
-              onClick={handleSaveDraft}
+              onClick={handleSaveDraftClick}
               disabled={saving}
             >
               {saving ? "Saving…" : "Save draft"}
@@ -1152,7 +1164,7 @@ export function CampaignCreateContent() {
             <button
               className="crm-btn-primary"
               type="button"
-              onClick={handlePublish}
+              onClick={handlePublishClick}
               disabled={saving}
             >
               {saving ? "Working…" : "Publish"}

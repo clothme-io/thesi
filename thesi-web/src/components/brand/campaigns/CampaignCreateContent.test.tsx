@@ -1,0 +1,123 @@
+import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { BrandCampaign, CampaignInput } from "@/lib/brand-campaigns/types";
+
+const createCampaign = vi.fn();
+const updateCampaign = vi.fn();
+const uploadCampaignFile = vi.fn();
+const deleteCampaignFile = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+vi.mock("next/link", () => ({
+  default: ({
+    children,
+    href,
+  }: {
+    children: React.ReactNode;
+    href: string;
+  }) => <a href={href}>{children}</a>,
+}));
+
+vi.mock("@/context/AuthProvider", () => ({
+  useAuth: () => ({
+    session: {
+      user: { id: "brand-user-1", fullName: "ClothME", role: "brand" },
+    },
+    authenticatedRequest: vi.fn(),
+  }),
+}));
+
+vi.mock("@/lib/brand-campaigns/storage", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/brand-campaigns/storage")
+  >("@/lib/brand-campaigns/storage");
+  return {
+    ...actual,
+    useBrandCampaigns: () => ({
+      data: { campaigns: [] },
+      ready: true,
+      error: "",
+      createCampaign,
+      updateCampaign,
+      uploadCampaignFile,
+      deleteCampaignFile,
+    }),
+  };
+});
+
+vi.mock("./InviteCreatorDrawer", () => ({
+  InviteCreatorDrawer: () => null,
+}));
+
+function campaignFromInput(input: CampaignInput): BrandCampaign {
+  return {
+    id: "campaign-new-1",
+    name: input.name,
+    description: input.description ?? null,
+    campaignType: input.campaignType,
+    contentTypes: input.contentTypes,
+    status: input.status,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    brief: input.brief,
+    deliverables: input.deliverables,
+    exampleVideoLinks: input.exampleVideoLinks,
+    requirements: input.requirements,
+    files: [],
+    requiredTasks: input.requiredTasks,
+    creatorBenefits: {
+      ...EMPTY_CREATOR_BENEFITS,
+      ...input.creatorBenefits,
+    },
+    contentRights: input.contentRights,
+    productsProvided: input.productsProvided,
+    creatorCapacity: input.creatorCapacity,
+    creatorDisclosureEnabled: input.creatorDisclosureEnabled,
+    postToMarketplace: input.postToMarketplace,
+    payment: input.payment,
+    createdAt: "2026-10-03T00:00:00.000Z",
+    updatedAt: "2026-10-03T00:00:00.000Z",
+  };
+}
+
+describe("CampaignCreateContent draft save", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  beforeEach(() => {
+    createCampaign.mockReset();
+    updateCampaign.mockReset();
+    uploadCampaignFile.mockReset();
+    deleteCampaignFile.mockReset();
+    createCampaign.mockImplementation(async (input: CampaignInput) =>
+      campaignFromInput(input),
+    );
+  });
+
+  it("saves a draft with only a campaign name", async () => {
+    const { CampaignCreateContent } = await import("./CampaignCreateContent");
+    const user = userEvent.setup();
+    render(<CampaignCreateContent />);
+
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "A");
+    await user.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
+
+    await waitFor(() => {
+      expect(createCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "A",
+          status: "draft",
+        }),
+      );
+    });
+    expect(await screen.findByText("Draft saved — A")).toBeInTheDocument();
+  });
+});
