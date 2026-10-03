@@ -1,5 +1,5 @@
 import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrandCampaign, CampaignInput } from "@/lib/brand-campaigns/types";
@@ -129,5 +129,28 @@ describe("CampaignCreateContent draft save", () => {
     });
     expect(createCampaign).not.toHaveBeenCalled();
     expect(await screen.findByText("Draft saved — A")).toBeInTheDocument();
+  });
+
+  it("defaults start date to today and keeps end date one month after start date", async () => {
+    const { CampaignCreateContent } = await import("./CampaignCreateContent");
+    render(<CampaignCreateContent />);
+
+    const startDate = screen.getByLabelText("Start date");
+    const endDate = screen.getByLabelText("End date");
+    const today = new Date();
+    const todayValue = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    expect(startDate).toHaveValue(todayValue);
+    expect(startDate).toHaveAttribute("min", todayValue);
+    expect(endDate).toHaveAttribute("readonly");
+
+    fireEvent.change(startDate, { target: { value: "2026-12-10" } });
+
+    expect(startDate).toHaveValue("2026-12-10");
+    expect(endDate).toHaveValue("2027-01-10");
   });
 });
