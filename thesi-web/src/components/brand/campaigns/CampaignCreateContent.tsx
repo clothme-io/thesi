@@ -264,6 +264,15 @@ export function CampaignCreateContent() {
     setCreatorDisclosureEnabled(source.creatorDisclosureEnabled ?? false);
   }, [ready, duplicateFromId, data]);
 
+  useEffect(() => {
+    if (
+      paymentModel !== "commission" &&
+      error === "Multi-product selection is paused"
+    ) {
+      setError("");
+    }
+  }, [error, paymentModel]);
+
   if (!ready) return null;
 
   const brandName = session?.user.fullName ?? "Your Brand";
@@ -499,7 +508,7 @@ export function CampaignCreateContent() {
             {error || loadError}
           </p>
         )}
-        {saveMessage && !error && (
+        {saveMessage && (
           <p className="workspace-hint" role="status">
             {saveMessage}
           </p>
