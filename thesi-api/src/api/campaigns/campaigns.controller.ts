@@ -154,6 +154,16 @@ export class CampaignsController {
     return { status: HttpStatus.CREATED, error: null, data };
   }
 
+  @Post('drafts')
+  @ApiOperation({ summary: 'Save a brand campaign draft without publish checks' })
+  async saveDraft(
+    @CurrentUser() user: AuthJwtPayload,
+    @Body() dto: UpsertCampaignDto,
+  ) {
+    const data = await this.campaigns.saveDraft(workspaceResourceOwner(user.sub), dto);
+    return { status: HttpStatus.CREATED, error: null, data };
+  }
+
   @Put(':id')
   @ApiOperation({ summary: 'Replace a brand campaign' })
   async update(
@@ -162,6 +172,17 @@ export class CampaignsController {
     @Body() dto: UpsertCampaignDto,
   ) {
     const data = await this.campaigns.update(workspaceResourceOwner(user.sub), id, dto);
+    return { status: HttpStatus.OK, error: null, data };
+  }
+
+  @Put(':id/draft')
+  @ApiOperation({ summary: 'Save changes to a brand campaign draft without publish checks' })
+  async updateDraft(
+    @CurrentUser() user: AuthJwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpsertCampaignDto,
+  ) {
+    const data = await this.campaigns.updateDraft(workspaceResourceOwner(user.sub), id, dto);
     return { status: HttpStatus.OK, error: null, data };
   }
 

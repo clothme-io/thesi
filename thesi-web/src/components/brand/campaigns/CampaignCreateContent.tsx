@@ -160,7 +160,7 @@ export function CampaignCreateContent() {
   const searchParams = useSearchParams();
   const duplicateFromId = searchParams.get("from");
   const { session, authenticatedRequest } = useAuth();
-  const { data, ready, createCampaign, updateCampaign, uploadCampaignFile, deleteCampaignFile, error: loadError } =
+  const { data, ready, createCampaign, createDraftCampaign, updateCampaign, updateDraftCampaign, uploadCampaignFile, deleteCampaignFile, error: loadError } =
     useBrandCampaigns(authenticatedRequest);
   const dates = defaultDates();
   const hydratedRef = useRef(false);
@@ -361,8 +361,8 @@ export function CampaignCreateContent() {
   }> => {
     const payload = buildCampaignPayload("draft");
     const campaign = draftRef.current
-      ? await updateCampaign(draftRef.current.id, payload)
-      : await createCampaign(payload);
+      ? await updateDraftCampaign(draftRef.current.id, payload)
+      : await createDraftCampaign(payload);
     const context = { id: campaign.id, name: campaign.name };
     draftRef.current = context;
     setInviteContext(context);
@@ -431,12 +431,18 @@ export function CampaignCreateContent() {
       setSaving(false);
       return;
     }
-    const payload = buildCampaignPayload(
-      requiresBaseFundingBeforePublish ? "draft" : "active",
-    );
+    const payload = buildCampaignPayload("active");
     const userId = session?.user.id ?? "dev-user-1";
 
     try {
+      if (requiresBaseFundingBeforePublish) {
+        const context = await saveDraft();
+        setSaveMessage(
+          "Draft saved. Fund the base deposit from the campaign page before publishing.",
+        );
+        router.push(`/app/campaigns/${context.id}`);
+        return;
+      }
       const existingId = draftRef.current?.id ?? inviteContext?.id;
       const campaign = existingId
         ? await updateCampaign(existingId, payload)
@@ -445,13 +451,6 @@ export function CampaignCreateContent() {
       draftRef.current = context;
       setInviteContext(context);
       const uploaded = await flushPendingUploads(campaign.id);
-      if (requiresBaseFundingBeforePublish) {
-        setSaveMessage(
-          "Draft saved. Fund the base deposit from the campaign page before publishing.",
-        );
-        router.push(`/app/campaigns/${campaign.id}`);
-        return;
-      }
       await publishCampaignToMarketplace(
         {
           ...campaign,

@@ -411,10 +411,10 @@ describe('CampaignsService', () => {
         affiliate: { enabled: true, commissionType: 'percentage_of_platform_commission', commissionPercent: 10.25, currency: 'USD', attributionWindowDays: 30, terms: 'Net platform revenue excluding refunds. Paid monthly.' },
       },
     };
-    const campaign = await service.create('brand-1', sampleCampaign({ payment }));
+    const campaign = await service.saveDraft('brand-1', sampleCampaign({ payment }));
     expect((await service.get('brand-1', campaign.id)).payment).toEqual(payment);
     expect(buildListingPayload(campaign, 'Brand').payment).toMatchObject({ structure: 'commission', hybrid: payment.hybrid, hybridFlatCents: 20000 });
-    const updated = await service.update('brand-1', campaign.id, sampleCampaign({ payment: { ...payment, notes: 'Updated note' } }));
+    const updated = await service.updateDraft('brand-1', campaign.id, sampleCampaign({ payment: { ...payment, notes: 'Updated note' } }));
     expect(updated.payment.hybrid).toEqual(payment.hybrid);
     await expect(service.payCreator('brand-1', campaign.id, { creatorUserId: 'creator-9' })).rejects.toThrow(/settlements are not available/);
     expect(stripe.chargeOffSession).not.toHaveBeenCalled();
@@ -431,7 +431,7 @@ describe('CampaignsService', () => {
   it('persists incomplete commission drafts and returns them in the brand campaign list', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         name: 'Draft commission campaign',
@@ -452,12 +452,11 @@ describe('CampaignsService', () => {
     });
   });
 
-  it('saves and lists a name-only draft with server defaults', async () => {
+  it('saves and lists a name-only draft through the draft-only path', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
-    const campaign = await service.create('brand-1', {
+    const campaign = await service.saveDraft('brand-1', {
       name: 'A',
-      status: 'draft',
     } as UpsertCampaignDto);
 
     expect(campaign).toEqual(
@@ -472,6 +471,7 @@ describe('CampaignsService', () => {
         postToMarketplace: false,
       }),
     );
+    expect(marketplaceSync.syncFromCampaign).not.toHaveBeenCalled();
     await expect(service.list('brand-1')).resolves.toEqual({
       campaigns: [
         expect.objectContaining({ id: campaign.id, name: 'A' }),
@@ -479,9 +479,40 @@ describe('CampaignsService', () => {
     });
   });
 
+  it('rejects draft saves through the publish create path', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+
+    await expect(
+      service.create('brand-1', {
+        name: 'A',
+        status: 'draft',
+      } as UpsertCampaignDto),
+    ).rejects.toThrow('Draft campaigns must be saved through the draft endpoint');
+  });
+
+  it('updates an existing draft through the draft-only path', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const campaign = await service.saveDraft('brand-1', {
+      name: 'A',
+    } as UpsertCampaignDto);
+
+    const updated = await service.updateDraft('brand-1', campaign.id, {
+      name: 'B',
+    } as UpsertCampaignDto);
+
+    expect(updated).toEqual(
+      expect.objectContaining({
+        id: campaign.id,
+        name: 'B',
+        status: 'draft',
+      }),
+    );
+    expect(marketplaceSync.syncFromCampaign).not.toHaveBeenCalled();
+  });
+
   it('lists campaigns for a brand', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    await service.create('brand-1', sampleCampaign({ name: 'Summer UGC' }));
+    await service.saveDraft('brand-1', sampleCampaign({ name: 'Summer UGC' }));
 
     await expect(service.list('brand-1')).resolves.toEqual({
       campaigns: [
@@ -496,7 +527,7 @@ describe('CampaignsService', () => {
   it('saves draft campaigns even when incomplete date values would fail publish validation', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         name: 'Date draft',
@@ -540,7 +571,7 @@ describe('CampaignsService', () => {
   it('normalizes sparse draft campaign input before saving', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
-    const campaign = await service.create('brand-1', {
+    const campaign = await service.saveDraft('brand-1', {
       status: 'draft',
       payment: { model: 'milestone', milestones: [] },
     } as UpsertCampaignDto);
@@ -567,7 +598,7 @@ describe('CampaignsService', () => {
 
   it('keeps existing values when updating a draft with partial input', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         name: 'Original draft',
@@ -575,7 +606,7 @@ describe('CampaignsService', () => {
       }),
     );
 
-    const updated = await service.update('brand-1', campaign.id, {
+    const updated = await service.updateDraft('brand-1', campaign.id, {
       status: 'draft',
       payment: { model: 'milestone', milestones: [] },
     } as UpsertCampaignDto);
@@ -591,7 +622,7 @@ describe('CampaignsService', () => {
 
   it('records a published version on first publish and again when terms change after accept', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const draft = await service.create('brand-1', sampleCampaign());
+    const draft = await service.saveDraft('brand-1', sampleCampaign());
     expect(repository.revisions).toHaveLength(0);
 
     const published = await service.update(
@@ -720,7 +751,7 @@ describe('CampaignsService', () => {
 
   it('allows creator capacity changes after acceptance when capacity covers accepted creators', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         status: 'active',
@@ -755,7 +786,7 @@ describe('CampaignsService', () => {
 
   it('rejects reducing creator capacity below accepted creators', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         status: 'active',
@@ -806,7 +837,7 @@ describe('CampaignsService', () => {
 
   it('uploads a campaign file and keeps metadata on the campaign', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create('brand-1', sampleCampaign());
+    const campaign = await service.saveDraft('brand-1', sampleCampaign());
 
     const meta = await service.uploadFile('brand-1', campaign.id, {
       buffer: Buffer.from('hello'),
@@ -851,7 +882,7 @@ describe('CampaignsService', () => {
 
   it('rejects oversized uploads', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create('brand-1', sampleCampaign());
+    const campaign = await service.saveDraft('brand-1', sampleCampaign());
 
     await expect(
       service.uploadFile('brand-1', campaign.id, {
@@ -884,7 +915,7 @@ describe('CampaignsService', () => {
     repository.user = { id: 'brand-1', role: 'brand' };
     billing.resolveChargeContext.mockResolvedValue(null);
 
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         status: 'draft',
@@ -902,7 +933,7 @@ describe('CampaignsService', () => {
   it('preserves creator disclosure visibility on campaign save', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({ creatorDisclosureEnabled: true }),
     );
@@ -928,7 +959,7 @@ describe('CampaignsService', () => {
 
   it('charges the brand and transfers to a ready creator', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         payment: { model: 'flat_rate', flatRateCents: 80_000 },
@@ -963,7 +994,7 @@ describe('CampaignsService', () => {
 
   it('blocks payouts until the brand approves submitted creator content', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create(
+    const campaign = await service.saveDraft(
       'brand-1',
       sampleCampaign({
         payment: { model: 'flat_rate', flatRateCents: 80_000 },
@@ -990,7 +1021,7 @@ describe('CampaignsService', () => {
 
   it('blocks payouts until the creator accepts the campaign invite', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
-    const campaign = await service.create('brand-1', sampleCampaign());
+    const campaign = await service.saveDraft('brand-1', sampleCampaign());
     invites.listCampaignInvites.mockResolvedValue([
       {
         id: 'invite-1',
@@ -1015,7 +1046,7 @@ describe('CampaignsService', () => {
       accountId: null,
       reason: 'Creator must finish Stripe payout setup',
     });
-    const campaign = await service.create('brand-1', sampleCampaign());
+    const campaign = await service.saveDraft('brand-1', sampleCampaign());
     invites.listCampaignInvites.mockResolvedValue([
       {
         id: 'invite-1',

@@ -167,6 +167,7 @@ export class CampaignsService {
     dto: UpsertCampaignDto,
   ): Promise<CampaignRecord> {
     await this.requireBrand(userId);
+    this.assertPublishPathStatus(dto);
     this.assertPublishReady(dto);
     const input = this.normalizeCampaignInput(dto);
     await this.funding?.beforeSave(input);
@@ -199,6 +200,19 @@ export class CampaignsService {
     return campaign;
   }
 
+  async saveDraft(
+    userId: string,
+    dto: UpsertCampaignDto,
+  ): Promise<CampaignRecord> {
+    await this.requireBrand(userId);
+    const input = this.normalizeCampaignInput({
+      ...dto,
+      status: 'draft',
+      postToMarketplace: dto.postToMarketplace ?? false,
+    });
+    return this.campaigns.create(userId, input);
+  }
+
   async update(
     userId: string,
     campaignId: string,
@@ -209,6 +223,7 @@ export class CampaignsService {
     if (!existing) {
       throw new NotFoundException('Campaign not found');
     }
+    this.assertPublishPathStatus(dto);
     this.assertPublishReady(dto, existing);
     const input = this.normalizeCampaignInput(dto, existing);
     if (input.payment.hybrid?.affiliate?.fundingFlowVersion === 1 && existing.payment.hybrid?.affiliate?.fundingFlowVersion !== 1 && (existing.status !== 'draft' || await this.campaigns.countAcceptedCreators(campaignId) > 0)) throw new BadRequestException('Existing published or accepted terms cannot switch funding flow. Create a new campaign.');
@@ -243,6 +258,36 @@ export class CampaignsService {
       previousPublished: isPublishedCampaignStatus(existing.status),
     });
     await this.marketplaceSync?.syncFromCampaign(userId, campaign);
+    return campaign;
+  }
+
+  async updateDraft(
+    userId: string,
+    campaignId: string,
+    dto: UpsertCampaignDto,
+  ): Promise<CampaignRecord> {
+    await this.requireBrand(userId);
+    const existing = await this.campaigns.getByIdForOwner(userId, campaignId);
+    if (!existing) {
+      throw new NotFoundException('Campaign not found');
+    }
+    if (existing.status !== 'draft') {
+      throw new BadRequestException(
+        'Published campaigns must use the publish update flow.',
+      );
+    }
+    const input = this.normalizeCampaignInput(
+      {
+        ...dto,
+        status: 'draft',
+        postToMarketplace: dto.postToMarketplace ?? existing.postToMarketplace,
+      },
+      existing,
+    );
+    const campaign = await this.campaigns.update(userId, campaignId, input);
+    if (!campaign) {
+      throw new NotFoundException('Campaign not found');
+    }
     return campaign;
   }
 
@@ -605,6 +650,14 @@ export class CampaignsService {
     if (missing.length > 0) {
       throw new BadRequestException(
         `Active campaigns require: ${missing.join(', ')}`,
+      );
+    }
+  }
+
+  private assertPublishPathStatus(dto: UpsertCampaignDto): void {
+    if (dto.status === 'draft') {
+      throw new BadRequestException(
+        'Draft campaigns must be saved through the draft endpoint.',
       );
     }
   }

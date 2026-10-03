@@ -138,12 +138,44 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
     [authenticatedRequest],
   );
 
+  const createDraftCampaign = useCallback(
+    async (input: CampaignInput) => {
+      setError("");
+      const campaign = await authenticatedRequest<BrandCampaign>("/api/campaigns/drafts", {
+        method: "POST",
+        body: campaignRequest({ ...input, status: "draft" }),
+      });
+      setData((prev) => ({
+        campaigns: [campaign, ...prev.campaigns.filter((c) => c.id !== campaign.id)],
+      }));
+      markCampaignsChanged();
+      return campaign;
+    },
+    [authenticatedRequest],
+  );
+
   const updateCampaign = useCallback(
     async (id: string, input: CampaignInput) => {
       setError("");
       const campaign = await authenticatedRequest<BrandCampaign>(`/api/campaigns/${id}`, {
         method: "PUT",
         body: campaignRequest(input),
+      });
+      setData((prev) => ({
+        campaigns: prev.campaigns.map((c) => (c.id === id ? campaign : c)),
+      }));
+      markCampaignsChanged();
+      return campaign;
+    },
+    [authenticatedRequest],
+  );
+
+  const updateDraftCampaign = useCallback(
+    async (id: string, input: CampaignInput) => {
+      setError("");
+      const campaign = await authenticatedRequest<BrandCampaign>(`/api/campaigns/${id}/draft`, {
+        method: "PUT",
+        body: campaignRequest({ ...input, status: "draft" }),
       });
       setData((prev) => ({
         campaigns: prev.campaigns.map((c) => (c.id === id ? campaign : c)),
@@ -210,7 +242,9 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
     error,
     reload,
     createCampaign,
+    createDraftCampaign,
     updateCampaign,
+    updateDraftCampaign,
     uploadCampaignFile,
     deleteCampaignFile,
   };

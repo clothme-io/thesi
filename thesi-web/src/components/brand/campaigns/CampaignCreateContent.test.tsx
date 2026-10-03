@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrandCampaign, CampaignInput } from "@/lib/brand-campaigns/types";
 
 const createCampaign = vi.fn();
+const createDraftCampaign = vi.fn();
 const updateCampaign = vi.fn();
+const updateDraftCampaign = vi.fn();
 const uploadCampaignFile = vi.fn();
 const deleteCampaignFile = vi.fn();
 
@@ -44,7 +46,9 @@ vi.mock("@/lib/brand-campaigns/storage", async () => {
       ready: true,
       error: "",
       createCampaign,
+      createDraftCampaign,
       updateCampaign,
+      updateDraftCampaign,
       uploadCampaignFile,
       deleteCampaignFile,
     }),
@@ -93,10 +97,15 @@ describe("CampaignCreateContent draft save", () => {
 
   beforeEach(() => {
     createCampaign.mockReset();
+    createDraftCampaign.mockReset();
     updateCampaign.mockReset();
+    updateDraftCampaign.mockReset();
     uploadCampaignFile.mockReset();
     deleteCampaignFile.mockReset();
     createCampaign.mockImplementation(async (input: CampaignInput) =>
+      campaignFromInput(input),
+    );
+    createDraftCampaign.mockImplementation(async (input: CampaignInput) =>
       campaignFromInput(input),
     );
   });
@@ -111,13 +120,14 @@ describe("CampaignCreateContent draft save", () => {
     await user.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
 
     await waitFor(() => {
-      expect(createCampaign).toHaveBeenCalledWith(
+      expect(createDraftCampaign).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "A",
           status: "draft",
         }),
       );
     });
+    expect(createCampaign).not.toHaveBeenCalled();
     expect(await screen.findByText("Draft saved — A")).toBeInTheDocument();
   });
 });
