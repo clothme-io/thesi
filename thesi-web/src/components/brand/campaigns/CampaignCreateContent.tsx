@@ -4,7 +4,7 @@ import {CampaignProductSelection,campaignProducts,productSelections,productInput
 import Link from "next/link";
 import {DEFAULT_COMMISSION_RULES} from "@/lib/brand-campaigns/commission-rules";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { getCampaignById, useBrandCampaigns } from "@/lib/brand-campaigns/storage";
 import {
@@ -400,6 +400,11 @@ export function CampaignCreateContent() {
     void handleSaveDraft();
   };
 
+  const handleSaveDraftSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    handleSaveDraftClick();
+  };
+
   const handlePublish = async () => {
     setSaving(true);
     setError("");
@@ -498,8 +503,8 @@ export function CampaignCreateContent() {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
             className="crm-btn-secondary"
-            type="button"
-            onClick={handleSaveDraftClick}
+            type="submit"
+            form="campaign-create-form"
             disabled={saving}
           >
             {saving ? "Saving…" : "Save draft"}
@@ -525,7 +530,11 @@ export function CampaignCreateContent() {
             {saveMessage}
           </p>
         )}
-        <div className="workspace-form">
+        <form
+          id="campaign-create-form"
+          className="workspace-form"
+          onSubmit={handleSaveDraftSubmit}
+        >
           {paymentModel === "commission" && <CampaignProductSelection initial={initialProducts} value={merchantProducts} onChange={setMerchantProducts} />}
           <section className="workspace-section">
             <h3>Campaign basics</h3>
@@ -1155,8 +1164,7 @@ export function CampaignCreateContent() {
             </button>
             <button
               className="crm-btn-secondary"
-              type="button"
-              onClick={handleSaveDraftClick}
+              type="submit"
               disabled={saving}
             >
               {saving ? "Saving…" : "Save draft"}
@@ -1170,7 +1178,7 @@ export function CampaignCreateContent() {
               {saving ? "Working…" : "Publish"}
             </button>
           </div>
-        </div>
+        </form>
       </div>
 
       {inviteContext && (
