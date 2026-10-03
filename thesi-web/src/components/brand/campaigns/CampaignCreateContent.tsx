@@ -211,6 +211,7 @@ export function CampaignCreateContent() {
   >([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const draftRef = useRef<{ id: string; name: string } | null>(null);
+  const saveDraftTriggerRef = useRef(0);
 
   useEffect(() => {
     if (!ready || !duplicateFromId || hydratedRef.current) return;
@@ -405,6 +406,21 @@ export function CampaignCreateContent() {
     handleSaveDraftClick();
   };
 
+  const triggerSaveDraft = (
+    event: {
+      preventDefault: () => void;
+      stopPropagation: () => void;
+    },
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (saving) return;
+    const now = Date.now();
+    if (now - saveDraftTriggerRef.current < 600) return;
+    saveDraftTriggerRef.current = now;
+    handleSaveDraftClick();
+  };
+
   const handlePublish = async () => {
     setSaving(true);
     setError("");
@@ -503,8 +519,9 @@ export function CampaignCreateContent() {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
             className="crm-btn-secondary"
-            type="submit"
-            form="campaign-create-form"
+            type="button"
+            onMouseDown={triggerSaveDraft}
+            onClickCapture={triggerSaveDraft}
             disabled={saving}
           >
             {saving ? "Saving…" : "Save draft"}
@@ -1164,7 +1181,9 @@ export function CampaignCreateContent() {
             </button>
             <button
               className="crm-btn-secondary"
-              type="submit"
+              type="button"
+              onMouseDown={triggerSaveDraft}
+              onClickCapture={triggerSaveDraft}
               disabled={saving}
             >
               {saving ? "Saving…" : "Save draft"}
