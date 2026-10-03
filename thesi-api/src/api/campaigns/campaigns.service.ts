@@ -174,7 +174,9 @@ export class CampaignsService {
     if (isPublishedCampaignStatus(input.status)) {
       assertCommissionPayment(input.payment);
     }
-    this.assertDateRange(input);
+    if (isPublishedCampaignStatus(input.status)) {
+      this.assertDateRange(input);
+    }
     const needsFee = this.requiresPlatformFee(input);
     const createDto = needsFee
       ? { ...input, status: 'draft' as const, postToMarketplace: false }
@@ -215,7 +217,9 @@ export class CampaignsService {
     if (isPublishedCampaignStatus(input.status)) {
       assertCommissionPayment(input.payment);
     }
-    this.assertDateRange(input);
+    if (isPublishedCampaignStatus(input.status)) {
+      this.assertDateRange(input);
+    }
     const acceptedCreatorCount = await this.campaigns.countAcceptedCreators(
       campaignId,
     );

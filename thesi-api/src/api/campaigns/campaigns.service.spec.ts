@@ -456,13 +456,13 @@ describe('CampaignsService', () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
     const campaign = await service.create('brand-1', {
-      name: 'Name only draft',
+      name: 'A',
       status: 'draft',
     } as UpsertCampaignDto);
 
     expect(campaign).toEqual(
       expect.objectContaining({
-        name: 'Name only draft',
+        name: 'A',
         status: 'draft',
         campaignType: 'experience',
         contentTypes: ['tiktok'],
@@ -473,7 +473,9 @@ describe('CampaignsService', () => {
       }),
     );
     await expect(service.list('brand-1')).resolves.toEqual({
-      campaigns: [expect.objectContaining({ id: campaign.id, name: 'Name only draft' })],
+      campaigns: [
+        expect.objectContaining({ id: campaign.id, name: 'A' }),
+      ],
     });
   });
 
@@ -491,13 +493,46 @@ describe('CampaignsService', () => {
     });
   });
 
-  it('rejects invalid date ranges', async () => {
+  it('saves draft campaigns even when incomplete date values would fail publish validation', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({
+        name: 'Date draft',
+        status: 'draft',
+        startDate: '2026-08-01',
+        endDate: '2026-07-01',
+      }),
+    );
+
+    expect(campaign).toEqual(
+      expect.objectContaining({
+        name: 'Date draft',
+        status: 'draft',
+        startDate: '2026-08-01',
+        endDate: '2026-07-01',
+      }),
+    );
+    await expect(service.list('brand-1')).resolves.toEqual({
+      campaigns: [
+        expect.objectContaining({ id: campaign.id, name: 'Date draft' }),
+      ],
+    });
+  });
+
+  it('rejects invalid date ranges when publishing', async () => {
     repository.user = { id: 'brand-1', role: 'brand' };
 
     await expect(
       service.create(
         'brand-1',
-        sampleCampaign({ startDate: '2026-08-01', endDate: '2026-07-01' }),
+        sampleCampaign({
+          status: 'active',
+          postToMarketplace: true,
+          startDate: '2026-08-01',
+          endDate: '2026-07-01',
+        }),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
