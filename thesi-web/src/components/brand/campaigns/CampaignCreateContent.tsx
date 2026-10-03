@@ -145,13 +145,35 @@ function centsFromPaymentInput(value: string): number | undefined {
     : undefined;
 }
 
+function toLocalDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function todayDateInputValue(): string {
+  return toLocalDateInputValue(new Date());
+}
+
+function oneMonthFromDateInputValue(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  const date = new Date(year, month - 1, day);
+  date.setMonth(date.getMonth() + 1);
+  return toLocalDateInputValue(date);
+}
+
+function clampStartDate(value: string): string {
+  const today = todayDateInputValue();
+  return value && value >= today ? value : today;
+}
+
 const defaultDates = () => {
-  const start = new Date();
-  const end = new Date();
-  end.setMonth(end.getMonth() + 1);
+  const start = todayDateInputValue();
   return {
-    start: start.toISOString().slice(0, 10),
-    end: end.toISOString().slice(0, 10),
+    start,
+    end: oneMonthFromDateInputValue(start),
   };
 };
 
@@ -226,8 +248,9 @@ export function CampaignCreateContent() {
     setDescription(source.description ?? "");
     setCampaignType(source.campaignType);
     setContentTypes(source.contentTypes);
-    setStartDate(source.startDate.slice(0, 10));
-    setEndDate(source.endDate.slice(0, 10));
+    const nextStartDate = clampStartDate(source.startDate.slice(0, 10));
+    setStartDate(nextStartDate);
+    setEndDate(oneMonthFromDateInputValue(nextStartDate));
     setBrief(source.brief);
     setDeliverables(source.deliverables);
     setExampleVideoLinks(
@@ -298,7 +321,7 @@ export function CampaignCreateContent() {
     contentTypes,
     status,
     startDate,
-    endDate,
+    endDate: oneMonthFromDateInputValue(startDate),
     brief,
     deliverables,
     exampleVideoLinks: exampleVideoLinks.map((link) => link.trim()).filter(Boolean),
@@ -617,8 +640,13 @@ export function CampaignCreateContent() {
                   name="campaignStartDate"
                   data-testid="campaign-start-date-input"
                   type="date"
+                  min={todayDateInputValue()}
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => {
+                    const nextStartDate = clampStartDate(e.target.value);
+                    setStartDate(nextStartDate);
+                    setEndDate(oneMonthFromDateInputValue(nextStartDate));
+                  }}
                 />
               </label>
               <label className="workspace-field">
@@ -628,8 +656,9 @@ export function CampaignCreateContent() {
                   name="campaignEndDate"
                   data-testid="campaign-end-date-input"
                   type="date"
+                  readOnly
+                  aria-readonly="true"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
                 />
               </label>
               <label className="workspace-field workspace-field--full">

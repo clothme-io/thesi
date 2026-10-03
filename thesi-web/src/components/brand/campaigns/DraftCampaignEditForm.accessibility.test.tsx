@@ -61,13 +61,18 @@ describe("DraftCampaignEditForm field handles", () => {
     );
 
     const startDate = screen.getByLabelText("Start date");
+    const endDate = screen.getByLabelText("End date");
     expect(startDate).toHaveAttribute("name", "campaignStartDate");
     expect(startDate).toHaveAttribute("data-testid", "campaign-start-date-input");
+    expect(endDate).toHaveAttribute("readonly");
 
-    fireEvent.change(startDate, { target: { value: "2026-09-10" } });
+    fireEvent.change(startDate, { target: { value: "2026-12-10" } });
 
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ startDate: "2026-09-10" }),
+      expect.objectContaining({
+        startDate: "2026-12-10",
+        endDate: "2027-01-10",
+      }),
     );
   });
 });

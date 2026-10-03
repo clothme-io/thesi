@@ -1,5 +1,5 @@
 import { EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
@@ -232,10 +232,9 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     expect(screen.getByTestId("campaign-flat-amount-input")).toBeInTheDocument();
     expect(screen.getByTestId("campaign-deliverables-textarea")).toBeInTheDocument();
 
-    await user.clear(screen.getByTestId("campaign-start-date-input"));
-    await user.type(screen.getByTestId("campaign-start-date-input"), "2026-07-15");
-    await user.clear(screen.getByTestId("campaign-end-date-input"));
-    await user.type(screen.getByTestId("campaign-end-date-input"), "2026-09-01");
+    fireEvent.change(screen.getByTestId("campaign-start-date-input"), {
+      target: { value: "2026-12-15" },
+    });
     await user.clear(screen.getByTestId("campaign-deliverables-textarea"));
     await user.type(
       screen.getByTestId("campaign-deliverables-textarea"),
@@ -252,8 +251,8 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         "campaign-1",
         expect.objectContaining({
           creatorCapacity: 7,
-          startDate: "2026-07-15",
-          endDate: "2026-09-01",
+          startDate: "2026-12-15",
+          endDate: "2027-01-15",
           deliverables: "2 videos and usage rights",
           exampleVideoLinks: ["https://example.com/original"],
           payment: expect.objectContaining({

@@ -136,6 +136,30 @@ function centsFromPaymentInput(value: string): number | undefined {
     : undefined;
 }
 
+function toLocalDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function todayDateInputValue(): string {
+  return toLocalDateInputValue(new Date());
+}
+
+function oneMonthFromDateInputValue(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  const date = new Date(year, month - 1, day);
+  date.setMonth(date.getMonth() + 1);
+  return toLocalDateInputValue(date);
+}
+
+function clampStartDate(value: string): string {
+  const today = todayDateInputValue();
+  return value && value >= today ? value : today;
+}
+
 export type DraftCampaignFormState = {
   merchantProducts?: ProductSelection[];multiProductAgreement?:boolean;
   name: string;
@@ -213,7 +237,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
     contentTypes: form.contentTypes,
     status: "draft",
     startDate: form.startDate,
-    endDate: form.endDate,
+    endDate: oneMonthFromDateInputValue(form.startDate),
     brief: form.brief,
     deliverables: form.deliverables,
     exampleVideoLinks: form.exampleVideoLinks
@@ -290,6 +314,14 @@ export function DraftCampaignEditForm({
     key: K,
     value: DraftCampaignFormState[K],
   ) => onChange({ ...form, [key]: value });
+  const setStartDateFromInput = (value: string) => {
+    const nextStartDate = clampStartDate(value);
+    onChange({
+      ...form,
+      startDate: nextStartDate,
+      endDate: oneMonthFromDateInputValue(nextStartDate),
+    });
+  };
 
   return (
     <div className="workspace-form">
@@ -355,8 +387,9 @@ export function DraftCampaignEditForm({
               name="campaignStartDate"
               data-testid="campaign-start-date-input"
               type="date"
+              min={todayDateInputValue()}
               value={form.startDate}
-              onChange={(e) => set("startDate", e.target.value)}
+              onChange={(e) => setStartDateFromInput(e.target.value)}
             />
           </label>
           <label className="workspace-field">
@@ -366,8 +399,9 @@ export function DraftCampaignEditForm({
               name="campaignEndDate"
               data-testid="campaign-end-date-input"
               type="date"
+              readOnly
+              aria-readonly="true"
               value={form.endDate}
-              onChange={(e) => set("endDate", e.target.value)}
             />
           </label>
           <label className="workspace-field workspace-field--full">
