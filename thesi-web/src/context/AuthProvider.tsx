@@ -160,13 +160,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("You must sign in to continue");
       }
 
-      const workspaceId = workspaceForRequest(path, session.user);
+      const method = options.method ?? "GET";
+      const workspaceId = workspaceForRequest(path, session.user, method);
       try {
         return await callAuthApi<T>(
           path,
           options.body,
           session.accessToken,
-          options.method ?? "GET",
+          method,
           workspaceId,
         );
       } catch (error) {
@@ -189,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           path,
           options.body,
           refreshed.accessToken,
-          options.method ?? "GET",
+          method,
           workspaceId,
         );
       } catch (error) {

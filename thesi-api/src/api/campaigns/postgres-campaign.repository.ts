@@ -1,8 +1,8 @@
 import { promotedProducts } from './promoted-products';
 import { isDeepStrictEqual } from 'node:util';
-import { workspaceWrite, workspaceFilter } from '../brand-workspaces/workspace-context';
+import { workspaceContext, workspaceWrite, workspaceFilter } from '../brand-workspaces/workspace-context';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, max, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, max, or, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
@@ -44,7 +44,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
     const rows = await this.db
       .select()
       .from(schema.campaign)
-      .where(and(workspaceFilter(schema.campaign), eq(schema.campaign.ownerUserId, ownerUserId)))
+      .where(and(this.campaignWorkspaceFilter(), eq(schema.campaign.ownerUserId, ownerUserId)))
       .orderBy(desc(schema.campaign.updatedAt));
     return Promise.all(rows.map((row) => this.mapCampaignWithFiles(row)));
   }
@@ -58,8 +58,8 @@ export class PostgresCampaignRepository implements CampaignRepository {
       .from(schema.campaign)
       .where(
         and(
-          and(workspaceFilter(schema.campaign), eq(schema.campaign.id, campaignId)),
-          and(workspaceFilter(schema.campaign), eq(schema.campaign.ownerUserId, ownerUserId)),
+          and(this.campaignWorkspaceFilter(), eq(schema.campaign.id, campaignId)),
+          and(this.campaignWorkspaceFilter(), eq(schema.campaign.ownerUserId, ownerUserId)),
         ),
       )
       .limit(1);
@@ -148,11 +148,15 @@ export class PostgresCampaignRepository implements CampaignRepository {
     ownerUserId: string,
     input: UpsertCampaignDto,
   ): Promise<CampaignRecord> {
+    const workspace = workspaceWrite();
+    if (!workspace.workspaceId) {
+      throw new BadRequestException('Choose a brand before saving campaigns.');
+    }
     const [row] = await this.saveWithProductLink(ownerUserId, input, undefined, tx => tx
       .insert(schema.campaign)
       .values({
         ownerUserId,
-        ...workspaceWrite(),
+        ...workspace,
         name: input.name,
         description: input.description?.trim() || null,
         campaignType: input.campaignType,
@@ -186,6 +190,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
     const [row] = await this.saveWithProductLink(ownerUserId, input, campaignId, tx => tx
       .update(schema.campaign)
       .set({
+        ...workspaceWrite(),
         name: input.name,
         description: input.description?.trim() || null,
         campaignType: input.campaignType,
@@ -210,8 +215,8 @@ export class PostgresCampaignRepository implements CampaignRepository {
       })
       .where(
         and(
-          and(workspaceFilter(schema.campaign), eq(schema.campaign.id, campaignId)),
-          and(workspaceFilter(schema.campaign), eq(schema.campaign.ownerUserId, ownerUserId)),
+          and(this.campaignWorkspaceFilter(), eq(schema.campaign.id, campaignId)),
+          and(this.campaignWorkspaceFilter(), eq(schema.campaign.ownerUserId, ownerUserId)),
         ),
       )
       .returning());
@@ -223,7 +228,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
     return this.db.transaction(async tx => {
       let draft = true;
       if (campaignId) {
-        const [current] = await tx.select().from(schema.campaign).where(and(eq(schema.campaign.id, campaignId), eq(schema.campaign.ownerUserId, ownerUserId), workspaceFilter(schema.campaign))).for('update');
+        const [current] = await tx.select().from(schema.campaign).where(and(eq(schema.campaign.id, campaignId), eq(schema.campaign.ownerUserId, ownerUserId), this.campaignWorkspaceFilter())).for('update');
         if (!current) return [];
         draft = current.status === 'draft';
         if (!draft && !isDeepStrictEqual(promotedProducts(current.payment), promotedProducts(input.payment))) {
@@ -243,6 +248,15 @@ export class PostgresCampaignRepository implements CampaignRepository {
       }
       return write(tx);
     });
+  }
+
+  private campaignWorkspaceFilter(): SQL {
+    const context = workspaceContext.getStore();
+    if (!context) return sql`true`;
+    const selected = eq(schema.campaign.workspaceId, context.workspaceId);
+    return context.isDefault === false
+      ? selected
+      : or(selected, isNull(schema.campaign.workspaceId))!;
   }
 
   async createFile(input: CreateCampaignFileInput): Promise<CampaignFileRow> {

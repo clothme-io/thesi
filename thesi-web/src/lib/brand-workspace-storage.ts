@@ -13,10 +13,18 @@ export function selectWorkspace(userId: string, workspaceId: string) {
   if (!uuid.test(workspaceId)) throw new Error('Invalid brand workspace');
   sessionStorage.setItem(key(userId), workspaceId);
 }
-export function workspaceForRequest(path: string, user: { id: string; role: string }): string | undefined {
+export function workspaceForRequest(
+  path: string,
+  user: { id: string; role: string },
+  method: string = 'GET',
+): string | undefined {
   if (user.role !== 'brand') return undefined;
   if (!/^\/api\/(commission-settlement|campaign-funding|commission-earnings|campaigns|marketplace|profile|inbox|creators|billing|invites\/campaign)(\/|\?|$)/.test(path)) return undefined;
-  return selectedWorkspace(user.id);
+  const selected = selectedWorkspace(user.id);
+  if (!selected && !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
+    throw new Error('Choose a brand before saving changes.');
+  }
+  return selected;
 }
 export function brandStorageKey(base: string): string {
   const session = getStoredSession();

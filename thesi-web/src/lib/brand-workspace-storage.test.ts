@@ -24,6 +24,11 @@ describe('brand selection boundaries', () => {
     selectWorkspace(user.id, second);
     expect(workspaceForRequest(path, user)).toBe(second);
   });
+  it('blocks workspace-scoped writes without a selected brand instead of creating invisible records', () => {
+    expect(workspaceForRequest('/api/campaigns', user)).toBeUndefined();
+    expect(() => workspaceForRequest('/api/campaigns', user, 'POST')).toThrow('Choose a brand');
+    expect(() => workspaceForRequest('/api/campaigns/id', user, 'PUT')).toThrow('Choose a brand');
+  });
   it.each(['/api/brand-workspaces', '/api/auth/refresh', '/api/settings', '/api/creator-crm/brands', '/api/profile-images/brands/workspace/id', '/api/invites/platform-brand'])('keeps account/creator/public route %s outside selection', path => {
     selectWorkspace(user.id, second);
     expect(workspaceForRequest(path, user)).toBeUndefined();
