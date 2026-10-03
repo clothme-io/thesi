@@ -111,6 +111,7 @@ export function CampaignDetailContent() {
     ready,
     error,
     updateCampaign,
+    updateDraftCampaign,
     uploadCampaignFile,
     deleteCampaignFile,
     reload,
@@ -349,7 +350,7 @@ export function CampaignDetailContent() {
     setSaveMessage("");
     try {
       const payload = draftFormToInput(form);
-      await updateCampaign(campaign.id, payload);
+      await updateDraftCampaign(campaign.id, payload);
       let fileUploadFailed = false;
       for (const file of pendingFiles) {
         try {

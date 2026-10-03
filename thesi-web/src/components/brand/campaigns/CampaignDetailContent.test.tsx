@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrandCampaign } from "@/lib/brand-campaigns/types";
 
 const updateCampaign = vi.fn();
+const updateDraftCampaign = vi.fn();
 const authenticatedRequest = vi.fn().mockResolvedValue({ payouts: [] });
 
 let activeCampaign: BrandCampaign;
@@ -76,6 +77,7 @@ vi.mock("@/lib/brand-campaigns/storage", async () => {
       ready: true,
       error: "",
       updateCampaign,
+      updateDraftCampaign,
       reload: vi.fn(),
       createCampaign: vi.fn(),
       uploadCampaignFile: vi.fn().mockResolvedValue({
@@ -120,6 +122,8 @@ describe("CampaignDetailContent lifecycle buttons", () => {
   beforeEach(() => {
     updateCampaign.mockReset();
     updateCampaign.mockResolvedValue(undefined);
+    updateDraftCampaign.mockReset();
+    updateDraftCampaign.mockResolvedValue(undefined);
     authenticatedRequest.mockReset();
     authenticatedRequest.mockImplementation(async (url: string) => {
       if (String(url).includes("/revisions")) return { revisions: [] };
@@ -436,7 +440,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     await user.click(screen.getByRole("button", { name: "Save draft" }));
 
     await waitFor(() => {
-      expect(updateCampaign).toHaveBeenCalledWith(
+      expect(updateDraftCampaign).toHaveBeenCalledWith(
         "campaign-1",
         expect.objectContaining({
           status: "draft",
@@ -445,6 +449,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         }),
       );
     });
+    expect(updateCampaign).not.toHaveBeenCalled();
     expect(await screen.findByText("Draft saved")).toBeInTheDocument();
   });
 
@@ -470,7 +475,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
     await user.click(screen.getByRole("button", { name: "Save draft" }));
 
     await waitFor(() => {
-      expect(updateCampaign).toHaveBeenCalledWith(
+      expect(updateDraftCampaign).toHaveBeenCalledWith(
         "campaign-1",
         expect.objectContaining({
           status: "draft",
@@ -560,6 +565,7 @@ describe("CampaignDetailContent lifecycle buttons", () => {
         }),
       );
     });
+    expect(updateCampaign).not.toHaveBeenCalled();
   });
 
   it("holds pay creator until accepted content is approved", async () => {
