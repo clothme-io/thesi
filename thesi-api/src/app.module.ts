@@ -21,6 +21,7 @@ import { BillingModule } from './api/billing/billing.module';
 import { ConnectModule } from './api/connect/connect.module';
 import { SocialModule } from './api/social/social.module';
 import { StripeWebhooksModule } from './api/stripe-webhooks/stripe-webhooks.module';
+import { SupportModule } from './api/support/support.module';
 import {
   HealthController,
   ReadinessController,
@@ -59,6 +60,7 @@ import { AnalyticsModule } from './shared/analytics/analytics.module';
     ConnectModule,
     SocialModule,
     StripeWebhooksModule,
+    SupportModule,
   ],
   controllers: [HealthController, ReadinessController],
 })

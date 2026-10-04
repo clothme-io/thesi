@@ -16,4 +16,5 @@ export * from './profileSchema';
 export * from './refreshTokenSchema';
 export * from './settingsSchema';
 export * from './stripeWebhookEventSchema';
+export * from './supportSchema';
 export * from './userSchema';

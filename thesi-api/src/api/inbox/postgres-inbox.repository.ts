@@ -194,7 +194,13 @@ export class PostgresInboxRepository implements InboxRepository {
           eq(schema.inboxMessageState.userId, userId),
         ),
       )
-      .where(and(eq(schema.inboxMessageState.deleted, false), workspaceThreadFilter(sql`${schema.inboxMessage.threadId}`)))
+      .where(
+        and(
+          eq(schema.inboxMessageState.deleted, false),
+          sql`${schema.inboxMessage.kind} <> 'support'`,
+          workspaceThreadFilter(sql`${schema.inboxMessage.threadId}`),
+        ),
+      )
       .orderBy(asc(schema.inboxMessage.createdAt));
 
     return rows.map((row) => ({
