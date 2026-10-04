@@ -8,10 +8,12 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { CreatorCrmService } from 'src/api/creator-crm/creator-crm.service';
 import { InboxService } from 'src/api/inbox/inbox.service';
 import { NovuService } from 'src/shared/novu/novu.service';
+import { AnalyticsService } from 'src/shared/analytics/analytics.service';
 import {
   INVITES_REPOSITORY,
   type CampaignInviteRecord,
@@ -30,6 +32,7 @@ export class InvitesService {
     private readonly inbox: InboxService,
     private readonly novu: NovuService,
     private readonly creatorCrm: CreatorCrmService,
+    @Optional() private readonly analytics?: AnalyticsService,
   ) {}
 
   async listCampaignInvites(
@@ -158,6 +161,14 @@ export class InvitesService {
         );
     }
 
+    this.analytics?.track(`campaign_invite_${input.decision}`, userId, {
+      invite_id: updated.id,
+      campaign_id: updated.campaignId,
+      brand_user_id: updated.brandUserId,
+      creator_user_id: updated.creatorId ?? userId,
+      external: updated.external,
+    });
+
     return updated;
   }
 
@@ -261,6 +272,13 @@ export class InvitesService {
         }`,
       );
     }
+
+    this.analytics?.track('campaign_invite_sent', userId, {
+      invite_id: invite.id,
+      campaign_id: invite.campaignId,
+      creator_user_id: invite.creatorId,
+      external: invite.external,
+    });
 
     return invite;
   }

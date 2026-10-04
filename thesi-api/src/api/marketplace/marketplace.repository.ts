@@ -128,7 +128,7 @@ export interface MarketplaceCampaignSync {
   syncFromCampaign(
     ownerUserId: string,
     campaign: CampaignRecord,
-  ): Promise<void>;
+  ): Promise<MarketplaceListingRecord | null>;
   notifyPendingApplicantsOfPublishedChange(
     ownerUserId: string,
     campaign: CampaignRecord,

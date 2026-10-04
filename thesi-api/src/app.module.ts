@@ -29,6 +29,7 @@ import { validateEnv } from './platform/config/env.validation';
 import { EmailModule } from './shared/email/email.module';
 import { NovuModule } from './shared/novu/novu.module';
 import { StripeModule } from './shared/stripe/stripe.module';
+import { AnalyticsModule } from './shared/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { StripeModule } from './shared/stripe/stripe.module';
     EmailModule,
     NovuModule,
     StripeModule,
+    AnalyticsModule,
     AuthModule,
     BrandWorkspacesModule,
     CampaignFundingModule,

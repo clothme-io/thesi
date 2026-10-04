@@ -44,16 +44,16 @@ export class MarketplaceService implements MarketplaceCampaignSync {
   async syncFromCampaign(
     ownerUserId: string,
     campaign: CampaignRecord,
-  ): Promise<void> {
+  ): Promise<MarketplaceListingRecord | null> {
     // True unpublish (or never posted): remove listing.
     if (!campaign.postToMarketplace) {
       await this.marketplace.deleteListingByCampaignId(campaign.id);
-      return;
+      return null;
     }
     // Draft campaigns are not marketplace-visible yet.
     if (campaign.status === 'draft') {
       await this.marketplace.deleteListingByCampaignId(campaign.id);
-      return;
+      return null;
     }
     // Active / paused / completed: upsert so applicants are preserved when
     // paused or completed (listing status resolves to closed).
@@ -63,7 +63,7 @@ export class MarketplaceService implements MarketplaceCampaignSync {
     const wasBrowsable = Boolean(existing && existing.status !== 'closed');
     const brandName =
       (await this.marketplace.getBrandDisplayName(ownerUserId)) || 'Your Brand';
-    await this.marketplace.upsertListingFromCampaign({
+    const listing = await this.marketplace.upsertListingFromCampaign({
       ownerUserId,
       brandName,
       campaign,
@@ -81,6 +81,7 @@ export class MarketplaceService implements MarketplaceCampaignSync {
         audience: 'brand',
       });
     }
+    return listing;
   }
 
   async notifyPendingApplicantsOfPublishedChange(

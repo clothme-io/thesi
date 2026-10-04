@@ -15,5 +15,6 @@ import { PostgresCreatorsDirectoryRepository } from './postgres-creators-directo
       useClass: PostgresCreatorsDirectoryRepository,
     },
   ],
+  exports: [CREATORS_DIRECTORY_REPOSITORY],
 })
 export class CreatorsModule {}

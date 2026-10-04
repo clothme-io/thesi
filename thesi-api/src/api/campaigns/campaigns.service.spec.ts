@@ -342,6 +342,7 @@ describe('CampaignsService', () => {
     notifyPendingApplicantsOfPublishedChange: jest.Mock;
   };
   let inbox: { notifySelf: jest.Mock };
+  let publicationNotifier: { notifyCreatorsOfPublishedCampaign: jest.Mock };
 
   beforeEach(() => {
     repository = new FakeCampaignRepository();
@@ -388,6 +389,9 @@ describe('CampaignsService', () => {
         .mockResolvedValue(undefined),
     };
     inbox = { notifySelf: jest.fn().mockResolvedValue(undefined) };
+    publicationNotifier = {
+      notifyCreatorsOfPublishedCampaign: jest.fn().mockResolvedValue(undefined),
+    };
     service = new CampaignsService(
       repository,
       storage,
@@ -399,6 +403,8 @@ describe('CampaignsService', () => {
       undefined,
       undefined,
       inbox as never,
+      undefined,
+      publicationNotifier as never,
     );
   });
 
@@ -472,6 +478,9 @@ describe('CampaignsService', () => {
       }),
     );
     expect(marketplaceSync.syncFromCampaign).not.toHaveBeenCalled();
+    expect(
+      publicationNotifier.notifyCreatorsOfPublishedCampaign,
+    ).not.toHaveBeenCalled();
     await expect(service.list('brand-1')).resolves.toEqual({
       campaigns: [
         expect.objectContaining({ id: campaign.id, name: 'A' }),
@@ -508,6 +517,9 @@ describe('CampaignsService', () => {
       }),
     );
     expect(marketplaceSync.syncFromCampaign).not.toHaveBeenCalled();
+    expect(
+      publicationNotifier.notifyCreatorsOfPublishedCampaign,
+    ).not.toHaveBeenCalled();
   });
 
   it('lists campaigns for a brand', async () => {
@@ -566,6 +578,54 @@ describe('CampaignsService', () => {
         }),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('emails matched creators when a marketplace campaign is created as active', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const listing = { id: 'listing-1', brandName: 'Acme' };
+    marketplaceSync.syncFromCampaign.mockResolvedValueOnce(listing);
+
+    const campaign = await service.create(
+      'brand-1',
+      sampleCampaign({ status: 'active', postToMarketplace: true }),
+    );
+
+    expect(marketplaceSync.syncFromCampaign).toHaveBeenCalledWith(
+      'brand-1',
+      campaign,
+    );
+    expect(
+      publicationNotifier.notifyCreatorsOfPublishedCampaign,
+    ).toHaveBeenCalledWith(campaign, listing);
+  });
+
+  it('emails matched creators once when a draft is first published', async () => {
+    repository.user = { id: 'brand-1', role: 'brand' };
+    const listing = { id: 'listing-1', brandName: 'Acme' };
+    const draft = await service.saveDraft('brand-1', sampleCampaign());
+    marketplaceSync.syncFromCampaign.mockResolvedValue(listing);
+
+    const published = await service.update(
+      'brand-1',
+      draft.id,
+      sampleCampaign({ status: 'active', postToMarketplace: true }),
+    );
+    await service.update(
+      'brand-1',
+      published.id,
+      sampleCampaign({
+        status: 'active',
+        postToMarketplace: true,
+        brief: 'Updated active brief',
+      }),
+    );
+
+    expect(
+      publicationNotifier.notifyCreatorsOfPublishedCampaign,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      publicationNotifier.notifyCreatorsOfPublishedCampaign,
+    ).toHaveBeenCalledWith(published, listing);
   });
 
   it('normalizes sparse draft campaign input before saving', async () => {
