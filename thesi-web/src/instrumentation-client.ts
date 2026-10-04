@@ -1,3 +1,3 @@
-import { initPostHog } from "@/lib/posthog";
+import { initAnalytics } from "@/lib/analytics";
 
-initPostHog();
+initAnalytics();

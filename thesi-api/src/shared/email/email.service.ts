@@ -10,6 +10,19 @@ export interface SendEmailOptions {
   text?: string;
 }
 
+export interface CampaignPublishedEmailInput {
+  to: string;
+  creatorName: string;
+  campaignName: string;
+  brandName: string;
+  description?: string | null;
+  contentTypes: string[];
+  startDate: string;
+  endDate: string;
+  paymentSummary: string;
+  listingUrl: string;
+}
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -143,4 +156,61 @@ export class EmailService {
       text: `Hi ${fullName || 'there'}, reset your Thesi password: ${resetUrl}. This link expires in one hour. If you did not request a reset, ignore this email.`,
     });
   }
+
+  async sendCampaignPublishedToCreator(
+    input: CampaignPublishedEmailInput,
+  ): Promise<void> {
+    const creatorName = escapeHtml(input.creatorName || 'there');
+    const campaignName = escapeHtml(input.campaignName);
+    const brandName = escapeHtml(input.brandName);
+    const description = truncate(input.description?.trim() || '', 240);
+    const contentTypes = input.contentTypes
+      .map(formatContentType)
+      .filter(Boolean)
+      .join(', ');
+    const paymentSummary = escapeHtml(input.paymentSummary);
+    const listingUrl = escapeHtml(input.listingUrl);
+
+    await this.send({
+      to: input.to,
+      subject: `New Thesi campaign from ${input.brandName}: ${input.campaignName}`,
+      html: `
+        <p>Hi ${creatorName},</p>
+        <p><strong>${brandName}</strong> just published a new creator campaign on Thesi.</p>
+        <h2>${campaignName}</h2>
+        ${description ? `<p>${escapeHtml(description)}</p>` : ''}
+        <ul>
+          <li><strong>Content:</strong> ${escapeHtml(contentTypes || 'Creator content')}</li>
+          <li><strong>Timeline:</strong> ${escapeHtml(input.startDate)} to ${escapeHtml(input.endDate)}</li>
+          <li><strong>Payment:</strong> ${paymentSummary}</li>
+        </ul>
+        <p><a href="${listingUrl}">View campaign in Thesi</a></p>
+        <p>You are receiving this because you have a Thesi creator account and match this campaign's creator criteria.</p>
+        <p>— The Thesi Team</p>
+      `,
+      text: `Hi ${input.creatorName || 'there'}, ${input.brandName} just published a new creator campaign on Thesi: ${input.campaignName}. Content: ${contentTypes || 'Creator content'}. Timeline: ${input.startDate} to ${input.endDate}. Payment: ${input.paymentSummary}. View it here: ${input.listingUrl}`,
+    });
+  }
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function formatContentType(value: string): string {
+  return value
+    .split(/[_-]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }

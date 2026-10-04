@@ -8,9 +8,11 @@ import { ConnectModule } from 'src/api/connect/connect.module';
 import { InboxModule } from 'src/api/inbox/inbox.module';
 import { InvitesModule } from 'src/api/invites/invites.module';
 import { MarketplaceModule } from 'src/api/marketplace/marketplace.module';
+import { CreatorsModule } from 'src/api/creators/creators.module';
 import { FILE_STORAGE } from 'src/shared/storage/file-storage.port';
 import { ConfigurableFileStorage } from 'src/shared/storage/file-storage';
 import { CAMPAIGN_REPOSITORY } from './campaign.repository';
+import { CampaignPublicationNotifier } from './campaign-publication-notifier.service';
 import { CampaignContentReviewController } from './campaign-content-review.controller';
 import {
   CAMPAIGN_CONTENT_REVIEW_REPOSITORY,
@@ -30,6 +32,7 @@ import { PostgresCampaignRepository } from './postgres-campaign.repository';
     ConnectModule,
     InvitesModule,
     InboxModule,
+    CreatorsModule,
   ],
   exports: [CampaignProductsService],
   controllers: [
@@ -39,6 +42,7 @@ import { PostgresCampaignRepository } from './postgres-campaign.repository';
   ],
   providers: [
     CampaignsService,
+    CampaignPublicationNotifier,
     CampaignProductsService,
     CampaignContentReviewService,
     {

@@ -19,7 +19,7 @@ import {
 } from "@/lib/auth-storage";
 
 import { workspaceForRequest, WORKSPACE_HEADER } from "@/lib/brand-workspace-storage";
-import { track } from "@/lib/posthog";
+import { analyticsPath, track } from "@/lib/analytics";
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -163,15 +163,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const method = options.method ?? "GET";
       const workspaceId = workspaceForRequest(path, session.user, method);
       try {
-        return await callAuthApi<T>(
+        const result = await callAuthApi<T>(
           path,
           options.body,
           session.accessToken,
           method,
           workspaceId,
         );
+        if (method !== "GET") {
+          track("api_request_succeeded", {
+            method,
+            path: analyticsPath(path),
+            workspace_id: workspaceId,
+          });
+        }
+        return result;
       } catch (error) {
         if (!(error instanceof AuthApiError) || error.status !== 401) {
+          if (method !== "GET") {
+            track("api_request_failed", {
+              method,
+              path: analyticsPath(path),
+              workspace_id: workspaceId,
+              status: error instanceof AuthApiError ? error.status : undefined,
+            });
+          }
           throw error;
         }
       }
@@ -186,16 +202,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        return await callAuthApi<T>(
+        const result = await callAuthApi<T>(
           path,
           options.body,
           refreshed.accessToken,
           method,
           workspaceId,
         );
+        if (method !== "GET") {
+          track("api_request_succeeded", {
+            method,
+            path: analyticsPath(path),
+            workspace_id: workspaceId,
+            refreshed_session: true,
+          });
+        }
+        return result;
       } catch (error) {
         if (error instanceof AuthApiError && error.status === 401) {
           persist(null);
+        }
+        if (method !== "GET") {
+          track("api_request_failed", {
+            method,
+            path: analyticsPath(path),
+            workspace_id: workspaceId,
+            status: error instanceof AuthApiError ? error.status : undefined,
+            refreshed_session: true,
+          });
         }
         throw error;
       }

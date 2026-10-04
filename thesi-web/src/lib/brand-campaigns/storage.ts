@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { track } from "@/lib/analytics";
 import type { BrandCampaign, BrandCampaignData, BrandCampaignFile } from "./types";
 
 type AuthenticatedRequest = <T>(
@@ -133,6 +134,12 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
         campaigns: [campaign, ...prev.campaigns.filter((c) => c.id !== campaign.id)],
       }));
       markCampaignsChanged();
+      track("campaign_published", {
+        campaign_id: campaign.id,
+        campaign_type: campaign.campaignType,
+        payment_model: campaign.payment.model,
+        post_to_marketplace: campaign.postToMarketplace,
+      });
       return campaign;
     },
     [authenticatedRequest],
@@ -149,6 +156,11 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
         campaigns: [campaign, ...prev.campaigns.filter((c) => c.id !== campaign.id)],
       }));
       markCampaignsChanged();
+      track("campaign_draft_created", {
+        campaign_id: campaign.id,
+        campaign_type: campaign.campaignType,
+        payment_model: campaign.payment.model,
+      });
       return campaign;
     },
     [authenticatedRequest],
@@ -165,6 +177,13 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
         campaigns: prev.campaigns.map((c) => (c.id === id ? campaign : c)),
       }));
       markCampaignsChanged();
+      track("campaign_updated", {
+        campaign_id: campaign.id,
+        status: campaign.status,
+        campaign_type: campaign.campaignType,
+        payment_model: campaign.payment.model,
+        post_to_marketplace: campaign.postToMarketplace,
+      });
       return campaign;
     },
     [authenticatedRequest],
@@ -181,6 +200,11 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
         campaigns: prev.campaigns.map((c) => (c.id === id ? campaign : c)),
       }));
       markCampaignsChanged();
+      track("campaign_draft_updated", {
+        campaign_id: campaign.id,
+        campaign_type: campaign.campaignType,
+        payment_model: campaign.payment.model,
+      });
       return campaign;
     },
     [authenticatedRequest],
@@ -209,6 +233,12 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
         ),
       }));
       markCampaignsChanged();
+      track("campaign_file_uploaded", {
+        campaign_id: campaignId,
+        file_id: meta.id,
+        file_name: meta.name,
+        size_label: meta.sizeLabel,
+      });
       return meta;
     },
     [authenticatedRequest],
@@ -232,6 +262,10 @@ export function useBrandCampaigns(authenticatedRequest: AuthenticatedRequest) {
         ),
       }));
       markCampaignsChanged();
+      track("campaign_file_deleted", {
+        campaign_id: campaignId,
+        file_id: fileId,
+      });
     },
     [authenticatedRequest],
   );

@@ -6,9 +6,9 @@ import { useAuth } from "@/context/AuthProvider";
 import {
   capturePageview,
   identifyUser,
-  initPostHog,
+  initAnalytics,
   resetUser,
-} from "@/lib/posthog";
+} from "@/lib/analytics";
 
 function PostHogPageView() {
   const pathname = usePathname();
@@ -17,7 +17,7 @@ function PostHogPageView() {
   const identifiedId = useRef<string | null>(null);
 
   useEffect(() => {
-    initPostHog();
+    initAnalytics();
   }, []);
 
   useEffect(() => {

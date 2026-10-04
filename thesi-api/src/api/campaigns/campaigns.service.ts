@@ -1,4 +1,5 @@
 import { CampaignFundingService } from '../campaign-funding/campaign-funding.service';
+import { CampaignPublicationNotifier } from './campaign-publication-notifier.service';
 import { CampaignProductsService } from './campaign-products.service';
 import { assertCommissionPayment } from './commission-payment';
 import {
@@ -25,6 +26,7 @@ import {
   type UploadableFile,
 } from 'src/shared/storage/file-storage.port';
 import { StripeService } from 'src/shared/stripe/stripe.service';
+import { AnalyticsService } from 'src/shared/analytics/analytics.service';
 import {
   MARKETPLACE_CAMPAIGN_SYNC,
   type MarketplaceCampaignSync,
@@ -84,6 +86,9 @@ export class CampaignsService {
     @Optional() private readonly products?: CampaignProductsService,
     @Optional() private readonly funding?: CampaignFundingService,
     @Optional() private readonly inbox?: InboxService,
+    @Optional() private readonly analytics?: AnalyticsService,
+    @Optional()
+    private readonly publicationNotifier?: CampaignPublicationNotifier,
   ) {}
 
   async list(userId: string): Promise<{ campaigns: CampaignRecord[] }> {
@@ -196,7 +201,23 @@ export class CampaignsService {
     await this.maybeRecordPublishedRevision(userId, campaign, {
       previousPublished: false,
     });
-    await this.marketplaceSync?.syncFromCampaign(userId, campaign);
+    const listing = await this.marketplaceSync?.syncFromCampaign(
+      userId,
+      campaign,
+    );
+    if (listing && isPublishedCampaignStatus(campaign.status)) {
+      await this.publicationNotifier?.notifyCreatorsOfPublishedCampaign(
+        campaign,
+        listing,
+      );
+    }
+    this.analytics?.track(
+      isPublishedCampaignStatus(campaign.status)
+        ? 'campaign_published'
+        : 'campaign_created',
+      userId,
+      this.campaignAnalyticsProperties(campaign, { source: 'create' }),
+    );
     return campaign;
   }
 
@@ -210,7 +231,13 @@ export class CampaignsService {
       status: 'draft',
       postToMarketplace: dto.postToMarketplace ?? false,
     });
-    return this.campaigns.create(userId, input);
+    const campaign = await this.campaigns.create(userId, input);
+    this.analytics?.track(
+      'campaign_draft_created',
+      userId,
+      this.campaignAnalyticsProperties(campaign, { source: 'draft_create' }),
+    );
+    return campaign;
   }
 
   async update(
@@ -254,10 +281,32 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
+    const wasPublished = isPublishedCampaignStatus(existing.status);
     await this.maybeRecordPublishedRevision(userId, campaign, {
-      previousPublished: isPublishedCampaignStatus(existing.status),
+      previousPublished: wasPublished,
     });
-    await this.marketplaceSync?.syncFromCampaign(userId, campaign);
+    const listing = await this.marketplaceSync?.syncFromCampaign(
+      userId,
+      campaign,
+    );
+    if (listing && !wasPublished && isPublishedCampaignStatus(campaign.status)) {
+      await this.publicationNotifier?.notifyCreatorsOfPublishedCampaign(
+        campaign,
+        listing,
+      );
+    }
+    this.analytics?.track(
+      isPublishedCampaignStatus(campaign.status)
+        ? existing.status === 'draft'
+          ? 'campaign_published'
+          : 'campaign_updated'
+        : 'campaign_updated',
+      userId,
+      this.campaignAnalyticsProperties(campaign, {
+        previous_status: existing.status,
+        source: 'update',
+      }),
+    );
     return campaign;
   }
 
@@ -288,6 +337,11 @@ export class CampaignsService {
     if (!campaign) {
       throw new NotFoundException('Campaign not found');
     }
+    this.analytics?.track(
+      'campaign_draft_updated',
+      userId,
+      this.campaignAnalyticsProperties(campaign, { source: 'draft_update' }),
+    );
     return campaign;
   }
 
@@ -448,7 +502,7 @@ export class CampaignsService {
         },
       });
 
-      return this.campaigns.upsertCreatorPayout({
+      const payout = await this.campaigns.upsertCreatorPayout({
         campaignId,
         brandUserId: userId,
         creatorUserId,
@@ -460,6 +514,14 @@ export class CampaignsService {
         idempotencyKey,
         failureReason: null,
       });
+      this.analytics?.track('creator_paid', userId, {
+        campaign_id: campaignId,
+        creator_user_id: creatorUserId,
+        amount_cents: amountCents,
+        payment_model: campaign.payment.model,
+        payout_status: payout.status,
+      });
+      return payout;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Creator payout failed';
@@ -474,6 +536,13 @@ export class CampaignsService {
         stripeDestinationAccountId: readiness.accountId,
         idempotencyKey,
         failureReason: message,
+      });
+      this.analytics?.track('creator_payment_failed', userId, {
+        campaign_id: campaignId,
+        creator_user_id: creatorUserId,
+        amount_cents: amountCents,
+        payment_model: campaign.payment.model,
+        failure_reason: message,
       });
       throw new BadRequestException(message);
     }
@@ -524,6 +593,12 @@ export class CampaignsService {
       });
       await this.marketplaceSync?.syncFromCampaign(userId, updated);
     }
+    this.analytics?.track('campaign_file_uploaded', userId, {
+      campaign_id: campaignId,
+      file_id: row.id,
+      content_type: row.contentType,
+      size_bytes: row.sizeBytes,
+    });
     return toFileMeta(row);
   }
 
@@ -582,7 +657,28 @@ export class CampaignsService {
       });
       await this.marketplaceSync?.syncFromCampaign(userId, updated);
     }
+    this.analytics?.track('campaign_file_deleted', userId, {
+      campaign_id: campaignId,
+      file_id: fileId,
+    });
     return { deleted: true };
+  }
+
+  private campaignAnalyticsProperties(
+    campaign: CampaignRecord,
+    extra: Record<string, unknown> = {},
+  ) {
+    return {
+      campaign_id: campaign.id,
+      status: campaign.status,
+      campaign_type: campaign.campaignType,
+      payment_model: campaign.payment.model,
+      post_to_marketplace: campaign.postToMarketplace,
+      creator_capacity: campaign.creatorCapacity,
+      start_date: campaign.startDate,
+      end_date: campaign.endDate,
+      ...extra,
+    };
   }
 
   private async refreshFilesJson(campaignId: string): Promise<void> {

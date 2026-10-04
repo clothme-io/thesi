@@ -3,12 +3,14 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   type OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'node:crypto';
 import { promotedProducts } from '../campaigns/promoted-products';
+import { AnalyticsService } from 'src/shared/analytics/analytics.service';
 import { sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
@@ -39,6 +41,7 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
     @Inject(DrizzleAsyncProvider) private readonly db: Db,
     private readonly config: ConfigService,
     private readonly products: CampaignProductsService,
+    @Optional() private readonly analytics?: AnalyticsService,
   ) {}
   private enabled() {
     if (this.config.get('CREATOR_TRACKING_ENABLED') !== true)
@@ -130,6 +133,12 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
         const row = await tx.execute(
           sql`SELECT public_code FROM thesi.creator_tracking_link WHERE acceptance_snapshot_id=${snapshotId}::uuid AND product_id IS NULL`,
         );
+        this.analytics?.track('creator_tracking_link_issued', userId, {
+          campaign_id: campaignId,
+          acceptance_snapshot_id: snapshotId,
+          commission_type: payment.hybrid?.affiliate?.commissionType,
+          link_type: 'install',
+        });
         return {
           url: new URL(
             `/i/${row.rows[0].public_code}`,
@@ -158,6 +167,13 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
       const row = await tx.execute(
         sql`SELECT public_code FROM thesi.creator_tracking_link WHERE id=${context.id}::uuid`,
       );
+      this.analytics?.track('creator_tracking_link_issued', userId, {
+        campaign_id: context.campaign_id,
+        tracking_link_id: context.id,
+        acceptance_snapshot_id: context.snapshot_id,
+        product_id: context.product.productId,
+        commission_type: context.payment.hybrid?.affiliate?.commissionType,
+      });
       return {
         url: new URL(
           `/r/${row.rows[0].public_code}`,
@@ -183,6 +199,14 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
       const days = current.payment.hybrid!.affiliate!.attributionWindowDays!;
       await tx.execute(sql`INSERT INTO thesi.creator_click_grant(tracking_link_id,code_hash,redeem_until,expires_at)
         VALUES (${c.id}::uuid,${clickDigest(grant)},now()+interval '15 minutes',now()+${days}*interval '1 day')`);
+    });
+    this.analytics?.track('creator_link_clicked', c.creator_id, {
+      campaign_id: c.campaign_id,
+      workspace_id: c.workspace_id,
+      tracking_link_id: c.id,
+      acceptance_snapshot_id: c.snapshot_id,
+      product_id: c.product.productId,
+      commission_type: c.payment.hybrid?.affiliate?.commissionType,
     });
     return {
       deepLink: `clothme://creator-link/${grant}`,
@@ -218,7 +242,17 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
         await tx.execute(
           sql`UPDATE thesi.creator_click_grant SET buyer_key=${buyerKey},claimed_at=now() WHERE id=${grant.id}::uuid`,
         );
-      return this.receipt(c, grant);
+      const receipt = this.receipt(c, grant);
+      this.analytics?.track('creator_click_claimed', c.creator_id, {
+        campaign_id: c.campaign_id,
+        workspace_id: c.workspace_id,
+        tracking_link_id: c.id,
+        acceptance_snapshot_id: c.snapshot_id,
+        product_id: c.product.productId,
+        receipt_id: receipt.receiptId,
+        commission_type: c.payment.hybrid?.affiliate?.commissionType,
+      });
+      return receipt;
     });
   }
   async validate(receiptId: string, buyerKey: string) {
@@ -282,6 +316,16 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
           sql`SELECT event_id,accrued_cents::text AS accrued_cents,state,received_at FROM thesi.commission_install_event WHERE campaign_id=${row.campaign_id}::uuid AND buyer_key=${buyerKey}`,
         )
       ).rows[0] as any;
+      this.analytics?.track('creator_install_attributed', row.creator_user_id, {
+        campaign_id: row.campaign_id,
+        workspace_id: row.workspace_id,
+        tracking_link_id: row.tracking_link_id,
+        acceptance_snapshot_id: row.snapshot_id,
+        event_id: stored.event_id,
+        accrued_cents: Number(stored.accrued_cents),
+        state: stored.state,
+        commission_type: affiliate.commissionType,
+      });
       return {
         eventId: stored.event_id,
         campaignId: row.campaign_id,
