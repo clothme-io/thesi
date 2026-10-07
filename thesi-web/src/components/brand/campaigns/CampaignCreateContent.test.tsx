@@ -131,7 +131,7 @@ describe("CampaignCreateContent draft save", () => {
     expect(await screen.findByText("Draft saved — A")).toBeInTheDocument();
   });
 
-  it("defaults start date to today and keeps end date one month after start date", async () => {
+  it("defaults start date to today, defaults end date one month later, and allows end date edits", async () => {
     const { CampaignCreateContent } = await import("./CampaignCreateContent");
     render(<CampaignCreateContent />);
 
@@ -146,11 +146,40 @@ describe("CampaignCreateContent draft save", () => {
 
     expect(startDate).toHaveValue(todayValue);
     expect(startDate).toHaveAttribute("min", todayValue);
-    expect(endDate).toHaveAttribute("readonly");
+    expect(endDate).not.toHaveAttribute("readonly");
 
     fireEvent.change(startDate, { target: { value: "2026-12-10" } });
 
     expect(startDate).toHaveValue("2026-12-10");
     expect(endDate).toHaveValue("2027-01-10");
+
+    fireEvent.change(endDate, { target: { value: "2027-02-15" } });
+    expect(endDate).toHaveValue("2027-02-15");
+  });
+
+  it("saves the selected end date instead of recalculating it from start date", async () => {
+    const { CampaignCreateContent } = await import("./CampaignCreateContent");
+    const user = userEvent.setup();
+    render(<CampaignCreateContent />);
+
+    await user.clear(screen.getByLabelText("Name"));
+    await user.type(screen.getByLabelText("Name"), "Custom dates");
+    fireEvent.change(screen.getByLabelText("Start date"), {
+      target: { value: "2026-12-10" },
+    });
+    fireEvent.change(screen.getByLabelText("End date"), {
+      target: { value: "2027-02-15" },
+    });
+    await user.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
+
+    await waitFor(() => {
+      expect(createDraftCampaign).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Custom dates",
+          startDate: "2026-12-10",
+          endDate: "2027-02-15",
+        }),
+      );
+    });
   });
 });

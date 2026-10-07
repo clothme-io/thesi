@@ -54,6 +54,17 @@ function campaign(overrides: Partial<BrandCampaign> = {}): BrandCampaign {
 }
 
 describe("draft form milestone round-trip", () => {
+  it("preserves an edited end date instead of deriving it from the start date", () => {
+    const form = draftFormFromCampaign(campaign());
+    form.startDate = "2026-12-10";
+    form.endDate = "2027-02-15";
+
+    expect(draftFormToInput(form)).toMatchObject({
+      startDate: "2026-12-10",
+      endDate: "2027-02-15",
+    });
+  });
+
   it("preserves structured milestones instead of flattening to a base amount", () => {
     const form = draftFormFromCampaign(campaign());
     expect(form.paymentModel).toBe("milestone");

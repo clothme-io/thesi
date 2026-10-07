@@ -73,6 +73,16 @@ export function parseMoneyToCents(raw: string): number {
   return Math.round(num * 100);
 }
 
+function isOptionalNonNegativeMoney(raw: string): boolean {
+  const value = raw.trim();
+  return (
+    value === "" ||
+    (/^\$?\d+(?:\.\d{1,2})?$/.test(value) &&
+      parseMoneyToCents(value) >= 0 &&
+      parseMoneyToCents(value) <= 2_147_483_647)
+  );
+}
+
 export function centsToInput(cents?: number): string {
   if (!cents) return "";
   const dollars = cents / 100;
@@ -362,8 +372,8 @@ export function paymentFormError(
 ): string | null {
   if (model === "commission") {
     if (!hybrid) return "Configure the commission terms.";
-    if (hybrid.baseEnabled && (!/^\$?\d+(?:\.\d{1,2})?$/.test(hybrid.baseAmount.trim()) || parseMoneyToCents(hybrid.baseAmount) <= 0 || parseMoneyToCents(hybrid.baseAmount) > 2_147_483_647)) {
-      return "Enter a positive base payment with at most two decimal places.";
+    if (hybrid.baseEnabled && !isOptionalNonNegativeMoney(hybrid.baseAmount)) {
+      return "Enter a base payment of 0 or more with at most two decimal places.";
     }
     if(hybrid.commissionRules){try{assertCommissionRules(hybrid.commissionRules);}catch{return 'Check the review period, payout schedule and minimum.';}}
     const rate = Number(hybrid.affiliatePercent);

@@ -44,6 +44,20 @@ describe("Commission with optional base", () => {
     expect(getCampaignBudgetLabel(campaign)).toContain("Commission only: 12.25%");
     expect(formatListingPayment(campaignToListing(campaign,"Brand","brand-1").payment)).not.toContain("base per creator");
   });
+  it.each(["", "0"])("allows optional base amount %s", (baseAmount) => {
+    const hybrid = { ...form(), baseAmount };
+    expect(paymentFormError("commission", [], hybrid)).toBeNull();
+    const payment = buildCampaignPayment({
+      model: "commission",
+      flatAmount: "",
+      milestoneStructure: "cumulative",
+      notes: "",
+      milestones: [],
+      hybrid,
+    });
+    expect(payment.hybrid?.base?.amountCents).toBe(0);
+    expect(formPayoutCents("commission", "999", [], "cumulative", hybrid)).toBe(0);
+  });
   it("preserves terms through editing and marketplace mapping without including stale hybrid bonuses", () => {
     const hybrid = {
       ...form(),
@@ -89,7 +103,7 @@ describe("Commission with optional base", () => {
     },
   );
 
-  it.each(["-200", "0", "200.123", "abc", "21474836.48"])(
+  it.each(["-200", "200.123", "abc", "21474836.48"])(
     "rejects invalid base amount %s",
     (baseAmount) => {
       expect(
