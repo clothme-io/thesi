@@ -39,6 +39,8 @@ const PAYMENT_OPTIONS: Array<PaymentStructure | "all"> = [
   "milestone",
   "royalty",
   "hybrid",
+  "product_commission",
+  "app_install",
   "commission",
 ];
 

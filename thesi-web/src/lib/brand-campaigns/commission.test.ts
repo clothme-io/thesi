@@ -13,6 +13,7 @@ import { SEED_BRAND_CAMPAIGN_DATA } from "./seed";
 import { campaignToListing } from "@/lib/marketplace/listings";
 import { formatListingPayment } from "@/lib/marketplace/types";
 import { getCampaignBudgetLabel } from "./types";
+import { formPaymentModel } from "./commission";
 
 const form = () => ({
   ...defaultHybridPaymentForm(),
@@ -29,7 +30,10 @@ describe("Commission with optional base", () => {
     expect(payment.hybrid?.affiliate?.payoutHandler).toBe('clothme');
     expect(payment.hybrid?.affiliate?.fundingSource).toBe('brand');
     const campaign={...SEED_BRAND_CAMPAIGN_DATA.campaigns[0],payment};
-    expect(draftFormToInput(draftFormFromCampaign(campaign)).payment).toEqual(payment);
+    expect(draftFormToInput(draftFormFromCampaign(campaign)).payment).toEqual({
+      ...payment,
+      model: "product_commission",
+    });
     expect(payment.hybrid?.affiliate?.fundingFlowVersion).toBe(1);
     expect(paymentFormError('commission',[],{...hybrid,commissionFundingTerms:''})).toBeNull();
   });
@@ -39,7 +43,10 @@ describe("Commission with optional base", () => {
     const payment = buildCampaignPayment({model:"commission",flatAmount:"",milestoneStructure:"cumulative",notes:"",milestones:[],hybrid});
     expect(payment.hybrid?.base).toBeUndefined();
     const campaign = {...SEED_BRAND_CAMPAIGN_DATA.campaigns[0],payment};
-    expect(draftFormToInput(draftFormFromCampaign(campaign)).payment).toEqual(payment);
+    expect(draftFormToInput(draftFormFromCampaign(campaign)).payment).toEqual({
+      ...payment,
+      model: "product_commission",
+    });
     expect(formPayoutCents("commission","999",[],"cumulative",hybrid)).toBe(0);
     expect(getCampaignBudgetLabel(campaign)).toContain("Commission only: 12.25%");
     expect(formatListingPayment(campaignToListing(campaign,"Brand","brand-1").payment)).not.toContain("base per creator");
@@ -75,7 +82,7 @@ describe("Commission with optional base", () => {
     });
     const campaign = { ...SEED_BRAND_CAMPAIGN_DATA.campaigns[0], payment };
     const restored = draftFormToInput(draftFormFromCampaign(campaign));
-    expect(restored.payment).toEqual(payment);
+    expect(restored.payment).toEqual({ ...payment, model: "product_commission" });
     expect(payment.hybrid?.base?.amountCents).toBe(20050);
     expect(payment.hybrid?.affiliate?.commissionPercent).toBe(12.25);
     expect(payment.hybrid?.milestones).toBeUndefined();
@@ -138,7 +145,7 @@ describe("Commission with optional base", () => {
         ...form(),
         affiliateType: "fixed_amount_per_install",
       }),
-    ).toMatch(/app install/i);
+    ).toMatch(/conversion event/i);
     expect(
       paymentFormError("commission", [], {
         ...form(),
@@ -151,5 +158,112 @@ describe("Commission with optional base", () => {
     expect(
       paymentFormError("commission", [], { ...form(), affiliateTerms: " " }),
     ).toMatch(/settlement/i);
+  });
+
+  it("does not send Merchant products or a prepaid install pool for install campaigns", () => {
+    const hybrid = {
+      ...form(),
+      affiliateType: "fixed_amount_per_install" as const,
+      installEventAmounts: { verified_account: "2.00" },
+    };
+    const payment = buildCampaignPayment({
+      model: "commission",
+      flatAmount: "",
+      milestoneStructure: "cumulative",
+      notes: "",
+      milestones: [],
+      hybrid,
+    });
+    expect(payment.hybrid?.affiliate?.fundingTerms).toMatch(/does not collect a prepaid install pool/i);
+    const campaign = {
+      ...SEED_BRAND_CAMPAIGN_DATA.campaigns[0],
+      payment,
+    };
+    const input = draftFormToInput({
+      ...draftFormFromCampaign(campaign),
+      merchantProducts: [{ productId: "should-not-publish", variantIds: ["v1"] }],
+    });
+    expect(input.merchantProducts ?? []).toEqual([]);
+    expect(input.merchantProductId ?? null).toBeNull();
+    expect(input.payment.model).toBe("app_install");
+  });
+
+  it("maps legacy commission to first-class product commission and app install", () => {
+    expect(
+      formPaymentModel({
+        model: "commission",
+        hybrid: { affiliate: { commissionType: "percentage_of_sale" } },
+      }),
+    ).toBe("product_commission");
+    expect(
+      formPaymentModel({
+        model: "commission",
+        hybrid: { affiliate: { commissionType: "fixed_amount_per_install" } },
+      }),
+    ).toBe("app_install");
+    expect(formPaymentModel({ model: "product_commission" })).toBe(
+      "product_commission",
+    );
+    expect(formPaymentModel({ model: "app_install" })).toBe("app_install");
+    expect(
+      buildCampaignPayment({
+        model: "product_commission",
+        flatAmount: "",
+        milestoneStructure: "cumulative",
+        notes: "",
+        milestones: [],
+        hybrid: form(),
+      }).model,
+    ).toBe("product_commission");
+    expect(
+      buildCampaignPayment({
+        model: "app_install",
+        flatAmount: "",
+        milestoneStructure: "cumulative",
+        notes: "",
+        milestones: [],
+        hybrid: {
+          ...form(),
+          affiliateType: "percentage_of_sale",
+          installEventAmounts: { verified_account: "2.00" },
+        },
+      }),
+    ).toMatchObject({
+      model: "app_install",
+      hybrid: {
+        affiliate: {
+          commissionType: "fixed_amount_per_install",
+          installApp: "customer",
+          conversions: [{ event: "verified_account", amountCents: 200 }],
+        },
+      },
+    });
+  });
+
+  it("allows mixed paid and unpaid install conversion events", () => {
+    const hybrid = {
+      ...form(),
+      affiliateType: "fixed_amount_per_install" as const,
+      installEventAmounts: {
+        verified_account: "1.00",
+        fit_profile_completed: "",
+        first_purchase: "0",
+      },
+    };
+    expect(paymentFormError("app_install", [], hybrid)).toBeNull();
+    expect(
+      buildCampaignPayment({
+        model: "app_install",
+        flatAmount: "",
+        milestoneStructure: "cumulative",
+        notes: "",
+        milestones: [],
+        hybrid,
+      }).hybrid?.affiliate?.conversions,
+    ).toEqual([
+      { event: "verified_account", amountCents: 100 },
+      { event: "fit_profile_completed" },
+      { event: "first_purchase" },
+    ]);
   });
 });

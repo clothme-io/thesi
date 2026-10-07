@@ -113,6 +113,8 @@ function campaignPaymentToListingPayment(
         ...(payment.notes ? { notes: payment.notes } : {}),
       };
     case 'commission':
+    case 'product_commission':
+    case 'app_install':
     case 'hybrid':
       return {
         structure: payment.model,

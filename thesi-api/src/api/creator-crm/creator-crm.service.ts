@@ -89,6 +89,8 @@ function listingValueCents(payment: {
     case 'royalty':
       return payment.royaltyMinimumCents ?? 0;
     case 'commission':
+    case 'product_commission':
+    case 'app_install':
     case 'hybrid':
       return payment.hybridFlatCents ?? 0;
     default:

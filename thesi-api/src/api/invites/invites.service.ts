@@ -1,5 +1,8 @@
 import { workspaceContext } from '../brand-workspaces/workspace-context';
-import { commissionInviteTerms } from '../campaigns/commission-payment';
+import {
+  commissionInviteTerms,
+  isAttributedCommissionPayment,
+} from '../campaigns/commission-payment';
 import {
   BadRequestException,
   ConflictException,
@@ -9,7 +12,9 @@ import {
   Logger,
   NotFoundException,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
+import { CreatorTrackingService } from 'src/api/creator-tracking/creator-tracking.service';
 import { CreatorCrmService } from 'src/api/creator-crm/creator-crm.service';
 import { InboxService } from 'src/api/inbox/inbox.service';
 import { NovuService } from 'src/shared/novu/novu.service';
@@ -33,6 +38,9 @@ export class InvitesService {
     private readonly novu: NovuService,
     private readonly creatorCrm: CreatorCrmService,
     @Optional() private readonly analytics?: AnalyticsService,
+    @Optional()
+    @Inject(forwardRef(() => CreatorTrackingService))
+    private readonly tracking?: CreatorTrackingService,
   ) {}
 
   async listCampaignInvites(
@@ -129,6 +137,10 @@ export class InvitesService {
         source: 'campaign_invite',
         sourceId: updated.id,
       });
+      await this.tracking?.issueAccepted(
+        updated.creatorId ?? userId,
+        updated.campaignId,
+      );
     }
 
     await this.inbox.notifyCampaignInviteResponse(userId, {
@@ -202,7 +214,10 @@ export class InvitesService {
     const owned = await this.invites.findOwnedCampaign(userId, campaignId);
     if (!owned) throw new NotFoundException('Campaign not found in this brand');
     const campaignName = owned.name.trim() || input.campaignName.trim();
-    const paymentTerms = owned?.payment?.model === 'commission' ? commissionInviteTerms(owned.payment) : undefined;
+    const paymentTerms =
+      owned.payment && isAttributedCommissionPayment(owned.payment)
+        ? commissionInviteTerms(owned.payment)
+        : undefined;
     const brandName = workspaceContext.getStore()?.name || input.brandName.trim() || user.fullName;
 
     let creatorUserId = input.creatorId?.trim() || null;
@@ -312,6 +327,10 @@ export class InvitesService {
       source: 'marketplace_application',
       sourceId: input.applicationId ?? invite.id,
     });
+    await this.tracking?.issueAccepted(
+      invite.creatorId ?? input.creatorUserId,
+      invite.campaignId,
+    );
     return invite;
   }
 

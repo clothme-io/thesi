@@ -2,6 +2,7 @@
 
 import {CampaignProductSelection,campaignProducts,productSelections,productInput,type ProductSelection} from "./CampaignProductSelection";
 import Link from "next/link";
+import { formPaymentModel, isInstallCommission } from "@/lib/brand-campaigns/commission";
 import {DEFAULT_COMMISSION_RULES} from "@/lib/brand-campaigns/commission-rules";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -32,7 +33,7 @@ import type {
   BrandCampaignStatus,
   BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
-import { EMPTY_CONTENT_RIGHTS, EMPTY_CREATOR_BENEFITS } from "@/lib/brand-campaigns/types";
+import { EMPTY_CONTENT_RIGHTS, EMPTY_CREATOR_BENEFITS, perkCreatorBenefits } from "@/lib/brand-campaigns/types";
 import { InviteCreatorDrawer } from "./InviteCreatorDrawer";
 import { MilestoneBuilder } from "./MilestoneBuilder";
 import { HybridPaymentBuilder } from "./HybridPaymentBuilder";
@@ -71,7 +72,8 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Flat Rate", value: "flat_rate" },
   { label: "Milestone", value: "milestone" },
   { label: "Royalty", value: "royalty" },
-  { label: "Commission", value: "commission" },
+  { label: "Product commission", value: "product_commission" },
+  { label: "App install", value: "app_install" },
   { label: "Hybrid", value: "hybrid" },
 ];
 
@@ -130,19 +132,6 @@ function toggleArrayItem<T>(items: T[], item: T): T[] {
   return items.includes(item)
     ? items.filter((value) => value !== item)
     : [...items, item];
-}
-
-function paymentInputFromCents(cents?: number): string {
-  if (!cents) return "";
-  const dollars = cents / 100;
-  return `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
-}
-
-function centsFromPaymentInput(value: string): number | undefined {
-  const amount = Number(value.replace(/[^0-9.]/g, ""));
-  return Number.isFinite(amount) && amount > 0
-    ? Math.round(amount * 100)
-    : undefined;
 }
 
 function toLocalDateInputValue(date: Date): string {
@@ -260,7 +249,7 @@ export function CampaignCreateContent() {
     setMinFollowersRange(source.requirements.minFollowersRange);
     setLocation(source.requirements.location);
     setPlatforms(source.requirements.platforms);
-    setPaymentModel(source.payment.model);
+    setPaymentModel(formPaymentModel(source.payment));
     setMerchantProducts(productSelections(campaignProducts(source.payment)));
     setInitialProducts(campaignProducts(source.payment));
     setMilestoneStructure(
@@ -282,7 +271,7 @@ export function CampaignCreateContent() {
     setRequiredTasks(source.requiredTasks.map((task) => task.title).join("\n"));
     setProductsProvided(source.productsProvided.map((product) => product.name).join("\n"));
     setCreatorCapacity(source.creatorCapacity ? String(source.creatorCapacity) : "");
-    setCreatorBenefits(source.creatorBenefits);
+    setCreatorBenefits(perkCreatorBenefits(source.creatorBenefits));
     setContentRights(source.contentRights ?? EMPTY_CONTENT_RIGHTS);
     setPostToMarketplace(source.postToMarketplace);
     setCreatorDisclosureEnabled(source.creatorDisclosureEnabled ?? false);
@@ -290,6 +279,7 @@ export function CampaignCreateContent() {
 
   useEffect(() => {
     if (
+      paymentModel !== "product_commission" &&
       paymentModel !== "commission" &&
       error === "Multi-product selection is paused"
     ) {
@@ -309,8 +299,15 @@ export function CampaignCreateContent() {
   );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
+  const installCommission =
+    paymentModel === "app_install" ||
+    (paymentModel === "commission" &&
+      isInstallCommission(hybridPayment.affiliateType));
+  const productCommission =
+    paymentModel === "product_commission" ||
+    (paymentModel === "commission" && !installCommission);
   const requiresBaseFundingBeforePublish =
-    paymentModel === "commission" &&
+    (productCommission || installCommission) &&
     hybridPayment.baseEnabled &&
     parseMoneyToCents(hybridPayment.baseAmount) > 0;
 
@@ -332,7 +329,7 @@ export function CampaignCreateContent() {
       platforms,
     },
     files: [],
-    ...productInput(paymentModel === "commission" ? merchantProducts : []),
+    ...productInput(productCommission ? merchantProducts : []),
     payment: buildCampaignPayment({
       model: paymentModel,
       flatAmount,
@@ -347,7 +344,7 @@ export function CampaignCreateContent() {
       required: true,
     })),
     creatorBenefits: {
-      ...creatorBenefits,
+      ...perkCreatorBenefits(creatorBenefits),
       customBenefits: listToRows(creatorBenefits.customBenefits.join("\n")),
     },
     contentRights,
@@ -451,6 +448,14 @@ export function CampaignCreateContent() {
     const milestoneError = requireMilestonePayment();
     if (milestoneError) {
       setError(milestoneError);
+      setSaving(false);
+      return;
+    }
+    if (
+      productCommission &&
+      merchantProducts.length === 0
+    ) {
+      setError("Select a Merchant product before publishing a product commission campaign.");
       setSaving(false);
       return;
     }
@@ -574,7 +579,7 @@ export function CampaignCreateContent() {
           className="workspace-form"
           onSubmit={handleSaveDraftSubmit}
         >
-          {paymentModel === "commission" && <CampaignProductSelection initial={initialProducts} value={merchantProducts} onChange={setMerchantProducts} />}
+          {productCommission && <CampaignProductSelection initial={initialProducts} value={merchantProducts} onChange={setMerchantProducts} />}
           <section className="workspace-section">
             <h3>Campaign basics</h3>
             <div className="workspace-grid">
@@ -845,24 +850,6 @@ export function CampaignCreateContent() {
           <section className="workspace-section">
             <h3>Creator benefits</h3>
             <div className="workspace-grid">
-              <label className="workspace-field">
-                <span>Guaranteed payment</span>
-                <input
-                  id="campaign-guaranteed-payment"
-                  name="campaignGuaranteedPayment"
-                  data-testid="campaign-guaranteed-payment-input"
-                  type="text"
-                  placeholder="$300"
-                  inputMode="decimal"
-                  value={paymentInputFromCents(creatorBenefits.guaranteedPaymentCents)}
-                  onChange={(e) =>
-                    setCreatorBenefits((prev) => ({
-                      ...prev,
-                      guaranteedPaymentCents: centsFromPaymentInput(e.target.value),
-                    }))
-                  }
-                />
-              </label>
               <label className="workspace-field workspace-field--full">
                 <span>Products provided</span>
                 <textarea
@@ -975,6 +962,20 @@ export function CampaignCreateContent() {
                     if (next === "hybrid") {
                       setHybridPayment((prev) => prev ?? defaultHybridPaymentForm());
                     }
+                    if (next === "app_install") {
+                      setMerchantProducts([]);
+                      setHybridPayment((prev) => ({
+                        ...prev,
+                        affiliateType: "fixed_amount_per_install",
+                      }));
+                    }
+                    if (next === "product_commission") {
+                      setHybridPayment((prev) =>
+                        prev.affiliateType === "fixed_amount_per_install"
+                          ? { ...prev, affiliateType: "percentage_of_sale" }
+                          : prev,
+                      );
+                    }
                   }}
                 >
                   {PAYMENT_OPTIONS.map((opt) => (
@@ -1008,9 +1009,16 @@ export function CampaignCreateContent() {
                   </div>
                   <MilestoneBuilder rows={milestones} onChange={setMilestones} />
                 </>
-              ) : paymentModel === "commission" ? (
+              ) : paymentModel === "commission" ||
+                paymentModel === "product_commission" ||
+                paymentModel === "app_install" ? (
                 <>
-                  <CommissionPaymentBuilder creatorCapacity={creatorCapacity} value={hybridPayment} onChange={setHybridPayment} />
+                  <CommissionPaymentBuilder
+                    creatorCapacity={creatorCapacity}
+                    variant={installCommission ? "install" : "product"}
+                    value={hybridPayment}
+                    onChange={setHybridPayment}
+                  />
                   <p className="workspace-hint">
                     Fee and budget estimates include only an enabled fixed base; future commission is not included.
                   </p>

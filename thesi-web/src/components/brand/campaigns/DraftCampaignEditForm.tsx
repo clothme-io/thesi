@@ -21,6 +21,7 @@ import {
   BRAND_CAMPAIGN_GOAL_TYPE_PURPOSES,
   EMPTY_CONTENT_RIGHTS,
   EMPTY_CREATOR_BENEFITS,
+  perkCreatorBenefits,
   formatMoney,
   type BrandCampaign,
   type BrandCampaignContentRights,
@@ -30,6 +31,7 @@ import {
   type BrandCampaignPaymentModel,
   type BrandCampaignType,
 } from "@/lib/brand-campaigns/types";
+import { formPaymentModel, isInstallCommission } from "@/lib/brand-campaigns/commission";
 import { MilestoneBuilder } from "./MilestoneBuilder";
 import { HybridPaymentBuilder } from "./HybridPaymentBuilder";
 import { CommissionPaymentBuilder } from "./CommissionPaymentBuilder";
@@ -62,7 +64,8 @@ const PAYMENT_OPTIONS: { label: string; value: BrandCampaignPaymentModel }[] = [
   { label: "Flat Rate", value: "flat_rate" },
   { label: "Milestone", value: "milestone" },
   { label: "Royalty", value: "royalty" },
-  { label: "Commission", value: "commission" },
+  { label: "Product commission", value: "product_commission" },
+  { label: "App install", value: "app_install" },
   { label: "Hybrid", value: "hybrid" },
 ];
 
@@ -121,19 +124,6 @@ function toggleArrayItem<T>(items: T[], item: T): T[] {
   return items.includes(item)
     ? items.filter((value) => value !== item)
     : [...items, item];
-}
-
-function paymentInputFromCents(cents?: number): string {
-  if (!cents) return "";
-  const dollars = cents / 100;
-  return `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)}`;
-}
-
-function centsFromPaymentInput(value: string): number | undefined {
-  const amount = Number(value.replace(/[^0-9.]/g, ""));
-  return Number.isFinite(amount) && amount > 0
-    ? Math.round(amount * 100)
-    : undefined;
 }
 
 function toLocalDateInputValue(date: Date): string {
@@ -213,11 +203,13 @@ export function draftFormFromCampaign(
     requiredTasks: (campaign.requiredTasks ?? []).map((task) => task.title).join("\n"),
     productsProvided: (campaign.productsProvided ?? []).map((product) => product.name).join("\n"),
     creatorCapacity: campaign.creatorCapacity ? String(campaign.creatorCapacity) : "",
-    creatorBenefits: campaign.creatorBenefits ?? { ...EMPTY_CREATOR_BENEFITS },
+    creatorBenefits: perkCreatorBenefits(
+      campaign.creatorBenefits ?? { ...EMPTY_CREATOR_BENEFITS },
+    ),
     contentRights: campaign.contentRights ?? { ...EMPTY_CONTENT_RIGHTS },
     merchantProducts: productSelections(campaignProducts(campaign.payment)),
     multiProductAgreement:!!campaign.payment.promotedProducts,
-    paymentModel: campaign.payment.model,
+    paymentModel: formPaymentModel(campaign.payment),
     milestoneStructure:
       campaign.payment.milestoneStructure ?? DEFAULT_MILESTONE_STRUCTURE,
     flatAmount: centsToInput(campaign.payment.flatRateCents),
@@ -250,7 +242,14 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       platforms: form.platforms,
     },
     files: [],
-    ...productInput(form.paymentModel === "commission" ? form.merchantProducts??[] : [],form.multiProductAgreement),
+    ...productInput(
+      form.paymentModel === "product_commission" ||
+        (form.paymentModel === "commission" &&
+          !isInstallCommission(form.hybridPayment.affiliateType))
+        ? form.merchantProducts ?? []
+        : [],
+      form.multiProductAgreement,
+    ),
     payment: buildCampaignPayment({
       model: form.paymentModel,
       flatAmount: form.flatAmount,
@@ -265,7 +264,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
       required: true,
     })),
     creatorBenefits: {
-      ...form.creatorBenefits,
+      ...perkCreatorBenefits(form.creatorBenefits),
       customBenefits: listToRows(form.creatorBenefits.customBenefits.join("\n")),
     },
     contentRights: form.contentRights,
@@ -309,6 +308,13 @@ export function DraftCampaignEditForm({
   );
   const feeCents = calculatePlatformFeeCents(payoutCents);
   const feeCapped = feeCents === PLATFORM_FEE_CAP_CENTS && payoutCents > 0;
+  const installCommission =
+    form.paymentModel === "app_install" ||
+    (form.paymentModel === "commission" &&
+      isInstallCommission(form.hybridPayment.affiliateType));
+  const productCommission =
+    form.paymentModel === "product_commission" ||
+    (form.paymentModel === "commission" && !installCommission);
 
   const set = <K extends keyof DraftCampaignFormState>(
     key: K,
@@ -325,7 +331,9 @@ export function DraftCampaignEditForm({
 
   return (
     <div className="workspace-form">
-      {form.paymentModel === "commission" && <CampaignProductSelection value={form.merchantProducts??[]} onChange={products => set("merchantProducts", products)} initial={campaignProducts(campaign.payment)} locked={campaign.status !== "draft"} />}
+      {productCommission && (
+        <CampaignProductSelection value={form.merchantProducts??[]} onChange={products => set("merchantProducts", products)} initial={campaignProducts(campaign.payment)} locked={campaign.status !== "draft"} />
+      )}
       <section className="workspace-section">
         <h3>Campaign basics</h3>
         <div className="workspace-grid">
@@ -588,23 +596,6 @@ export function DraftCampaignEditForm({
       <section className="workspace-section">
         <h3>Creator benefits</h3>
         <div className="workspace-grid">
-          <label className="workspace-field">
-            <span>Guaranteed payment</span>
-            <input
-              id="campaign-guaranteed-payment"
-              name="campaignGuaranteedPayment"
-              data-testid="campaign-guaranteed-payment-input"
-              type="text"
-              inputMode="decimal"
-              value={paymentInputFromCents(form.creatorBenefits.guaranteedPaymentCents)}
-              onChange={(e) =>
-                set("creatorBenefits", {
-                  ...form.creatorBenefits,
-                  guaranteedPaymentCents: centsFromPaymentInput(e.target.value),
-                })
-              }
-            />
-          </label>
           <label className="workspace-field workspace-field--full">
             <span>Products provided</span>
             <textarea
@@ -715,11 +706,31 @@ export function DraftCampaignEditForm({
               value={form.paymentModel}
               onChange={(e) => {
                 const next = e.target.value as BrandCampaignPaymentModel;
+                let hybridPayment =
+                  form.hybridPayment ?? defaultHybridPaymentForm();
+                let merchantProducts = form.merchantProducts;
+                if (next === "app_install") {
+                  merchantProducts = [];
+                  hybridPayment = {
+                    ...hybridPayment,
+                    affiliateType: "fixed_amount_per_install",
+                  };
+                }
+                if (
+                  next === "product_commission" &&
+                  hybridPayment.affiliateType === "fixed_amount_per_install"
+                ) {
+                  hybridPayment = {
+                    ...hybridPayment,
+                    affiliateType: "percentage_of_sale",
+                  };
+                }
                 onChange({
                   ...form,
                   paymentModel: next,
+                  merchantProducts,
                   milestones: seedMilestonesIfNeeded(next, form.milestones),
-                  hybridPayment: form.hybridPayment ?? defaultHybridPaymentForm(),
+                  hybridPayment,
                   milestoneStructure:
                     next === "milestone"
                       ? form.milestoneStructure
@@ -763,12 +774,17 @@ export function DraftCampaignEditForm({
                 onChange={(milestones) => onChange({ ...form, milestones })}
               />
             </>
-          ) : form.paymentModel === "commission" ? (
+          ) : form.paymentModel === "commission" ||
+            form.paymentModel === "product_commission" ||
+            form.paymentModel === "app_install" ? (
             <>
               <CommissionPaymentBuilder
                 creatorCapacity={form.creatorCapacity}
+                variant={installCommission ? "install" : "product"}
                 value={form.hybridPayment}
-                onChange={(next) => set("hybridPayment", next)}
+                onChange={(hybridPayment) =>
+                  onChange({ ...form, hybridPayment })
+                }
               />
               <p className="workspace-hint">
                 Fee and budget estimates include only an enabled fixed base; future commission is not included.

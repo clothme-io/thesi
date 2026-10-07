@@ -25,9 +25,11 @@ type EarningLine = {
   orderLineId?: string;
   eventId?: string;
   campaignId: string | null;
+  conversionEvent?: string;
   currency: string;
   accruedCents: string;
   state: string;
+  reasons?: string[] | string;
   updatedAt: string;
 };
 
@@ -48,6 +50,64 @@ const money = (cents: string | number, currency = "USD") =>
 
 function sumCents<T extends Record<string, unknown>>(rows: T[], key: keyof T) {
   return rows.reduce((sum, row) => sum + Number(row[key] ?? 0), 0);
+}
+
+function stateLabel(state: string) {
+  if (state === "under_review") return "Under review";
+  if (state === "held") return "Held";
+  if (state === "reversed") return "Reversed";
+  return state.replaceAll("_", " ");
+}
+
+function reasonText(reasons?: unknown, conversionEvent?: string) {
+  const notes = Array.isArray(reasons)
+    ? reasons.filter((item): item is string => typeof item === "string").join(" · ")
+    : typeof reasons === "string"
+      ? reasons
+      : "";
+  const event = conversionEvent ? conversionEvent.replaceAll("_", " ") : "";
+  return [event, notes].filter(Boolean).join(" · ");
+}
+
+function formatWhen(value: string) {
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? new Date(time).toLocaleString() : value;
+}
+
+function EventTable({
+  caption,
+  rows,
+}: {
+  caption: string;
+  rows: EarningLine[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="crm-table-wrap">
+      <table className="crm-table" aria-label={caption}>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Campaign</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.orderLineId ?? row.eventId ?? `${row.campaignId}-${row.updatedAt}`}>
+              <td>{formatWhen(row.updatedAt)}</td>
+              <td>{row.campaignId ?? "—"}</td>
+              <td>{money(row.accruedCents, row.currency)}</td>
+              <td>{stateLabel(row.state)}</td>
+              <td className="commission-line-reasons">{reasonText(row.reasons, row.conversionEvent)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export function CommissionEarningsPageContent() {
@@ -150,6 +210,10 @@ export function CommissionEarningsPageContent() {
                   </p>
                 ))
               )}
+              <EventTable
+                caption="Install events"
+                rows={report.installLines ?? []}
+              />
             </section>
 
             <section className="app-panel">
@@ -165,6 +229,10 @@ export function CommissionEarningsPageContent() {
                   </p>
                 ))
               )}
+              <EventTable
+                caption="Sale events"
+                rows={report.lines}
+              />
             </section>
           </>
         )}

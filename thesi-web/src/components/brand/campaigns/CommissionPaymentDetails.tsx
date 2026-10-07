@@ -3,6 +3,7 @@ import type { BrandCampaignHybridPayment } from "@/lib/brand-campaigns/types";
 import {
   commissionSummary,
   commissionTerms,
+  isInstallCommission,
 } from "@/lib/brand-campaigns/commission";
 
 export function CommissionPaymentDetails({
@@ -18,8 +19,10 @@ export function CommissionPaymentDetails({
         {commissionTerms(payment)}
       </p>
       <p className="workspace-hint">
-        Commission varies with qualifying sales. Commission estimates require review.
-        Commission payouts are not automated.
+        {isInstallCommission(payment?.affiliate?.commissionType)
+          ? "Commission varies with selected conversion events, not raw app installs."
+          : "Commission varies with qualifying sales."}{" "}
+        Commission estimates require review. Commission payouts are not automated.
       </p>
     </div>
   );

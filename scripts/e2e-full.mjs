@@ -299,7 +299,7 @@ async function main() {
         body: {},
       },
     );
-    // 502 = account created but outbound email provider failed (common locally with bad RESEND key)
+    // 502 = account created but outbound email provider failed (common locally with a bad MAILERSEND key)
     if (res.ok) ok('Creator application approve');
     else if (
       res.status === 502 &&

@@ -19,8 +19,17 @@ import {
   CampaignProductsService,
   type PromotedProduct,
 } from '../campaigns/campaign-products.service';
-import { assertCommissionPayment } from '../campaigns/commission-payment';
+import {
+  assertCommissionPayment,
+  isAppInstallPayment,
+} from '../campaigns/commission-payment';
+import {
+  conversionPayout,
+  isInstallConversionEvent,
+  type InstallConversion,
+} from '../campaigns/install-conversions';
 import type { CampaignPaymentDto } from '../campaigns/dto/campaign.dto';
+import { creatorShareUrl } from './creator-share-url';
 type Db = NodePgDatabase<typeof schema>;
 type Executor = Pick<Db, 'execute'>;
 type Context = {
@@ -78,7 +87,7 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
       WHERE ${condition} AND l.revoked_at IS NULL AND ml.revoked_at IS NULL AND w.status='active' AND u.role='creator'
         AND ml.workspace_id=c.workspace_id AND ml.vendor_id::text=chosen.product->>'vendorId'
         AND ml.merchant_brand_id::text=chosen.product->>'brandId'
-        AND s.payment_snapshot->>'model'='commission'
+        AND s.payment_snapshot->>'model' IN ('commission','product_commission')
         ${active ? sql`AND c.status='active' AND c.start_date<=CURRENT_DATE AND c.end_date>=CURRENT_DATE` : sql``}
       FOR SHARE OF l,s,c,w,ml,u`);
     const context = result.rows[0] as Context | undefined;
@@ -93,13 +102,87 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
       this.config.get('CREATOR_LINKS_ENABLED') !== true
     )
       return { enabled: false, campaigns: [] };
-    const rows = await this.db
-      .execute(sql`SELECT DISTINCT ON (s.campaign_id,p.product->>'productId') s.campaign_id AS "campaignId",s.campaign_name AS name,
-      p.product->>'title' AS "productTitle",p.product->>'productId' AS "productId"
-      FROM thesi.campaign_acceptance_snapshot s CROSS JOIN LATERAL jsonb_array_elements(COALESCE(s.payment_snapshot->'promotedProducts',jsonb_build_array(s.payment_snapshot->'promotedProduct'))) p(product) WHERE s.creator_user_id=${userId}
-      AND s.payment_snapshot->>'model'='commission' AND s.payment_snapshot->'promotedProduct' IS NOT NULL
-      ORDER BY s.campaign_id,p.product->>'productId',s.accepted_at,s.id LIMIT 200`);
-    return { enabled: true, campaigns: rows.rows };
+    const rows = await this.db.execute(sql`
+      SELECT * FROM (
+        (
+          SELECT DISTINCT ON (s.campaign_id, p.product->>'productId')
+            s.campaign_id AS "campaignId",
+            s.campaign_name AS name,
+            p.product->>'title' AS "productTitle",
+            p.product->>'productId' AS "productId",
+            s.payment_snapshot#>>'{hybrid,affiliate,commissionType}' AS "commissionType",
+            s.payment_snapshot#>>'{hybrid,affiliate,installApp}' AS "installApp",
+            l.public_code AS "publicCode"
+          FROM thesi.campaign_acceptance_snapshot s
+          CROSS JOIN LATERAL jsonb_array_elements(
+            COALESCE(s.payment_snapshot->'promotedProducts', jsonb_build_array(s.payment_snapshot->'promotedProduct'))
+          ) p(product)
+          LEFT JOIN thesi.creator_tracking_link l
+            ON l.acceptance_snapshot_id=s.id AND l.revoked_at IS NULL
+            AND COALESCE(to_jsonb(l)->>'product_id', s.payment_snapshot#>>'{promotedProduct,productId}')=p.product->>'productId'
+          WHERE s.creator_user_id=${userId}
+            AND s.payment_snapshot->>'model' IN ('commission','product_commission')
+            AND s.payment_snapshot->'promotedProduct' IS NOT NULL
+          ORDER BY s.campaign_id, p.product->>'productId', s.accepted_at, s.id
+        )
+        UNION ALL
+        (
+          SELECT DISTINCT ON (s.campaign_id)
+            s.campaign_id AS "campaignId",
+            s.campaign_name AS name,
+            NULL::text AS "productTitle",
+            NULL::text AS "productId",
+            s.payment_snapshot#>>'{hybrid,affiliate,commissionType}' AS "commissionType",
+            s.payment_snapshot#>>'{hybrid,affiliate,installApp}' AS "installApp",
+            l.public_code AS "publicCode"
+          FROM thesi.campaign_acceptance_snapshot s
+          LEFT JOIN thesi.creator_tracking_link l
+            ON l.acceptance_snapshot_id=s.id AND l.revoked_at IS NULL AND l.product_id IS NULL
+          WHERE s.creator_user_id=${userId}
+            AND s.payment_snapshot->>'model' IN ('commission','app_install')
+            AND s.payment_snapshot#>>'{hybrid,affiliate,commissionType}'='fixed_amount_per_install'
+            AND s.payment_snapshot->'promotedProduct' IS NULL
+            AND s.payment_snapshot->'promotedProducts' IS NULL
+          ORDER BY s.campaign_id, s.accepted_at, s.id
+        )
+      ) links
+      LIMIT 200`);
+    return {
+      enabled: true,
+      campaigns: (
+        rows.rows as Array<{
+          campaignId: string;
+          name: string;
+          productTitle: string | null;
+          productId: string | null;
+          commissionType: string | null;
+          installApp: 'customer' | 'vendor' | null;
+          publicCode: string | null;
+        }>
+      ).map((row) => {
+        const install =
+          row.commissionType === 'fixed_amount_per_install' && !row.productId;
+        return {
+          campaignId: row.campaignId,
+          name: row.name,
+          productTitle: row.productTitle ?? null,
+          productId: row.productId ?? null,
+          commissionType: row.commissionType,
+          linkType: install ? 'install' : 'sale',
+          url: row.publicCode
+            ? creatorShareUrl(
+                {
+                  publicCode: row.publicCode,
+                  productId: row.productId,
+                  install,
+                  installApp: row.installApp,
+                },
+                this.config,
+              )
+            : null,
+        };
+      }),
+    };
   }
   async issue(userId: string, campaignId: string, productId?: string) {
     this.enabled();
@@ -118,10 +201,7 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
         selected =
           products.find((p) => p.productId === productId) ??
           (!productId ? products[0] : undefined);
-      const installCampaign =
-        payment.model === 'commission' &&
-        payment.hybrid?.affiliate?.commissionType ===
-          'fixed_amount_per_install';
+      const installCampaign = isAppInstallPayment(payment);
       if (installCampaign && !products.length) {
         if (productId)
           throw new ForbiddenException(
@@ -140,10 +220,14 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
           link_type: 'install',
         });
         return {
-          url: new URL(
-            `/i/${row.rows[0].public_code}`,
-            this.config.getOrThrow<string>('THESI_WEB_URL'),
-          ).toString(),
+          url: creatorShareUrl(
+            {
+              publicCode: String(row.rows[0].public_code),
+              install: true,
+              installApp: payment.hybrid?.affiliate?.installApp,
+            },
+            this.config,
+          ),
         };
       }
       if (!selected)
@@ -175,17 +259,53 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
         commission_type: context.payment.hybrid?.affiliate?.commissionType,
       });
       return {
-        url: new URL(
-          `/r/${row.rows[0].public_code}`,
-          this.config.getOrThrow<string>('THESI_WEB_URL'),
-        ).toString(),
+        url: creatorShareUrl(
+          {
+            publicCode: String(row.rows[0].public_code),
+            productId: selected.productId,
+          },
+          this.config,
+        ),
       };
     });
+  }
+  async issueAccepted(userId: string, campaignId: string) {
+    try {
+      this.enabled();
+      this.newLinks();
+    } catch {
+      return;
+    }
+    try {
+      const result = await this.db.execute(
+        sql`SELECT payment_snapshot FROM thesi.campaign_acceptance_snapshot WHERE campaign_id=${campaignId}::uuid AND creator_user_id=${userId} ORDER BY accepted_at,id LIMIT 1`,
+      );
+      const payment = result.rows[0]?.payment_snapshot as
+        | CampaignPaymentDto
+        | undefined;
+      if (!payment) return;
+      const products = promotedProducts(payment);
+      if (isAppInstallPayment(payment) && !products.length) {
+        await this.issue(userId, campaignId);
+        return;
+      }
+      for (const product of products)
+        await this.issue(userId, campaignId, product.productId);
+    } catch {
+      /* Accept still succeeds if link minting is paused or the campaign is not commission. */
+    }
   }
   async preview(code: string) {
     this.enabled();
     const c = await this.context(this.db, sql`l.public_code=${code}`, true);
-    return this.products.preview(c.product.brandId, c.product.productId);
+    return {
+      ...(await this.products.preview(c.product.brandId, c.product.productId)),
+      productId: c.product.productId,
+      shareUrl: creatorShareUrl(
+        { publicCode: code, productId: c.product.productId },
+        this.config,
+      ),
+    };
   }
   async click(code: string) {
     this.enabled();
@@ -212,6 +332,33 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
       deepLink: `clothme://creator-link/${grant}`,
       redeemWithinSeconds: 900,
     };
+  }
+  async openProduct(code: string, buyerKey: string) {
+    this.enabled();
+    this.newLinks();
+    return this.db.transaction(async (tx) => {
+      const c = await this.context(tx, sql`l.public_code=${code}`, true);
+      await this.products.preview(c.product.brandId, c.product.productId);
+      const days = c.payment.hybrid!.affiliate!.attributionWindowDays!;
+      const grant = token();
+      await tx.execute(sql`INSERT INTO thesi.creator_click_grant(tracking_link_id,code_hash,buyer_key,claimed_at,redeem_until,expires_at)
+        VALUES (${c.id}::uuid,${clickDigest(grant)},${buyerKey},now(),now()+interval '15 minutes',now()+${days}*interval '1 day')`);
+      const stored = (
+        await tx.execute(
+          sql`SELECT id,clicked_at,expires_at FROM thesi.creator_click_grant WHERE code_hash=${clickDigest(grant)}`,
+        )
+      ).rows[0] as { id: string; clicked_at: Date; expires_at: Date };
+      this.analytics?.track('creator_click_claimed', c.creator_id, {
+        campaign_id: c.campaign_id,
+        workspace_id: c.workspace_id,
+        tracking_link_id: c.id,
+        acceptance_snapshot_id: c.snapshot_id,
+        product_id: c.product.productId,
+        receipt_id: stored.id,
+        commission_type: c.payment.hybrid?.affiliate?.commissionType,
+      });
+      return this.receipt(c, stored);
+    });
   }
   async claim(code: string, buyerKey: string) {
     this.enabled();
@@ -291,7 +438,7 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
           AND c.status='active'
           AND c.start_date<=CURRENT_DATE
           AND c.end_date>=CURRENT_DATE
-          AND s.payment_snapshot->>'model'='commission'
+          AND s.payment_snapshot->>'model' IN ('commission','app_install')
           AND s.payment_snapshot#>>'{hybrid,affiliate,commissionType}'='fixed_amount_per_install'
         FOR SHARE OF l,s,c,w,u`);
       const row = result.rows[0] as
@@ -307,13 +454,44 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
       if (!row) throw new NotFoundException('This creator install link is unavailable');
       assertCommissionPayment(row.payment);
       const affiliate = row.payment.hybrid!.affiliate!;
-      const fixedAmountCents = affiliate.fixedAmountCents ?? 0;
-      await tx.execute(sql`INSERT INTO thesi.commission_install_event(tracking_link_id,acceptance_snapshot_id,buyer_key,creator_user_id,workspace_id,campaign_id,source,currency,accrued_cents,state,reasons)
-        VALUES(${row.tracking_link_id}::uuid,${row.snapshot_id}::uuid,${buyerKey},${row.creator_user_id},${row.workspace_id}::uuid,${row.campaign_id}::uuid,${JSON.stringify({code,buyerKey,commission:affiliate})}::jsonb,${affiliate.currency},${fixedAmountCents},'under_review',${JSON.stringify(['qualified_install_pending_review'])}::jsonb)
+      const days = affiliate.attributionWindowDays ?? 30;
+      const expiresAt = new Date(
+        Date.now() + days * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      await tx.execute(sql`INSERT INTO thesi.creator_install_touchpoint(tracking_link_id,acceptance_snapshot_id,buyer_key,creator_user_id,workspace_id,campaign_id,expires_at)
+        VALUES(${row.tracking_link_id}::uuid,${row.snapshot_id}::uuid,${buyerKey},${row.creator_user_id},${row.workspace_id}::uuid,${row.campaign_id}::uuid,${expiresAt}::timestamptz)
         ON CONFLICT (campaign_id,buyer_key) DO NOTHING`);
+      const bound = (
+        await tx.execute(
+          sql`SELECT bound_at,expires_at FROM thesi.creator_install_touchpoint WHERE campaign_id=${row.campaign_id}::uuid AND buyer_key=${buyerKey}`,
+        )
+      ).rows[0] as { bound_at: Date; expires_at: Date };
+      this.analytics?.track('creator_install_bound', row.creator_user_id, {
+        campaign_id: row.campaign_id,
+        workspace_id: row.workspace_id,
+        tracking_link_id: row.tracking_link_id,
+        acceptance_snapshot_id: row.snapshot_id,
+        install_app: affiliate.installApp ?? 'customer',
+        conversion_count: affiliate.conversions?.length ?? 0,
+      });
+      if (affiliate.conversions?.length) {
+        return {
+          campaignId: row.campaign_id,
+          creatorId: row.creator_user_id,
+          currency: affiliate.currency,
+          accruedCents: 0,
+          state: 'bound',
+          boundAt: new Date(bound.bound_at).toISOString(),
+          expiresAt: new Date(bound.expires_at).toISOString(),
+        };
+      }
+      const fixedAmountCents = affiliate.fixedAmountCents ?? 0;
+      await tx.execute(sql`INSERT INTO thesi.commission_install_event(tracking_link_id,acceptance_snapshot_id,buyer_key,creator_user_id,workspace_id,campaign_id,conversion_event,source,currency,accrued_cents,state,reasons)
+        VALUES(${row.tracking_link_id}::uuid,${row.snapshot_id}::uuid,${buyerKey},${row.creator_user_id},${row.workspace_id}::uuid,${row.campaign_id}::uuid,'legacy_qualified_install',${JSON.stringify({code,buyerKey,commission:affiliate})}::jsonb,${affiliate.currency},${fixedAmountCents},'under_review',${JSON.stringify(['qualified_install_pending_review'])}::jsonb)
+        ON CONFLICT (campaign_id,buyer_key,conversion_event) DO NOTHING`);
       const stored = (
         await tx.execute(
-          sql`SELECT event_id,accrued_cents::text AS accrued_cents,state,received_at FROM thesi.commission_install_event WHERE campaign_id=${row.campaign_id}::uuid AND buyer_key=${buyerKey}`,
+          sql`SELECT event_id,accrued_cents::text AS accrued_cents,state,received_at FROM thesi.commission_install_event WHERE campaign_id=${row.campaign_id}::uuid AND buyer_key=${buyerKey} AND conversion_event='legacy_qualified_install'`,
         )
       ).rows[0] as any;
       this.analytics?.track('creator_install_attributed', row.creator_user_id, {
@@ -334,7 +512,82 @@ export class CreatorTrackingService implements OnApplicationBootstrap {
         accruedCents: Number(stored.accrued_cents),
         state: stored.state,
         receivedAt: new Date(stored.received_at).toISOString(),
+        boundAt: new Date(bound.bound_at).toISOString(),
+        expiresAt: new Date(bound.expires_at).toISOString(),
       };
+    });
+  }
+  async recordConversion(
+    buyerKey: string,
+    event: string,
+    listedProductCount?: number,
+  ) {
+    this.enabled();
+    if (!isInstallConversionEvent(event)) {
+      throw new NotFoundException('This conversion event is unavailable');
+    }
+    return this.db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT t.tracking_link_id,t.acceptance_snapshot_id AS snapshot_id,t.creator_user_id,t.workspace_id,t.campaign_id,s.payment_snapshot AS payment
+        FROM thesi.creator_install_touchpoint t
+        JOIN thesi.campaign_acceptance_snapshot s ON s.id=t.acceptance_snapshot_id
+        JOIN thesi.creator_tracking_link l ON l.id=t.tracking_link_id
+        WHERE t.buyer_key=${buyerKey}
+          AND t.expires_at>now()
+          AND l.revoked_at IS NULL
+        FOR SHARE OF t,s,l`);
+      const applied: Array<{
+        campaignId: string;
+        creatorId: string;
+        event: string;
+        accruedCents: number;
+        state: string;
+      }> = [];
+      for (const raw of result.rows as Array<{
+        tracking_link_id: string;
+        snapshot_id: string;
+        creator_user_id: string;
+        workspace_id: string;
+        campaign_id: string;
+        payment: CampaignPaymentDto;
+      }>) {
+        const affiliate = raw.payment.hybrid?.affiliate;
+        const payout = conversionPayout(
+          affiliate?.conversions as InstallConversion[] | undefined,
+          event,
+          listedProductCount,
+        );
+        if (!payout.selected) continue;
+        const accruedCents = payout.amountCents ?? 0;
+        const reasons =
+          accruedCents > 0
+            ? ['conversion_pending_review']
+            : ['tracked_no_payout'];
+        await tx.execute(sql`INSERT INTO thesi.commission_install_event(tracking_link_id,acceptance_snapshot_id,buyer_key,creator_user_id,workspace_id,campaign_id,conversion_event,source,currency,accrued_cents,state,reasons)
+          VALUES(${raw.tracking_link_id}::uuid,${raw.snapshot_id}::uuid,${buyerKey},${raw.creator_user_id},${raw.workspace_id}::uuid,${raw.campaign_id}::uuid,${event},${JSON.stringify({buyerKey,event,listedProductCount,commission:affiliate})}::jsonb,${affiliate?.currency ?? 'USD'},${accruedCents},'under_review',${JSON.stringify(reasons)}::jsonb)
+          ON CONFLICT (campaign_id,buyer_key,conversion_event) DO NOTHING`);
+        const stored = (
+          await tx.execute(
+            sql`SELECT accrued_cents::text AS accrued_cents,state FROM thesi.commission_install_event WHERE campaign_id=${raw.campaign_id}::uuid AND buyer_key=${buyerKey} AND conversion_event=${event}`,
+          )
+        ).rows[0] as { accrued_cents: string; state: string };
+        this.analytics?.track('creator_install_converted', raw.creator_user_id, {
+          campaign_id: raw.campaign_id,
+          workspace_id: raw.workspace_id,
+          tracking_link_id: raw.tracking_link_id,
+          conversion_event: event,
+          accrued_cents: Number(stored.accrued_cents),
+          state: stored.state,
+        });
+        applied.push({
+          campaignId: raw.campaign_id,
+          creatorId: raw.creator_user_id,
+          event,
+          accruedCents: Number(stored.accrued_cents),
+          state: stored.state,
+        });
+      }
+      return { applied };
     });
   }
   private receipt(

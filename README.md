@@ -78,15 +78,15 @@ Implemented in `thesi-api/src/shared/platform-fee/platform-fee.util.ts`.
 
 ## Email
 
-Supports **Resend** (primary) and **AWS SES** (fallback). If neither is configured, emails are logged to the console in development.
+Supports **MailerSend** (primary) and **Mailtrap** (fallback). If neither is configured, emails are logged to the console in development.
 
-| Variable           | Purpose              |
-|--------------------|----------------------|
-| `RESEND_API_KEY`   | Resend API key       |
-| `AWS_SES_REGION`   | SES region           |
-| `AWS_ACCESS_KEY_ID`| AWS credentials      |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials |
-| `EMAIL_FROM`       | Sender address       |
+Add API tokens in `thesi-api/.env` locally, and in cluster secret `thesi-api-secrets` (not the ConfigMap). For Novu-triggered mail, add the same providers in the Novu dashboard (Integrations → Email): MailerSend primary, Mailtrap failover. Disable Resend there.
+
+| Variable             | Purpose                    |
+|----------------------|----------------------------|
+| `MAILERSEND_API_KEY` | MailerSend API token       |
+| `MAILTRAP_API_KEY`   | Mailtrap API token (fallback) |
+| `EMAIL_FROM`         | Sender address             |
 
 ## Database (Flyway)
 

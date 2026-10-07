@@ -1,6 +1,8 @@
 import {
   assertCommissionPayment,
   commissionInviteTerms,
+  isAppInstallPayment,
+  isProductCommissionPayment,
 } from './commission-payment';
 import type { CampaignPaymentDto } from './dto/campaign.dto';
 import { previewPlatformFee } from 'src/shared/platform-fee/platform-fee.util';
@@ -114,5 +116,93 @@ describe('commission terms', () => {
     fixed.hybrid!.affiliate!.fixedAmountCents = 250;
     expect(() => assertCommissionPayment(fixed)).not.toThrow();
     expect(commissionInviteTerms(fixed)).toContain('$2.50 per attributed product sale');
+    const install = commissionFixture();
+    install.hybrid!.affiliate!.commissionType = 'fixed_amount_per_install';
+    install.hybrid!.affiliate!.commissionPercent = undefined;
+    install.hybrid!.affiliate!.fixedAmountCents = 200;
+    install.hybrid!.affiliate!.fundingFlowVersion = 1;
+    install.hybrid!.affiliate!.payoutHandler = 'clothme';
+    install.hybrid!.affiliate!.fundingSource = 'brand';
+    expect(() => assertCommissionPayment(install)).not.toThrow();
+    expect(commissionInviteTerms(install)).toContain('$2.00 per qualified app install');
+    expect(commissionInviteTerms(install)).toContain('does not collect a prepaid install pool');
+    expect(commissionInviteTerms(install)).not.toContain('funded campaign balance');
+  });
+
+  it('treats product_commission and app_install as first-class models', () => {
+    const product = commissionFixture();
+    product.model = 'product_commission';
+    expect(isProductCommissionPayment(product)).toBe(true);
+    expect(() => assertCommissionPayment(product)).not.toThrow();
+    const install = commissionFixture();
+    install.model = 'app_install';
+    install.hybrid!.affiliate!.commissionType = 'fixed_amount_per_install';
+    install.hybrid!.affiliate!.commissionPercent = undefined;
+    install.hybrid!.affiliate!.fixedAmountCents = 200;
+    expect(isAppInstallPayment(install)).toBe(true);
+    expect(() => assertCommissionPayment(install)).not.toThrow();
+    expect(isAppInstallPayment(commissionFixture())).toBe(false);
+    expect(
+      isProductCommissionPayment({
+        model: 'commission',
+        hybrid: { affiliate: { commissionType: 'fixed_amount_per_install' } },
+      }),
+    ).toBe(false);
+    const mixed = commissionFixture();
+    mixed.model = 'product_commission';
+    mixed.hybrid!.affiliate!.commissionType = 'fixed_amount_per_install';
+    mixed.hybrid!.affiliate!.commissionPercent = undefined;
+    mixed.hybrid!.affiliate!.fixedAmountCents = 200;
+    expect(() => assertCommissionPayment(mixed)).toThrow(/cannot use app install/i);
+    const installPercent = commissionFixture();
+    installPercent.model = 'app_install';
+    expect(() => assertCommissionPayment(installPercent)).toThrow(
+      /fixed amount per qualified install/i,
+    );
+  });
+
+  it('accepts mixed paid and tracked install conversion events', () => {
+    const payment = commissionFixture();
+    payment.model = 'app_install';
+    payment.hybrid!.affiliate!.commissionType = 'fixed_amount_per_install';
+    payment.hybrid!.affiliate!.commissionPercent = undefined;
+    payment.hybrid!.affiliate!.fixedAmountCents = undefined;
+    payment.hybrid!.affiliate!.installApp = 'customer';
+    payment.hybrid!.affiliate!.fundingFlowVersion = 1;
+    payment.hybrid!.affiliate!.payoutHandler = 'clothme';
+    payment.hybrid!.affiliate!.fundingSource = 'brand';
+    payment.hybrid!.affiliate!.conversions = [
+      { event: 'verified_account', amountCents: 100 },
+      { event: 'fit_profile_completed' },
+      { event: 'first_purchase', amountCents: 500 },
+    ];
+    expect(() => assertCommissionPayment(payment)).not.toThrow();
+    expect(commissionInviteTerms(payment)).toContain('$1.00 for Verified account');
+    expect(commissionInviteTerms(payment)).toContain(
+      'Fit profile completed (tracked, no payout)',
+    );
+    expect(commissionInviteTerms(payment)).toContain('$5.00 for First purchase');
+    expect(commissionInviteTerms(payment)).toContain(
+      'Opening the install link only attributes the new user',
+    );
+  });
+
+  it('rejects install campaigns with no conversion events or payout', () => {
+    const payment = commissionFixture();
+    payment.model = 'app_install';
+    payment.hybrid!.affiliate!.commissionType = 'fixed_amount_per_install';
+    payment.hybrid!.affiliate!.commissionPercent = undefined;
+    payment.hybrid!.affiliate!.fixedAmountCents = undefined;
+    expect(() => assertCommissionPayment(payment)).toThrow(/conversion event/i);
+  });
+
+  it('rejects vendor events on a customer install campaign', () => {
+    const payment = commissionFixture();
+    payment.model = 'app_install';
+    payment.hybrid!.affiliate!.commissionType = 'fixed_amount_per_install';
+    payment.hybrid!.affiliate!.commissionPercent = undefined;
+    payment.hybrid!.affiliate!.installApp = 'customer';
+    payment.hybrid!.affiliate!.conversions = [{ event: 'vendor_registered' }];
+    expect(() => assertCommissionPayment(payment)).toThrow(/Customer or Vendor/i);
   });
 });

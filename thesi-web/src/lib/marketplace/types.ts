@@ -11,7 +11,14 @@ export type MarketplaceListingType =
   | "mixed_bundle"
   | "long_form";
 
-export type PaymentStructure = "flat_rate" | "milestone" | "royalty" | "hybrid" | "commission";
+export type PaymentStructure =
+  | "flat_rate"
+  | "milestone"
+  | "royalty"
+  | "hybrid"
+  | "commission"
+  | "product_commission"
+  | "app_install";
 export type MilestoneStructure = "cumulative" | "highest_achieved";
 
 export type MarketplaceListingStatus = "open" | "closing_soon" | "closed";
@@ -154,6 +161,8 @@ export const PAYMENT_STRUCTURE_LABELS: Record<PaymentStructure, string> = {
   royalty: "Royalty",
   hybrid: "Hybrid",
   commission: "Commission",
+  product_commission: "Product commission",
+  app_install: "App install",
 };
 
 export const EMPTY_LISTING_CREATOR_BENEFITS: MarketplaceListing["creatorBenefits"] = {
@@ -244,6 +253,8 @@ export function formatListingPayment(payment: MarketplacePayment): string {
     case "royalty":
       return `${payment.royaltyPercent}% royalty${payment.royaltyMinimumCents ? ` · min ${formatCents(payment.royaltyMinimumCents)}` : ""}`;
     case "commission":
+    case "product_commission":
+    case "app_install":
       return commissionSummary(payment.hybrid);
     case "hybrid":
       return formatHybridPaymentSummary(payment);

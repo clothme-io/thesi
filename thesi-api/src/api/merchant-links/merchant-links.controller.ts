@@ -1,10 +1,11 @@
 import { Body, CanActivate, Controller, ExecutionContext, Get, Injectable, Param, ParseUUIDPipe, Post, UseGuards, UnauthorizedException, NotFoundException,ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual } from 'node:crypto';
-import { IsIn, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Matches, Min } from 'class-validator';
 import { JwtAuthGuard, type AuthJwtPayload } from 'src/shared/auth/jwt-auth.guard';
 import { CurrentUser } from 'src/shared/auth/current-user.decorator';
 import { MerchantLinksService } from './merchant-links.service';
+import { ProductCampaignService, type ProductCampaignInput } from './product-campaign.service';
 
 class MerchantBrandDto { @IsUUID() vendorId!: string; @IsUUID() brandId!: string; }
 class StartDto extends MerchantBrandDto {
@@ -21,6 +22,28 @@ class CompleteDto extends MerchantBrandDto {
   @Matches(/^[A-Za-z0-9_-]{43}$/) verifier!: string;
 }
 class RevokeDto extends MerchantBrandDto { @IsUUID() linkId!: string; }
+class ProductCampaignReadDto extends MerchantBrandDto { @IsUUID() campaignId!: string; }
+class ProductCampaignCurrentDto extends MerchantBrandDto { @IsUUID() productId!: string; }
+class ProductCampaignDto extends MerchantBrandDto {
+  @IsUUID() productId!: string;
+  @IsOptional() @IsUUID() campaignId?: string;
+  @IsString() @Length(1, 160) name!: string;
+  @IsString() @Length(0, 1000) description!: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) startDate!: string;
+  @Matches(/^\d{4}-\d{2}-\d{2}$/) endDate!: string;
+  @IsString() @Length(1, 8000) brief!: string;
+  @IsString() @Length(1, 4000) deliverables!: string;
+  @IsArray() @ArrayMinSize(1) @IsIn(['tiktok', 'instagram_reels', 'youtube_shorts', 'ugc_photos', 'mixed_bundle', 'long_form'], { each: true }) contentTypes!: string[];
+  @IsIn(['percentage_of_sale', 'fixed_amount_per_sale']) commissionType!: 'percentage_of_sale' | 'fixed_amount_per_sale';
+  @IsOptional() @IsNumber() @Min(0) commissionPercent?: number;
+  @IsOptional() @IsInt() @Min(0) fixedAmountCents?: number;
+  @IsString() @Length(1, 2000) notes!: string;
+  @IsInt() @Min(1) attributionWindowDays!: number;
+  @IsInt() @Min(1) creatorSlots!: number;
+  @IsInt() @Min(0) reviewDays!: number;
+  @IsIn(['on_approval', 'weekly', 'monthly']) payoutFrequency!: 'on_approval' | 'weekly' | 'monthly';
+  @IsInt() @Min(0) minimumPayoutCents!: number;
+}
 const ok = (data: unknown) => ({ status: 200, error: null, data });
 
 @Injectable()
@@ -40,8 +63,11 @@ export class MerchantServiceGuard implements CanActivate {
 @Controller('internal/merchant-links')
 @UseGuards(MerchantServiceGuard)
 export class MerchantLinkInternalController {
-  constructor(private readonly links: MerchantLinksService) {}
+  constructor(private readonly links: MerchantLinksService, private readonly productCampaigns: ProductCampaignService) {}
   @Post('start') async start(@Body() dto: StartDto) { return ok(await this.links.start(dto)); }
+  @Post('product-campaign/read') async readProductCampaign(@Body() dto: ProductCampaignReadDto) { return ok(await this.productCampaigns.read(dto.vendorId, dto.brandId, dto.campaignId)); }
+  @Post('product-campaign/current') async currentProductCampaign(@Body() dto: ProductCampaignCurrentDto) { return ok(await this.productCampaigns.current(dto.vendorId, dto.brandId, dto.productId)); }
+  @Post('product-campaign') async upsertProductCampaign(@Body() dto: ProductCampaignDto) { return ok(await this.productCampaigns.upsert(dto as ProductCampaignInput)); }
   @Post('review') async review(@Body() dto: CompleteDto) { return ok(await this.links.review(dto)); }
   @Post('complete') async complete(@Body() dto: CompleteDto) { return ok(await this.links.complete(dto)); }
   @Post('status') async status(@Body() dto: MerchantBrandDto) { return ok(await this.links.status(dto.vendorId, dto.brandId)); }

@@ -14,7 +14,10 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { isDeepStrictEqual } from 'node:util';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
-import { assertCommissionPayment } from '../campaigns/commission-payment';
+import {
+  assertCommissionPayment,
+  isProductCommissionPayment,
+} from '../campaigns/commission-payment';
 import { workspaceContext } from '../brand-workspaces/workspace-context';
 import { CommissionEventDto } from './commission-event.dto';
 import { commissionResult } from './commission-math';
@@ -123,7 +126,7 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
         throw new ForbiddenException(
           'Sale does not match its attribution receipt',
         );
-      if (r.payment.model !== 'commission')
+      if (!isProductCommissionPayment(r.payment))
         throw new ForbiddenException('No accepted commission terms');
       assertCommissionPayment(r.payment);
       const affiliate = r.payment.hybrid.affiliate;
@@ -277,6 +280,7 @@ export class CommissionEarningsService implements OnApplicationBootstrap {
       ? (
           await db.execute(sql`
             SELECT event_id AS "eventId",campaign_id AS "campaignId",creator_user_id AS "creatorUserId",
+              to_jsonb(i)->>'conversion_event' AS "conversionEvent",
               currency,accrued_cents::text AS "accruedCents",state,reasons,received_at AS "updatedAt"
             FROM thesi.commission_install_event i
             WHERE ${installScope}

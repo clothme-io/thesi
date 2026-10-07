@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { CreatorLinksPageContent } from "@/components/creator/CreatorLinksPageContent";
 
 export default function CreatorLinksPage() {
-  redirect("/app/marketplace");
+  return <CreatorLinksPageContent />;
 }

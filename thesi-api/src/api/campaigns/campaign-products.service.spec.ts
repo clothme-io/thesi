@@ -153,6 +153,23 @@ describe('Merchant campaign products', () => {
       } as any),
     ).resolves.toBeUndefined();
   });
+  it('keeps app install campaigns product-free and requires a product for product commission', async () => {
+    await expect(
+      service.prepare(
+        'owner',
+        input({
+          payment: { model: 'app_install' },
+          merchantProductId: productId,
+        }),
+      ),
+    ).rejects.toThrow('do not use a Merchant product');
+    await expect(
+      service.prepare(
+        'owner',
+        input({ status: 'active', payment: { model: 'product_commission' } }),
+      ),
+    ).rejects.toThrow('Select a Merchant product');
+  });
   it('rejects browser-provided product snapshots at the DTO boundary', async () => {
     const dto = plainToInstance(UpsertCampaignDto, {
       status: 'draft',

@@ -4,7 +4,11 @@ import type { PromotedProduct } from "@/lib/brand-campaigns/types";
 import {campaignProducts} from "@/components/brand/campaigns/CampaignProductSelection";
 import { PromotedProductDetails } from "@/components/brand/campaigns/PromotedProductDetails";
 import { CommissionPaymentDetails } from "@/components/brand/campaigns/CommissionPaymentDetails";
-import { commissionSummary } from "@/lib/brand-campaigns/commission";
+import {
+  commissionSummary,
+  isAttributedCommissionPayment,
+  isProductCommissionPayment,
+} from "@/lib/brand-campaigns/commission";
 
 
 import { useEffect, useState } from "react";
@@ -67,7 +71,14 @@ type AcceptanceSnapshot = {
   paymentSnapshot: {
     promotedProduct?: PromotedProduct;
   promotedProducts?: PromotedProduct[];
-    model: "flat_rate" | "milestone" | "royalty" | "hybrid" | "commission";
+    model:
+      | "flat_rate"
+      | "milestone"
+      | "royalty"
+      | "hybrid"
+      | "commission"
+      | "product_commission"
+      | "app_install";
     flatRateCents?: number;
     milestoneStructure?: "cumulative" | "highest_achieved";
     milestones?: Array<{
@@ -89,6 +100,8 @@ const CAMPAIGN_PAYMENT_LABELS: Record<AcceptanceSnapshot["paymentSnapshot"]["mod
   royalty: "Royalty",
   hybrid: "Hybrid",
   commission: "Commission",
+  product_commission: "Product commission",
+  app_install: "App install",
 };
 
 function formatCents(cents = 0): string {
@@ -114,6 +127,8 @@ function formatAcceptedPayment(
     case "royalty":
       return `${payment.royaltyPercent ?? 0}% royalty`;
     case "commission":
+    case "product_commission":
+    case "app_install":
       return commissionSummary(payment.hybrid);
     case "hybrid":
       return formatHybridPaymentSummary({
@@ -150,7 +165,7 @@ const AFFILIATE_TYPE_LABELS: Record<string, string> = {
   percentage_of_sale: "of each sale",
   percentage_of_platform_commission: "of platform commission",
   fixed_amount_per_sale: "per sale",
-  fixed_amount_per_install: "per qualified install",
+  fixed_amount_per_install: "per selected conversion",
 };
 
 const POOL_DISTRIBUTION_LABELS: Record<string, string> = {
@@ -703,7 +718,8 @@ export function MarketplaceDetailContent() {
                 product={p}
                 trackingCampaignId={
                   !isBrand &&
-                  acceptanceSnapshot?.paymentSnapshot.model === "commission" &&
+                  acceptanceSnapshot &&
+                  isProductCommissionPayment(acceptanceSnapshot.paymentSnapshot) &&
                   process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true"
                     ? acceptanceSnapshot.campaignId
                     : undefined
@@ -1052,8 +1068,19 @@ export function MarketplaceDetailContent() {
                   )}
                 </>
               )}
-              {listing.payment.structure === "commission" && (
-                <CommissionPaymentDetails payment={acceptanceSnapshot?.paymentSnapshot.model === "commission" ? acceptanceSnapshot.paymentSnapshot.hybrid : listing.payment.hybrid} />
+              {isAttributedCommissionPayment({
+                model: listing.payment.structure,
+                hybrid: listing.payment.hybrid,
+              }) && (
+                <CommissionPaymentDetails
+                  payment={
+                    isAttributedCommissionPayment(
+                      acceptanceSnapshot?.paymentSnapshot,
+                    )
+                      ? acceptanceSnapshot?.paymentSnapshot.hybrid
+                      : listing.payment.hybrid
+                  }
+                />
               )}
               {listing.payment.structure === "hybrid" && (
                 <HybridPaymentDetails payment={listing.payment} />

@@ -6,18 +6,16 @@ const request=vi.fn();
 vi.mock('@/context/AuthProvider',()=>({useAuth:()=>({authenticatedRequest:request})}));
 afterEach(()=>{cleanup();vi.restoreAllMocks();request.mockReset();});
 describe('creator links',()=>{
- it('requires a deliberate creator action before issuing a link',async()=>{
-  request.mockResolvedValue({url:'https://thesi.test/r/'+ 'a'.repeat(43)});
-  render(<CreatorTrackingLink campaignId="campaign"/>);expect(request).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button',{name:'Get my creator link'}));
-  await screen.findByLabelText('Personal product link');
+ it('issues the product link automatically for the accepted campaign',async()=>{
+  request.mockResolvedValue({url:'https://clothme.io/product/p1?c='+ 'a'.repeat(43)});
+  render(<CreatorTrackingLink campaignId="campaign"/>);
+  expect(await screen.findByLabelText('Product link')).toHaveValue('https://clothme.io/product/p1?c='+ 'a'.repeat(43));
   expect(request).toHaveBeenCalledWith('/api/creator-tracking/links',{method:'POST',body:{campaignId:'campaign'}});
  });
  it('labels and requests the selected product link',async()=>{
-  request.mockResolvedValue({url:'https://thesi.test/r/'+ 'c'.repeat(43)});
+  request.mockResolvedValue({url:'https://clothme.io/product/shirt?c='+ 'c'.repeat(43)});
   render(<CreatorTrackingLink campaignId="campaign" productId="shirt" productTitle="Linen shirt"/>);
-  fireEvent.click(screen.getByRole('button',{name:'Get my creator link'}));
-  expect(await screen.findByLabelText('Commission link for Linen shirt')).toBeInTheDocument();
+  expect(await screen.findByLabelText('Promote link for Linen shirt')).toBeInTheDocument();
   expect(request).toHaveBeenCalledWith('/api/creator-tracking/links',{method:'POST',body:{campaignId:'campaign',productId:'shirt'}});
  });
  it('does not generate shopper clicks on page load',async()=>{

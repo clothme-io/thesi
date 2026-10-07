@@ -18,7 +18,14 @@ const thesiSchema = pgSchema('thesi');
 export type MarketplacePaymentJson = {
   promotedProduct?: CampaignPaymentJson['promotedProduct'];
   promotedProducts?: CampaignPaymentJson['promotedProducts'];
-  structure: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid' | 'commission';
+  structure:
+    | 'flat_rate'
+    | 'milestone'
+    | 'royalty'
+    | 'hybrid'
+    | 'commission'
+    | 'product_commission'
+    | 'app_install';
   currency: 'USD';
   flatAmountCents?: number;
   milestoneStructure?: 'cumulative' | 'highest_achieved';

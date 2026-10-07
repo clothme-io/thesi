@@ -20,6 +20,11 @@ import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { workspaceContext } from '../brand-workspaces/workspace-context';
 import type { CampaignRecord } from './campaign.repository';
+import {
+  isAppInstallPayment,
+  isAttributedCommissionPayment,
+  isProductCommissionPayment,
+} from './commission-payment';
 import type { UpsertCampaignDto } from './dto/campaign.dto';
 
 export type PromotedProduct = {
@@ -48,9 +53,6 @@ type Link = {
   merchant_brand_id: string;
   workspace_id: string;
 };
-const isInstallCommission = (input: UpsertCampaignDto) =>
-  input.payment.model === 'commission' &&
-  input.payment.hybrid?.affiliate?.commissionType === 'fixed_amount_per_install';
 @Injectable()
 export class CampaignProductsService {
   constructor(
@@ -237,7 +239,7 @@ export class CampaignProductsService {
   ) {
     const oldRules = existing?.payment.hybrid?.affiliate?.rules;
     const affiliate = input.payment.hybrid?.affiliate;
-    if (affiliate && input.payment.model === 'commission') {
+    if (affiliate && isAttributedCommissionPayment(input.payment)) {
       if (oldRules && !affiliate.rules) affiliate.rules = oldRules;
       if (oldRules && (preserveDraftSnapshot || existing?.status !== 'draft')) {
         if (affiliate.rules && !isDeepStrictEqual(affiliate.rules, oldRules))
@@ -317,7 +319,7 @@ export class CampaignProductsService {
         throw new BadRequestException(
           'The promoted product is locked after publishing. Create a new campaign to change it.',
         );
-      if (previous && input.payment.model !== 'commission')
+      if (previous && !isProductCommissionPayment(input.payment))
         throw new BadRequestException(
           'Published product commission terms cannot be removed',
         );
@@ -341,17 +343,17 @@ export class CampaignProductsService {
       }
       return;
     }
-    if (input.payment.model !== 'commission') {
-      if (requested)
-        throw new BadRequestException(
-          'Promoted products require Base + Commission payment',
-        );
-      return;
-    }
-    if (isInstallCommission(input)) {
+    if (isAppInstallPayment(input.payment)) {
       if (requested)
         throw new BadRequestException(
           'App install campaigns do not use a Merchant product',
+        );
+      return;
+    }
+    if (!isProductCommissionPayment(input.payment)) {
+      if (requested)
+        throw new BadRequestException(
+          'Promoted products require Product commission payment',
         );
       return;
     }
@@ -370,7 +372,7 @@ export class CampaignProductsService {
     if (!requested) {
       if (input.status === 'active')
         throw new BadRequestException(
-          'Select a Merchant product before publishing a commission campaign',
+          'Select a Merchant product before publishing a product commission campaign',
         );
       return;
     }
@@ -407,7 +409,7 @@ export class CampaignProductsService {
         throw new BadRequestException(
           'Published or funded products and variants are locked. Create a new campaign to change the agreement.',
         );
-      if (before.length && input.payment.model !== 'commission')
+      if (before.length && !isProductCommissionPayment(input.payment))
         throw new BadRequestException(
           'Published commission terms cannot be removed',
         );
@@ -434,17 +436,17 @@ export class CampaignProductsService {
       }
       throw new BadRequestException('Multi-product activation is paused');
     }
-    if (input.payment.model !== 'commission') {
-      if (requested.length)
-        throw new BadRequestException(
-          'Promoted products require Commission payment',
-        );
-      return;
-    }
-    if (isInstallCommission(input)) {
+    if (isAppInstallPayment(input.payment)) {
       if (requested.length)
         throw new BadRequestException(
           'App install campaigns do not use Merchant products',
+        );
+      return;
+    }
+    if (!isProductCommissionPayment(input.payment)) {
+      if (requested.length)
+        throw new BadRequestException(
+          'Promoted products require Product commission payment',
         );
       return;
     }
