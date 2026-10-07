@@ -321,7 +321,7 @@ export function CampaignCreateContent() {
     contentTypes,
     status,
     startDate,
-    endDate: oneMonthFromDateInputValue(startDate),
+    endDate,
     brief,
     deliverables,
     exampleVideoLinks: exampleVideoLinks.map((link) => link.trim()).filter(Boolean),
@@ -656,9 +656,9 @@ export function CampaignCreateContent() {
                   name="campaignEndDate"
                   data-testid="campaign-end-date-input"
                   type="date"
-                  readOnly
-                  aria-readonly="true"
+                  min={startDate}
                   value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                 />
               </label>
               <label className="workspace-field workspace-field--full">

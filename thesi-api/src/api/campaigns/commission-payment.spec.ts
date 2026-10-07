@@ -42,6 +42,13 @@ describe('commission terms', () => {
     expect(() => assertCommissionPayment(payment)).not.toThrow();
     expect(previewPlatformFee(payment).feeCents).toBe(0);
   });
+  it('allows an enabled zero-dollar base payment', () => {
+    const payment = commissionFixture();
+    payment.hybrid!.base!.amountCents = 0;
+    expect(() => assertCommissionPayment(payment)).not.toThrow();
+    expect(previewPlatformFee(payment)).toMatchObject({ payoutCents: 0, feeCents: 0 });
+    expect(commissionInviteTerms(payment)).toContain('$0.00 base per creator');
+  });
   it('includes the product context and honest demo destination in invitations', () => {
     const payment = commissionFixture();
     payment.promotedProduct = { productId: 'p', brandId: 'b', vendorId: 'v', linkId: 'l', workspaceId: 'w',
@@ -84,7 +91,7 @@ describe('commission terms', () => {
     },
   );
 
-  it.each([undefined, 0, -1, 1.5, 2_147_483_648])(
+  it.each([undefined, -1, 1.5, 2_147_483_648])(
     'rejects invalid base %s',
     (amount) => {
       const payment = commissionFixture();

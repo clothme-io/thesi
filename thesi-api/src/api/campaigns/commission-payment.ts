@@ -75,11 +75,11 @@ export function assertCommissionPayment(payment: CampaignPaymentDto): void {
   if (
     base?.enabled &&
     (!Number.isSafeInteger(base.amountCents) ||
-      (base.amountCents ?? 0) <= 0 ||
+      (base.amountCents ?? 0) < 0 ||
       (base.amountCents ?? 0) > 2_147_483_647 ||
       base.currency !== 'USD')
   ) {
-    fail('Base + Commission requires a positive base payment in USD cents.');
+    fail('Base + Commission requires a base payment of 0 or more in USD cents.');
   }
   if (
     base?.enabled &&

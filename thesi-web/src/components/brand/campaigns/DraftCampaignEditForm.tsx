@@ -237,7 +237,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
     contentTypes: form.contentTypes,
     status: "draft",
     startDate: form.startDate,
-    endDate: oneMonthFromDateInputValue(form.startDate),
+    endDate: form.endDate,
     brief: form.brief,
     deliverables: form.deliverables,
     exampleVideoLinks: form.exampleVideoLinks
@@ -399,9 +399,9 @@ export function DraftCampaignEditForm({
               name="campaignEndDate"
               data-testid="campaign-end-date-input"
               type="date"
-              readOnly
-              aria-readonly="true"
+              min={form.startDate}
               value={form.endDate}
+              onChange={(e) => set("endDate", e.target.value)}
             />
           </label>
           <label className="workspace-field workspace-field--full">

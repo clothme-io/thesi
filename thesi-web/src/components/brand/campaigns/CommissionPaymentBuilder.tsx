@@ -197,7 +197,7 @@ export function CommissionPaymentBuilder({
       )}
       <p className="workspace-hint">
         {value.baseEnabled
-          ? `Base deposit before launch: ${Number(creatorCapacity) > 0 && Number(value.baseAmount) > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Math.round(Number(value.baseAmount) * 100) * Number(creatorCapacity)) / 100) : "set a base amount and creator slots"}. Base per creator × creator slots. ClothME holds the deposit, releases each creator’s base after your acceptance of their work, and returns unused slot funds when you close the campaign.`
+          ? `Base deposit before launch: ${Number(creatorCapacity) > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Math.round(Number(value.baseAmount || 0) * 100) * Number(creatorCapacity)) / 100) : "set creator slots"}. Base per creator × creator slots. ClothME holds the deposit, releases each creator’s base after your acceptance of their work, and returns unused slot funds when you close the campaign.`
           : "No deposit is required. Qualifying sales fund creator commission."}{" "}
         ClothME handles payouts. Sale payouts are funded from sales. Install
         payouts require a funded campaign balance before launch.
