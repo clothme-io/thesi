@@ -297,6 +297,7 @@ describe('InvitesService', () => {
     notifyCampaignInviteResponse: jest.Mock;
   };
   let novu: { trigger: jest.Mock };
+  let tracking: { issueAccepted: jest.Mock };
   let service: InvitesService;
 
   beforeEach(() => {
@@ -336,11 +337,14 @@ describe('InvitesService', () => {
         email: 'brand@nike.com',
       }),
     };
+    tracking = { issueAccepted: jest.fn().mockResolvedValue(undefined) };
     service = new InvitesService(
       repository,
       inbox as unknown as InboxService,
       novu as unknown as NovuService,
       creatorCrm as never,
+      undefined,
+      tracking as never,
     );
   });
 
@@ -433,6 +437,7 @@ describe('InvitesService', () => {
     expect(invite.status).toBe('accepted');
     expect(invite.external).toBe(false);
     expect(invite.creatorId).toBe('creator-1');
+    expect(tracking.issueAccepted).toHaveBeenCalledWith('creator-1', 'camp-1');
     expect(novu.trigger).not.toHaveBeenCalled();
     expect(inbox.deliverCampaignInvite).not.toHaveBeenCalled();
     expect(repository.acceptanceSnapshots).toEqual([
@@ -549,6 +554,7 @@ describe('InvitesService', () => {
         campaignId: 'camp-1',
       }),
     );
+    expect(tracking.issueAccepted).toHaveBeenCalledWith('creator-1', 'camp-1');
     expect(repository.acceptanceSnapshots).toEqual([
       expect.objectContaining({
         campaignId: 'camp-1',

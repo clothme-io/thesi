@@ -1,7 +1,7 @@
 import { CampaignFundingModule } from '../campaign-funding/campaign-funding.module';
 import { CampaignProductsService } from './campaign-products.service';
 import { ProductPreviewController } from './product-preview.controller';
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from 'src/api/auth/auth.module';
 import { BillingModule } from 'src/api/billing/billing.module';
 import { ConnectModule } from 'src/api/connect/connect.module';
@@ -30,11 +30,11 @@ import { PostgresCampaignRepository } from './postgres-campaign.repository';
     MarketplaceModule,
     BillingModule,
     ConnectModule,
-    InvitesModule,
+    forwardRef(() => InvitesModule),
     InboxModule,
     CreatorsModule,
   ],
-  exports: [CampaignProductsService],
+  exports: [CampaignProductsService, CampaignsService],
   controllers: [
     CampaignsController,
     CampaignContentReviewController,

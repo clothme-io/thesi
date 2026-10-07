@@ -127,4 +127,20 @@ describe("draft form milestone round-trip", () => {
       "Priority consideration, including future ClothME work",
     ]);
   });
+
+  it("does not keep a separate guaranteed payment on save", () => {
+    const input = draftFormToInput(
+      draftFormFromCampaign(
+        campaign({
+          creatorBenefits: {
+            ...EMPTY_CREATOR_BENEFITS,
+            guaranteedPaymentCents: 30000,
+            productsKept: true,
+          },
+        }),
+      ),
+    );
+    expect(input.creatorBenefits.guaranteedPaymentCents).toBeUndefined();
+    expect(input.creatorBenefits.productsKept).toBe(true);
+  });
 });

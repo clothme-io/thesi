@@ -93,7 +93,7 @@ describe('CampaignPublicationNotifier', () => {
   it('logs analytics failures without throwing publish flow errors', async () => {
     creators.listCreators.mockResolvedValue([creatorProfile()]);
     email.sendCampaignPublishedToCreator.mockRejectedValueOnce(
-      new Error('Resend unavailable'),
+      new Error('MailerSend unavailable'),
     );
 
     await expect(
@@ -107,7 +107,7 @@ describe('CampaignPublicationNotifier', () => {
       'campaign_publication_email_failed',
       'creator-1',
       expect.objectContaining({
-        failure_reason: 'Resend unavailable',
+        failure_reason: 'MailerSend unavailable',
       }),
     );
   });

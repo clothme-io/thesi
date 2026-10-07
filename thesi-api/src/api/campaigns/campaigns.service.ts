@@ -1,7 +1,10 @@
 import { CampaignFundingService } from '../campaign-funding/campaign-funding.service';
 import { CampaignPublicationNotifier } from './campaign-publication-notifier.service';
 import { CampaignProductsService } from './campaign-products.service';
-import { assertCommissionPayment } from './commission-payment';
+import {
+  assertCommissionPayment,
+  isAttributedCommissionPayment,
+} from './commission-payment';
 import {
   BadRequestException,
   ForbiddenException,
@@ -386,7 +389,7 @@ export class CampaignsService {
       throw new NotFoundException('Campaign not found');
     }
 
-    if (campaign.payment.model === 'commission') {
+    if (isAttributedCommissionPayment(campaign.payment)) {
       throw new BadRequestException('Base + Commission records payment terms only. Commission settlements are not available yet.');
     }
 

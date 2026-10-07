@@ -18,7 +18,6 @@ import {
 } from "@/lib/invites/respond-campaign-invite";
 import { INVITE_STATUS_LABELS } from "@/lib/invites/status-labels";
 import type { InviteStatus } from "@/lib/invites/types";
-import { AcceptedCampaignCommissionLinks } from "./AcceptedCampaignCommissionLinks";
 
 type InboxTab = "messages" | "notifications";
 
@@ -456,13 +455,6 @@ export function InboxPageContent() {
                                 Delete
                               </button>
                             </div>
-                            {role === "creator" &&
-                              message.kind === "invite" &&
-                              message.campaignId &&
-                              !message.isFromMe &&
-                              inviteStatuses[message.campaignId] === "accepted" && (
-                                <AcceptedCampaignCommissionLinks campaignId={message.campaignId} />
-                              )}
                           </article>
                         );
                       })

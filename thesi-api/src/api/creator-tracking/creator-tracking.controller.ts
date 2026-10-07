@@ -1,14 +1,21 @@
 import { Body, CanActivate, Controller, ExecutionContext, ForbiddenException, Get, Injectable, ServiceUnavailableException, Param, Post, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IsOptional, IsUUID, Matches } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsUUID, Matches, Max, Min } from 'class-validator';
 import { timingSafeEqual } from 'node:crypto';
+import { INSTALL_CONVERSION_EVENTS } from '../campaigns/install-conversions';
 import { CurrentUser } from 'src/shared/auth/current-user.decorator';
 import { JwtAuthGuard, type AuthJwtPayload } from 'src/shared/auth/jwt-auth.guard';
 import { CreatorTrackingService } from './creator-tracking.service';
 class CodeDto { @Matches(/^[A-Za-z0-9_-]{43}$/) code!: string; }
 class IssueDto { @IsUUID() campaignId!: string; @IsOptional() @IsUUID() productId?:string; }
 class ClaimDto extends CodeDto { @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string; }
+class OpenProductDto extends CodeDto { @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string; }
 class InstallClaimDto extends CodeDto { @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string; }
+class InstallConversionDto {
+  @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string;
+  @IsIn(INSTALL_CONVERSION_EVENTS) event!: (typeof INSTALL_CONVERSION_EVENTS)[number];
+  @IsOptional() @IsInt() @Min(1) @Max(10_000) listedProductCount?: number;
+}
 class ValidateDto { @IsUUID() receiptId!: string; @Matches(/^[A-Za-z0-9_-]{43}$/) buyerKey!: string; }
 @Injectable()
 export class AttributionServiceGuard implements CanActivate {
@@ -38,6 +45,8 @@ export class CreatorTrackingController {
 export class CreatorAttributionController {
   constructor(private readonly tracking: CreatorTrackingService) {}
   @Post('claim') async claim(@Body() dto: ClaimDto) { return { data: await this.tracking.claim(dto.code, dto.buyerKey) }; }
+  @Post('product') async product(@Body() dto: OpenProductDto) { return { data: await this.tracking.openProduct(dto.code, dto.buyerKey) }; }
   @Post('install') async install(@Body() dto: InstallClaimDto) { return { data: await this.tracking.claimInstall(dto.code, dto.buyerKey) }; }
+  @Post('conversion') async conversion(@Body() dto: InstallConversionDto) { return { data: await this.tracking.recordConversion(dto.buyerKey, dto.event, dto.listedProductCount) }; }
   @Post('validate') async validate(@Body() dto: ValidateDto) { return { data: await this.tracking.validate(dto.receiptId, dto.buyerKey) }; }
 }

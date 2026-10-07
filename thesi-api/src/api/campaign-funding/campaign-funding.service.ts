@@ -19,6 +19,7 @@ import * as schema from 'src/dbConfig/drizzle/schema';
 import { workspaceContext } from '../brand-workspaces/workspace-context';
 import { BillingService } from '../billing/billing.service';
 import { ConnectService } from '../connect/connect.service';
+import { isAttributedCommissionPayment } from '../campaigns/commission-payment';
 import { baseFundingPlan } from './funding-plan';
 import { FundingGateway } from './funding.gateway';
 type Db = NodePgDatabase<typeof schema>;
@@ -70,7 +71,7 @@ export class CampaignFundingService
     return c;
   }
   async beforeSave(input: any, id?: string) {
-    if (input.payment?.model !== 'commission') return;
+    if (!isAttributedCommissionPayment(input.payment)) return;
     if (
       !id &&
       this.config.get('CAMPAIGN_FUNDING_ENABLED') === true &&

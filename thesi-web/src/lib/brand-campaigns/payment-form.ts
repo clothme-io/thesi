@@ -1,4 +1,12 @@
 import { DEFAULT_COMMISSION_RULES,assertCommissionRules,type CommissionRules } from './commission-rules';
+import {
+  eventsForInstallApp,
+  isInstallApp,
+  isInstallConversionEvent,
+  type InstallApp,
+  type InstallConversion,
+  type InstallConversionEvent,
+} from "./install-conversions";
 import type {
   BrandCampaign,
   BrandCampaignHybridPayment,
@@ -49,6 +57,9 @@ export type HybridPaymentFormState = {
   affiliateType: BrandCampaignHybridAffiliateType;
   affiliatePercent: string;
   affiliateFixedAmount: string;
+  installApp: InstallApp;
+  installEventAmounts: Partial<Record<InstallConversionEvent, string>>;
+  installListedProductCount: string;
   affiliateAttributionDays: string;
   affiliateTerms: string;
   creatorPoolEnabled: boolean;
@@ -162,6 +173,9 @@ export function defaultHybridPaymentForm(): HybridPaymentFormState {
     affiliateType: "percentage_of_sale",
     affiliatePercent: "",
     affiliateFixedAmount: "",
+    installApp: "customer",
+    installEventAmounts: {},
+    installListedProductCount: "",
     affiliateAttributionDays: "30",
     affiliateTerms: "",
     creatorPoolEnabled: false,
@@ -220,6 +234,66 @@ function parsePositiveInt(raw: string): number | undefined {
   return Number.isFinite(value) && value > 0 ? Math.round(value) : undefined;
 }
 
+function installEventAmountsFromPayment(
+  conversions?: InstallConversion[],
+): Partial<Record<InstallConversionEvent, string>> {
+  const amounts: Partial<Record<InstallConversionEvent, string>> = {};
+  for (const row of conversions ?? []) {
+    if (!isInstallConversionEvent(row.event)) continue;
+    amounts[row.event] = row.amountCents ? centsToInput(row.amountCents) : "";
+  }
+  return amounts;
+}
+
+export function completeInstallConversions(
+  form: HybridPaymentFormState,
+): InstallConversion[] {
+  const allowed = eventsForInstallApp(form.installApp);
+  return allowed.flatMap((event) => {
+    if (!(event in form.installEventAmounts)) return [];
+    const amount = parseMoneyToCents(form.installEventAmounts[event] ?? "");
+    const listed =
+      event === "x_products_listed"
+        ? parsePositiveInt(form.installListedProductCount)
+        : undefined;
+    return [
+      {
+        event,
+        ...(amount > 0 ? { amountCents: amount } : {}),
+        ...(listed ? { listedProductCount: listed } : {}),
+      },
+    ];
+  });
+}
+
+export function validateInstallConversions(
+  form: HybridPaymentFormState,
+): string | null {
+  if (!isInstallApp(form.installApp)) {
+    return "Choose the Customer or Vendor app for this install campaign.";
+  }
+  const selected = completeInstallConversions(form);
+  if (selected.length === 0) {
+    if (parseMoneyToCents(form.affiliateFixedAmount) > 0) return null;
+    return "Select at least one app install conversion event.";
+  }
+  for (const event of Object.keys(form.installEventAmounts) as InstallConversionEvent[]) {
+    if (!eventsForInstallApp(form.installApp).includes(event)) {
+      return "Conversion events must match the selected Customer or Vendor app.";
+    }
+    const raw = form.installEventAmounts[event] ?? "";
+    if (raw.trim() && (!isOptionalNonNegativeMoney(raw) || parseMoneyToCents(raw) > 2_147_483_647)) {
+      return "Leave the earning blank for no payout, or enter a positive USD amount.";
+    }
+  }
+  if ("x_products_listed" in form.installEventAmounts) {
+    if (!parsePositiveInt(form.installListedProductCount) || parsePositiveInt(form.installListedProductCount)! > 10_000) {
+      return "Set how many listed products qualify for that conversion.";
+    }
+  }
+  return null;
+}
+
 export function hybridPaymentToForm(
   payment?: BrandCampaign["payment"],
 ): HybridPaymentFormState {
@@ -230,7 +304,7 @@ export function hybridPaymentToForm(
     hybrid?.affiliate?.commissionPercent ?? payment?.royaltyPercent;
   return {
     ...defaults,
-    baseEnabled: hybrid?.base?.enabled ?? (payment?.model !== "commission"),
+    baseEnabled: hybrid?.base?.enabled ?? !["commission", "product_commission", "app_install"].includes(payment?.model ?? ""),
     baseAmount: centsToInput(baseAmount),
     baseTrigger: hybrid?.base?.trigger ?? defaults.baseTrigger,
     baseCustomTrigger: hybrid?.base?.customTrigger ?? "",
@@ -250,6 +324,18 @@ export function hybridPaymentToForm(
     affiliateType: hybrid?.affiliate?.commissionType ?? defaults.affiliateType,
     affiliatePercent: affiliatePercent ? String(affiliatePercent) : "",
     affiliateFixedAmount: centsToInput(hybrid?.affiliate?.fixedAmountCents),
+    installApp: isInstallApp(hybrid?.affiliate?.installApp)
+      ? hybrid.affiliate.installApp
+      : defaults.installApp,
+    installEventAmounts: installEventAmountsFromPayment(hybrid?.affiliate?.conversions),
+    installListedProductCount: hybrid?.affiliate?.conversions?.find(
+      (row) => row.event === "x_products_listed",
+    )?.listedProductCount
+      ? String(
+          hybrid.affiliate.conversions.find((row) => row.event === "x_products_listed")
+            ?.listedProductCount,
+        )
+      : "",
     affiliateAttributionDays: hybrid?.affiliate?.attributionWindowDays
       ? String(hybrid.affiliate.attributionWindowDays)
       : defaults.affiliateAttributionDays,
@@ -370,21 +456,30 @@ export function paymentFormError(
   milestones: MilestoneFormRow[],
   hybrid?: HybridPaymentFormState,
 ): string | null {
-  if (model === "commission") {
+  if (model === "commission" || model === "product_commission" || model === "app_install") {
     if (!hybrid) return "Configure the commission terms.";
     if (hybrid.baseEnabled && !isOptionalNonNegativeMoney(hybrid.baseAmount)) {
       return "Enter a base payment of 0 or more with at most two decimal places.";
     }
     if(hybrid.commissionRules){try{assertCommissionRules(hybrid.commissionRules);}catch{return 'Check the review period, payout schedule and minimum.';}}
     const rate = Number(hybrid.affiliatePercent);
-    if (!["percentage_of_sale", "percentage_of_platform_commission", "fixed_amount_per_sale", "fixed_amount_per_install"].includes(hybrid.affiliateType)) {
-      return "Choose product sale, platform commission, or app install as the payout event.";
+    if (model === "app_install" && hybrid.affiliateType !== "fixed_amount_per_install") {
+      return "App install campaigns pay a fixed amount per qualified install.";
     }
-    if (hybrid.affiliateType === "fixed_amount_per_install" || hybrid.affiliateType === "fixed_amount_per_sale") {
+    if (model === "product_commission" && hybrid.affiliateType === "fixed_amount_per_install") {
+      return "Product commission campaigns cannot use app install payouts.";
+    }
+    if (!["percentage_of_sale", "percentage_of_platform_commission", "fixed_amount_per_sale", "fixed_amount_per_install"].includes(hybrid.affiliateType)) {
+      return model === "app_install"
+        ? "App install campaigns pay a fixed amount per qualified install."
+        : "Choose product sale or platform commission as the payout event.";
+    }
+    if (model === "app_install" || hybrid.affiliateType === "fixed_amount_per_install") {
+      const conversionError = validateInstallConversions(hybrid);
+      if (conversionError) return conversionError;
+    } else if (hybrid.affiliateType === "fixed_amount_per_sale") {
       if (!/^\$?\d+(?:\.\d{1,2})?$/.test(hybrid.affiliateFixedAmount.trim()) || parseMoneyToCents(hybrid.affiliateFixedAmount) <= 0 || parseMoneyToCents(hybrid.affiliateFixedAmount) > 2_147_483_647) {
-        return hybrid.affiliateType === "fixed_amount_per_install"
-          ? "Enter a positive payout per qualified app install."
-          : "Enter a positive payout per attributed product sale.";
+        return "Enter a positive payout per attributed product sale.";
       }
     } else if (!/^\d+(?:\.\d{1,2})?$/.test(hybrid.affiliatePercent.trim()) || rate <= 0 || rate > 100) {
       return "Enter a commission rate greater than 0 and no more than 100%, with at most two decimal places.";
@@ -432,7 +527,9 @@ export function formPayoutCents(
   milestoneStructure: BrandCampaignMilestoneStructure = DEFAULT_MILESTONE_STRUCTURE,
   hybrid?: HybridPaymentFormState,
 ): number {
-  if (model === "commission") return hybrid?.baseEnabled ? parseMoneyToCents(hybrid.baseAmount) : 0;
+  if (model === "commission" || model === "product_commission" || model === "app_install") {
+    return hybrid?.baseEnabled ? parseMoneyToCents(hybrid.baseAmount) : 0;
+  }
   if (model === "hybrid" && hybrid) return hybridPayoutCents(hybrid);
   if (model === "milestone") {
     const amounts = completeMilestoneRows(milestones).map(
@@ -463,22 +560,38 @@ export function buildCampaignPayment(input: {
       ...(notes ? { notes } : {}),
     };
   }
-  if (input.model === "commission") {
-    const form = input.hybrid ?? defaultHybridPaymentForm();
-    const error = paymentFormError("commission", [], form);
+  if (input.model === "commission" || input.model === "product_commission" || input.model === "app_install") {
+    const form = {
+      ...(input.hybrid ?? defaultHybridPaymentForm()),
+      ...(input.model === "app_install"
+        ? { affiliateType: "fixed_amount_per_install" as const }
+        : {}),
+    };
+    const error = paymentFormError(input.model, [], form);
     if (error) throw new Error(error);
     const hybrid = completeHybridPayment(form);
     return {
-      model: "commission",
+      model: input.model,
       hybrid: {
         ...(form.baseEnabled ? { base: { ...hybrid.base!, enabled: true, trigger: "content_accepted", customTrigger: undefined } } : {}),
         affiliate: { ...hybrid.affiliate!, enabled: true,
-          ...(form.affiliateType === "fixed_amount_per_sale" || form.affiliateType === "fixed_amount_per_install"
+          ...(form.affiliateType === "fixed_amount_per_sale"
             ? { commissionPercent: undefined }
+            : form.affiliateType === "fixed_amount_per_install"
+              ? completeInstallConversions(form).length
+                ? {
+                    commissionPercent: undefined,
+                    fixedAmountCents: undefined,
+                    installApp: form.installApp,
+                    conversions: completeInstallConversions(form),
+                  }
+                : { commissionPercent: undefined }
             : { fixedAmountCents: undefined }),
           ...(form.commissionRules?{rules:form.commissionRules}:{}),
           fundingFlowVersion: 1, payoutHandler: 'clothme', fundingSource: 'brand',
-          fundingTerms: 'Commission is funded by qualifying sales; an enabled base is prepaid per creator slot.',
+          fundingTerms: form.affiliateType === "fixed_amount_per_install"
+            ? "Opening the install link only attributes the new user. Earnings are estimates until a selected conversion is reviewed. This campaign does not collect a prepaid install pool."
+            : "Commission is funded by qualifying sales; an enabled base is prepaid per creator slot.",
         },
       },
       ...(notes ? { notes } : {}),

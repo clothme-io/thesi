@@ -41,6 +41,8 @@ export function campaignPayoutCents(payment: CampaignPaymentForFee): number {
       return Math.max(0, payment.flatRateCents ?? 0);
     // Configuration-only estimate: future sales commissions are not known yet.
     case 'commission':
+    case 'product_commission':
+    case 'app_install':
       return payment.hybrid?.base?.enabled ? Math.max(0, payment.hybrid.base.amountCents ?? 0) : 0;
     case 'hybrid': {
       const base = payment.hybrid?.base?.enabled

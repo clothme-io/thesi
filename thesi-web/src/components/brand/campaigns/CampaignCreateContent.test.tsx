@@ -131,6 +131,19 @@ describe("CampaignCreateContent draft save", () => {
     expect(await screen.findByText("Draft saved — A")).toBeInTheDocument();
   });
 
+  it("offers product commission and app install as separate payment types", async () => {
+    const { CampaignCreateContent } = await import("./CampaignCreateContent");
+    render(<CampaignCreateContent />);
+    const select = screen.getByTestId("campaign-payment-model-select");
+    const labels = [...select.querySelectorAll("option")].map(
+      (option) => option.textContent,
+    );
+    expect(labels).toContain("Product commission");
+    expect(labels).toContain("App install");
+    expect(labels).toContain("Hybrid");
+    expect(labels).not.toContain("Commission");
+  });
+
   it("defaults start date to today, defaults end date one month later, and allows end date edits", async () => {
     const { CampaignCreateContent } = await import("./CampaignCreateContent");
     render(<CampaignCreateContent />);

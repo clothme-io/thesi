@@ -31,6 +31,8 @@ function campaignPaymentToListingPayment(campaign: BrandCampaign): MarketplacePa
     case "royalty":
       return { structure: "royalty", currency: "USD", royaltyPercent: payment.royaltyPercent ?? 0, notes: payment.notes };
     case "commission":
+    case "product_commission":
+    case "app_install":
     case "hybrid":
       return {
         structure: payment.model,

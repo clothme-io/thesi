@@ -1,10 +1,14 @@
 import { BadRequestException } from '@nestjs/common';
+import { isAttributedCommissionPayment } from '../campaigns/commission-payment';
 import type { CampaignPaymentDto } from '../campaigns/dto/campaign.dto';
 export function baseFundingPlan(
   payment: CampaignPaymentDto,
   capacity?: number | null,
 ) {
-  if (payment.model !== 'commission' || !payment.hybrid?.base?.enabled)
+  if (
+    !isAttributedCommissionPayment(payment) ||
+    !payment.hybrid?.base?.enabled
+  )
     return { baseCents: 0, slots: capacity ?? 0, depositCents: 0 };
   const base = payment.hybrid.base;
   if (

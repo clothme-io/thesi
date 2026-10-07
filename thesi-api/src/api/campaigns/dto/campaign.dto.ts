@@ -52,6 +52,8 @@ export const CAMPAIGN_PAYMENT_MODELS = [
   'royalty',
   'hybrid',
   'commission',
+  'product_commission',
+  'app_install',
 ] as const;
 
 export const CAMPAIGN_MILESTONE_STRUCTURES = [
@@ -105,6 +107,28 @@ export const CAMPAIGN_HYBRID_POOL_SETTLEMENTS = [
   'campaign_end',
   'days_after_campaign_end',
   'manual',
+] as const;
+
+export const CAMPAIGN_INSTALL_APPS = ['customer', 'vendor'] as const;
+
+export const CAMPAIGN_CUSTOMER_INSTALL_EVENTS = [
+  'verified_account',
+  'fit_profile_completed',
+  'first_purchase',
+] as const;
+
+export const CAMPAIGN_VENDOR_INSTALL_EVENTS = [
+  'vendor_registered',
+  'vendor_approved',
+  'store_completed',
+  'product_listed',
+  'x_products_listed',
+  'first_sale',
+] as const;
+
+export const CAMPAIGN_INSTALL_CONVERSION_EVENTS = [
+  ...CAMPAIGN_CUSTOMER_INSTALL_EVENTS,
+  ...CAMPAIGN_VENDOR_INSTALL_EVENTS,
 ] as const;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -242,6 +266,26 @@ export class CommissionRulesDto {
   @IsIn(['hold_until_reviewed']) selfReferralPolicy!: 'hold_until_reviewed';
 }
 
+export class CampaignInstallConversionDto {
+  @ApiProperty({ enum: CAMPAIGN_INSTALL_CONVERSION_EVENTS })
+  @IsIn(CAMPAIGN_INSTALL_CONVERSION_EVENTS)
+  event: (typeof CAMPAIGN_INSTALL_CONVERSION_EVENTS)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2_147_483_647)
+  amountCents?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10_000)
+  listedProductCount?: number;
+}
+
 export class CampaignHybridAffiliateDto {
   @IsOptional() @ValidateNested() @Type(() => CommissionRulesDto) rules?: CommissionRulesDto;
   @ApiPropertyOptional({enum:[1]}) @IsOptional() @IsIn([1]) fundingFlowVersion?: 1;
@@ -268,6 +312,19 @@ export class CampaignHybridAffiliateDto {
   @IsInt()
   @Min(0)
   fixedAmountCents?: number;
+
+  @ApiPropertyOptional({ enum: CAMPAIGN_INSTALL_APPS })
+  @IsOptional()
+  @IsIn(CAMPAIGN_INSTALL_APPS)
+  installApp?: (typeof CAMPAIGN_INSTALL_APPS)[number];
+
+  @ApiPropertyOptional({ type: [CampaignInstallConversionDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(16)
+  @ValidateNested({ each: true })
+  @Type(() => CampaignInstallConversionDto)
+  conversions?: CampaignInstallConversionDto[];
 
   @ApiProperty({ enum: ['USD'] })
   @IsIn(['USD'])

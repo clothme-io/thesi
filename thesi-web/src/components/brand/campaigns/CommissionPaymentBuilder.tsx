@@ -1,5 +1,12 @@
 "use client";
 
+import { isInstallCommission } from "@/lib/brand-campaigns/commission";
+import {
+  eventsForInstallApp,
+  INSTALL_EVENT_LABELS,
+  type InstallApp,
+  type InstallConversionEvent,
+} from "@/lib/brand-campaigns/install-conversions";
 import type { HybridPaymentFormState } from "@/lib/brand-campaigns/payment-form";
 import type { BrandCampaignHybridAffiliateType } from "@/lib/brand-campaigns/types";
 
@@ -7,11 +14,15 @@ export function CommissionPaymentBuilder({
   value,
   onChange,
   creatorCapacity,
+  variant,
 }: {
   value: HybridPaymentFormState;
   creatorCapacity?: string;
   onChange: (next: HybridPaymentFormState) => void;
+  variant?: "product" | "install";
 }) {
+  const install =
+    variant === "install" || isInstallCommission(value.affiliateType);
   const set = <K extends keyof HybridPaymentFormState>(
     key: K,
     next: HybridPaymentFormState[K],
@@ -48,6 +59,9 @@ export function CommissionPaymentBuilder({
             </p>
           </>
         )}
+        {install ? (
+          <InstallConversionFields value={value} onChange={onChange} />
+        ) : (
         <label className="workspace-field">
           <span>Creator earns when</span>
           <select
@@ -72,19 +86,12 @@ export function CommissionPaymentBuilder({
             <option value="fixed_amount_per_sale">
               Fixed amount per attributed product sale
             </option>
-            <option value="fixed_amount_per_install">
-              Fixed amount per qualified app install
-            </option>
           </select>
         </label>
-        {value.affiliateType === "fixed_amount_per_sale" ||
-        value.affiliateType === "fixed_amount_per_install" ? (
+        )}
+        {value.affiliateType === "fixed_amount_per_sale" && !install ? (
           <label className="workspace-field">
-            <span>
-              {value.affiliateType === "fixed_amount_per_install"
-                ? "Payout per qualified install (USD)"
-                : "Payout per attributed sale (USD)"}
-            </span>
+            <span>Payout per attributed sale (USD)</span>
             <input
               name="commissionFixedAmount"
               inputMode="decimal"
@@ -93,7 +100,7 @@ export function CommissionPaymentBuilder({
               onChange={(e) => set("affiliateFixedAmount", e.target.value)}
             />
           </label>
-        ) : (
+        ) : install ? null : (
           <label className="workspace-field">
             <span>Commission rate (%)</span>
             <input
@@ -120,7 +127,11 @@ export function CommissionPaymentBuilder({
             name="commissionTerms"
             rows={3}
             maxLength={2000}
-            placeholder="Define eligible sales, discounts, taxes, shipping, refunds, attribution rules, and when commission is payable."
+            placeholder={
+              install
+                ? "Define attribution rules and when selected conversion rewards are payable."
+                : "Define eligible sales, discounts, taxes, shipping, refunds, attribution rules, and when commission is payable."
+            }
             value={value.affiliateTerms}
             onChange={(e) => set("affiliateTerms", e.target.value)}
           />
@@ -131,7 +142,7 @@ export function CommissionPaymentBuilder({
           <legend>Commission payout rules</legend>
           <div className="workspace-grid">
             <label className="workspace-field">
-              <span>Sale review period (days)</span>
+              <span>{install ? "Install review period (days)" : "Sale review period (days)"}</span>
               <input
                 type="number"
                 name="commissionReviewDays"
@@ -198,19 +209,128 @@ export function CommissionPaymentBuilder({
       <p className="workspace-hint">
         {value.baseEnabled
           ? `Base deposit before launch: ${Number(creatorCapacity) > 0 ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Math.round(Number(value.baseAmount || 0) * 100) * Number(creatorCapacity)) / 100) : "set creator slots"}. Base per creator × creator slots. ClothME holds the deposit, releases each creator’s base after your acceptance of their work, and returns unused slot funds when you close the campaign.`
-          : "No deposit is required. Qualifying sales fund creator commission."}{" "}
-        ClothME handles payouts. Sale payouts are funded from sales. Install
-        payouts require a funded campaign balance before launch.
+          : install
+            ? "No deposit is required. Selected conversions are recorded as estimates for review."
+            : "No deposit is required. Qualifying sales fund creator commission."}{" "}
+        ClothME handles payouts.
+        {install
+          ? " This campaign does not collect a prepaid install pool. Opening the link only attributes the new user; payouts are not auto-paid."
+          : " Sale payouts are funded from sales."}
       </p>
       <p className="workspace-hint">
-        The optional base is a fixed amount per creator. Commission varies with
-        qualifying sales or installs. Platform commission means revenue the
-        platform earns from those sales, not Thesi’s campaign service fee.
+        The optional base is a fixed amount per creator.
+        {install
+          ? " Leave an earning blank to track that conversion without paying. Raw app installs do not earn."
+          : " Commission varies with qualifying sales. Platform commission means revenue the platform earns from those sales, not Thesi’s campaign service fee."}
       </p>
       <p className="workspace-hint">
         These fields record the agreed terms. Commission estimates require
         review. Commission payouts are not automated.
       </p>
     </div>
+  );
+}
+
+function InstallConversionFields({
+  value,
+  onChange,
+}: {
+  value: HybridPaymentFormState;
+  onChange: (next: HybridPaymentFormState) => void;
+}) {
+  const events = eventsForInstallApp(value.installApp);
+  const toggle = (event: InstallConversionEvent, selected: boolean) => {
+    const next = { ...value.installEventAmounts };
+    if (selected) next[event] = next[event] ?? "";
+    else delete next[event];
+    onChange({
+      ...value,
+      installEventAmounts: next,
+      ...(event === "x_products_listed" && !selected
+        ? { installListedProductCount: "" }
+        : {}),
+    });
+  };
+  return (
+    <fieldset className="workspace-field workspace-field--full">
+      <legend>Conversion events</legend>
+      <p className="workspace-hint">
+        Choose Customer or Vendor, then pick one or more events. Opening the
+        creator link only attributes the new user. Earnings are optional per
+        event.
+      </p>
+      <label className="workspace-field">
+        <span>App</span>
+        <select
+          name="installApp"
+          value={value.installApp}
+          onChange={(e) =>
+            onChange({
+              ...value,
+              installApp: e.target.value as InstallApp,
+              installEventAmounts: {},
+              installListedProductCount: "",
+            })
+          }
+        >
+          <option value="customer">Customer app</option>
+          <option value="vendor">Vendor app</option>
+        </select>
+      </label>
+      {events.map((event) => {
+        const selected = event in value.installEventAmounts;
+        return (
+          <div key={event} className="workspace-grid">
+            <label className="workspace-field">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={(e) => toggle(event, e.target.checked)}
+                />{" "}
+                {INSTALL_EVENT_LABELS[event]}
+              </span>
+            </label>
+            {selected && (
+              <label className="workspace-field">
+                <span>Earning (USD, optional)</span>
+                <input
+                  name={`installEarning-${event}`}
+                  inputMode="decimal"
+                  placeholder="Leave blank for no payout"
+                  value={value.installEventAmounts[event] ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      installEventAmounts: {
+                        ...value.installEventAmounts,
+                        [event]: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </label>
+            )}
+            {event === "x_products_listed" && selected && (
+              <label className="workspace-field">
+                <span>Number of products listed</span>
+                <input
+                  name="installListedProductCount"
+                  inputMode="numeric"
+                  placeholder="3"
+                  value={value.installListedProductCount}
+                  onChange={(e) =>
+                    onChange({
+                      ...value,
+                      installListedProductCount: e.target.value,
+                    })
+                  }
+                />
+              </label>
+            )}
+          </div>
+        );
+      })}
+    </fieldset>
   );
 }

@@ -13,6 +13,7 @@ import {
   type CampaignFundingStatus,
 } from "./CampaignFundingPanel";
 import { CommissionPaymentDetails } from "./CommissionPaymentDetails";
+import { isAttributedCommissionPayment } from "@/lib/brand-campaigns/commission";
 import { paymentFormError } from "@/lib/brand-campaigns/payment-form";
 import {
   downloadCampaignFile,
@@ -826,12 +827,12 @@ export function CampaignDetailContent() {
                             <button
                               type="button"
                               className="inbox-btn-text"
-                              disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
+                              disabled={isAttributedCommissionPayment(campaign.payment) || payingCreatorId === invite.creatorId}
                               onClick={() =>
                                 setConfirmPayoutCreatorId(invite.creatorId!)
                               }
                             >
-                              {campaign.payment.model === "commission"
+                              {isAttributedCommissionPayment(campaign.payment)
                                 ? "Commission payouts coming soon"
                                 : payingCreatorId === invite.creatorId
                                 ? "Paying…"
@@ -1100,12 +1101,12 @@ export function CampaignDetailContent() {
                             <button
                               type="button"
                               className="inbox-btn-text"
-                              disabled={campaign.payment.model === "commission" || payingCreatorId === invite.creatorId}
+                              disabled={isAttributedCommissionPayment(campaign.payment) || payingCreatorId === invite.creatorId}
                               onClick={() =>
                                 setConfirmPayoutCreatorId(invite.creatorId!)
                               }
                             >
-                              {campaign.payment.model === "commission"
+                              {isAttributedCommissionPayment(campaign.payment)
                                 ? "Commission payouts coming soon"
                                 : payingCreatorId === invite.creatorId
                                 ? "Paying…"
@@ -1131,7 +1132,7 @@ export function CampaignDetailContent() {
                   <span>Budget</span>
                   <span>{getCampaignBudgetLabel(displayedCampaign ?? campaign)}</span>
                 </div>
-                {(displayedCampaign ?? campaign).payment.model === "commission" && (
+                {isAttributedCommissionPayment((displayedCampaign ?? campaign).payment) && (
                   <CommissionPaymentDetails payment={(displayedCampaign ?? campaign).payment.hybrid} />
                 )}
                 {(displayedCampaign ?? campaign).payment.milestones?.map((milestone) => (

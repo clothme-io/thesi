@@ -1,5 +1,9 @@
 import type { CommissionRules } from './commission-rules';
 import { commissionSummary } from "@/lib/brand-campaigns/commission";
+import type {
+  InstallApp,
+  InstallConversion,
+} from "@/lib/brand-campaigns/install-conversions";
 export type BrandCampaignGoalType =
   | "experience"
   | "growth"
@@ -16,7 +20,14 @@ export type BrandCampaignType =
   | "long_form";
 
 export type BrandCampaignStatus = "draft" | "active" | "paused" | "completed";
-export type BrandCampaignPaymentModel = "flat_rate" | "milestone" | "royalty" | "hybrid" | "commission";
+export type BrandCampaignPaymentModel =
+  | "flat_rate"
+  | "milestone"
+  | "royalty"
+  | "hybrid"
+  | "commission"
+  | "product_commission"
+  | "app_install";
 export type BrandCampaignMilestoneStructure =
   | "cumulative"
   | "highest_achieved";
@@ -96,6 +107,8 @@ export interface BrandCampaignHybridPayment {
     commissionType: BrandCampaignHybridAffiliateType;
     commissionPercent?: number;
     fixedAmountCents?: number;
+    installApp?: InstallApp;
+    conversions?: InstallConversion[];
     currency: "USD";
     attributionWindowDays?: number;
     terms?: string;
@@ -253,6 +266,8 @@ export const BRAND_CAMPAIGN_PAYMENT_LABELS: Record<BrandCampaignPaymentModel, st
   royalty: "Royalty",
   hybrid: "Hybrid",
   commission: "Commission",
+  product_commission: "Product commission",
+  app_install: "App install",
 };
 
 export const EMPTY_CREATOR_BENEFITS: BrandCampaignCreatorBenefits = {
@@ -265,6 +280,14 @@ export const EMPTY_CREATOR_BENEFITS: BrandCampaignCreatorBenefits = {
   brandOpportunityAccess: false,
   customBenefits: [],
 };
+
+/** Payment model owns guaranteed cash. Benefits are perks only. */
+export function perkCreatorBenefits(
+  benefits: BrandCampaignCreatorBenefits,
+): BrandCampaignCreatorBenefits {
+  const { guaranteedPaymentCents: _ignored, ...perks } = benefits;
+  return perks;
+}
 
 export const EMPTY_CONTENT_RIGHTS: BrandCampaignContentRights = {
   organicUsage: true,
@@ -294,6 +317,8 @@ export function getCampaignBudgetLabel(campaign: BrandCampaign): string {
     case "royalty":
       return `${payment.royaltyPercent ?? 0}% royalty`;
     case "commission":
+    case "product_commission":
+    case "app_install":
       return commissionSummary(payment.hybrid);
     case "hybrid": {
       const base = payment.hybrid?.base?.enabled

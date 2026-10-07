@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Resend } from 'resend';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { parseFromAddress } from './from-address';
+
+const MAILERSEND_EMAIL_URL = 'https://api.mailersend.com/v1/email';
+const MAILTRAP_SEND_URL = 'https://send.api.mailtrap.io/api/send';
 
 export interface SendEmailOptions {
   to: string;
@@ -26,15 +28,16 @@ export interface CampaignPublishedEmailInput {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly resend: Resend | null;
-  private readonly ses: SESClient | null;
+  private readonly mailerSendKey: string | null;
+  private readonly mailtrapKey: string | null;
   private readonly fromEmail: string;
   private readonly signInUrl: string;
-  private readonly provider: 'resend' | 'ses' | 'log';
 
   constructor(private readonly configService: ConfigService) {
-    const resendKey = this.configService.get<string>('RESEND_API_KEY');
-    const sesRegion = this.configService.get<string>('AWS_SES_REGION');
+    this.mailerSendKey =
+      this.configService.get<string>('MAILERSEND_API_KEY')?.trim() || null;
+    this.mailtrapKey =
+      this.configService.get<string>('MAILTRAP_API_KEY')?.trim() || null;
     this.fromEmail =
       this.configService.get<string>('EMAIL_FROM') ||
       'Thesi <noreply@thesi.clothme.io>';
@@ -43,16 +46,7 @@ export class EmailService {
       .replace(/\/+$/, '');
     this.signInUrl = `${webUrl}/sign-in`;
 
-    if (resendKey) {
-      this.resend = new Resend(resendKey);
-      this.provider = 'resend';
-    } else if (sesRegion) {
-      this.ses = new SESClient({ region: sesRegion });
-      this.provider = 'ses';
-    } else {
-      this.resend = null;
-      this.ses = null;
-      this.provider = 'log';
+    if (!this.mailerSendKey && !this.mailtrapKey) {
       this.logger.warn(
         'No email provider configured — emails will be logged only',
       );
@@ -60,34 +54,22 @@ export class EmailService {
   }
 
   async send(options: SendEmailOptions): Promise<void> {
-    if (this.provider === 'resend' && this.resend) {
-      const result = await this.resend.emails.send({
-        from: this.fromEmail,
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
-        text: options.text,
-      });
-      if (result.error) {
-        throw new Error(`Resend delivery failed: ${result.error.message}`);
+    if (this.mailerSendKey) {
+      try {
+        await this.sendViaMailerSend(options);
+        return;
+      } catch (error) {
+        if (!this.mailtrapKey) {
+          throw error;
+        }
+        const message =
+          error instanceof Error ? error.message : 'MailerSend send failed';
+        this.logger.warn(`MailerSend failed, falling back to Mailtrap: ${message}`);
       }
-      return;
     }
 
-    if (this.provider === 'ses' && this.ses) {
-      await this.ses.send(
-        new SendEmailCommand({
-          Source: this.fromEmail,
-          Destination: { ToAddresses: [options.to] },
-          Message: {
-            Subject: { Data: options.subject },
-            Body: {
-              Html: { Data: options.html },
-              ...(options.text ? { Text: { Data: options.text } } : {}),
-            },
-          },
-        }),
-      );
+    if (this.mailtrapKey) {
+      await this.sendViaMailtrap(options);
       return;
     }
 
@@ -96,6 +78,59 @@ export class EmailService {
     }
 
     this.logger.log(`[EMAIL] To: ${options.to} | Subject: ${options.subject}`);
+  }
+
+  private async sendViaMailerSend(options: SendEmailOptions): Promise<void> {
+    const from = parseFromAddress(this.fromEmail);
+    const response = await fetch(MAILERSEND_EMAIL_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.mailerSendKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [{ email: options.to }],
+        subject: options.subject,
+        html: options.html,
+        ...(options.text ? { text: options.text } : {}),
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `MailerSend delivery failed (${response.status}): ${body.slice(0, 500)}`,
+      );
+    }
+  }
+
+  private async sendViaMailtrap(options: SendEmailOptions): Promise<void> {
+    const from = parseFromAddress(this.fromEmail);
+    const response = await fetch(MAILTRAP_SEND_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.mailtrapKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': 'thesi-api',
+      },
+      body: JSON.stringify({
+        from,
+        to: [{ email: options.to }],
+        subject: options.subject,
+        html: options.html,
+        ...(options.text ? { text: options.text } : {}),
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `Mailtrap delivery failed (${response.status}): ${body.slice(0, 500)}`,
+      );
+    }
   }
 
   async sendCreatorApplicationConfirmation(

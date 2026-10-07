@@ -191,13 +191,20 @@ function summarizePayment(payment: CampaignRecord['payment']): string {
       : null;
     return [base, reward].filter(Boolean).join(' + ') || 'Hybrid';
   }
-  if (payment.model === 'commission') {
+  if (
+    payment.model === 'commission' ||
+    payment.model === 'product_commission' ||
+    payment.model === 'app_install'
+  ) {
     const base = payment.hybrid?.base?.amountCents
       ? formatMoney(payment.hybrid.base.amountCents)
       : null;
     const commission = payment.hybrid?.affiliate?.commissionPercent
       ? `${payment.hybrid.affiliate.commissionPercent}% commission`
-      : 'commission';
+      : payment.model === 'app_install' ||
+          payment.hybrid?.affiliate?.commissionType === 'fixed_amount_per_install'
+        ? 'app install'
+        : 'commission';
     return [base, commission].filter(Boolean).join(' + ');
   }
   return 'Payment details available in Thesi';

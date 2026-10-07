@@ -46,7 +46,14 @@ export type CampaignMilestoneJson = {
 export type CampaignPaymentJson = {
   promotedProduct?: PromotedProduct;
   promotedProducts?: PromotedProduct[];
-  model: 'flat_rate' | 'milestone' | 'royalty' | 'hybrid' | 'commission';
+  model:
+    | 'flat_rate'
+    | 'milestone'
+    | 'royalty'
+    | 'hybrid'
+    | 'commission'
+    | 'product_commission'
+    | 'app_install';
   flatRateCents?: number;
   milestoneStructure?: 'cumulative' | 'highest_achieved';
   milestones?: CampaignMilestoneJson[];
@@ -93,6 +100,21 @@ export type CampaignPaymentJson = {
         | 'fixed_amount_per_install';
       commissionPercent?: number;
       fixedAmountCents?: number;
+      installApp?: 'customer' | 'vendor';
+      conversions?: Array<{
+        event:
+          | 'verified_account'
+          | 'fit_profile_completed'
+          | 'first_purchase'
+          | 'vendor_registered'
+          | 'vendor_approved'
+          | 'store_completed'
+          | 'product_listed'
+          | 'x_products_listed'
+          | 'first_sale';
+        amountCents?: number;
+        listedProductCount?: number;
+      }>;
       currency: 'USD';
       attributionWindowDays?: number;
       terms?: string;

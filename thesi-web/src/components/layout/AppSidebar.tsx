@@ -19,6 +19,9 @@ const CREATOR_NAV: NavItem[] = [
   ...(process.env.NEXT_PUBLIC_COMMISSION_EARNINGS_ENABLED === "true"
     ? [{ href: "/app/commission-earnings", label: "Commission earnings", icon: "▥" }]
     : []),
+  ...(process.env.NEXT_PUBLIC_CREATOR_TRACKING_ENABLED === "true"
+    ? [{ href: "/app/creator-links", label: "Creator links", icon: "↗" }]
+    : []),
   { href: CRM_ROUTES.brands, label: "CRM", icon: "◎", match: (path: string) => path.startsWith("/app/crm") },
   { href: CRM_ROUTES.invoices, label: "Invoices", icon: "▤", match: (path: string) => path.startsWith("/app/tools/invoices") },
   { href: "/app/inbox", label: "Inbox", icon: "✉" },
