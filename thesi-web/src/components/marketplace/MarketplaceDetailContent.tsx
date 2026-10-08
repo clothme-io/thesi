@@ -18,6 +18,7 @@ import { useAuth } from "@/context/AuthProvider";
 import { InviteCreatorDrawer } from "@/components/brand/campaigns/InviteCreatorDrawer";
 import { CampaignPublishedContent } from "@/components/inbox/CampaignPublishedContent";
 import { CampaignContentReview } from "@/components/brand/campaigns/CampaignContentReview";
+import { CreativeDirectionSummary } from "@/components/brand/campaigns/CreativeDirectionFields";
 import {
   useMarketplace,
   getListingById,
@@ -794,6 +795,10 @@ export function MarketplaceDetailContent() {
                   text={termsListing.deliverables}
                   fallback="See brief for deliverables."
                 />
+              </div>
+
+              <div className="marketplace-section-block">
+                <CreativeDirectionSummary value={termsListing.creativeDirection} />
               </div>
 
               {termsListing.requiredTasks.length > 0 && (

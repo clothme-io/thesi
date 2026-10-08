@@ -1,6 +1,6 @@
 # Stripe payments rollout
 
-Status: implementation scaffolding is present; keep live money movement disabled until Stripe test-mode evidence is complete.
+Status: test-key wiring is in place. Campaign funding and commission settlement stay **off**. Paste Stripe **test** keys, then verify brand cards and creator Connect. Do not add live `sk_live_` keys in the same step as turning money flags on.
 
 ## Recommended platform
 
@@ -15,7 +15,11 @@ Use separate charges and transfers for campaign base deposits, creator base rele
 
 ## Keys to add
 
-Add these to `thesi-api` first:
+Use **test mode** (`sk_test_`, `pk_test_`). Do not put live keys here yet.
+
+### Local
+
+`thesi-api/.env`:
 
 ```sh
 STRIPE_SECRET_KEY=sk_test_...
@@ -24,20 +28,38 @@ STRIPE_PLATFORM_ACCOUNT_ID=acct_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
-For settlement, the existing dedicated settlement keys are still required:
+`thesi-web/.env.local` (gitignored):
+
+```sh
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED=true
+```
+
+Local webhook forwarding:
+
+```sh
+stripe listen --forward-to localhost:5010/v1/stripe/webhooks
+```
+
+Paste the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`. Restart the API after changing env.
+
+### Cluster / CI
+
+| Place | Keys |
+|---|---|
+| `thesi-api-secrets` (SOPS) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PLATFORM_ACCOUNT_ID` |
+| GitHub Actions secret | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (baked into thesi-web) |
+| Stripe Dashboard endpoint | `https://dv.get-thesi.com/v1/stripe/webhooks` |
+
+`CAMPAIGN_FUNDING_ENABLED` and `COMMISSION_SETTLEMENT_ENABLED` stay `false`. Creator payouts UI is on (`NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED=true`); Connect still no-ops until `STRIPE_SECRET_KEY` is set on the API.
+
+For later settlement only:
 
 ```sh
 COMMERCE_SETTLEMENT_API_URL=https://...
 COMMERCE_SETTLEMENT_SERVICE_KEY=...
 SETTLEMENT_PLATFORM_ACCOUNT_ID=$STRIPE_PLATFORM_ACCOUNT_ID
 SETTLEMENT_OPERATOR_USER_IDS=...
-```
-
-Add this to `thesi-web` only after creator onboarding should be visible:
-
-```sh
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED=true
 ```
 
 Do not enable creator payout setup in the web app before the API has a real Stripe secret key, webhook secret and platform account id.

@@ -1,3 +1,4 @@
+import type { CampaignCreativeDirection } from "../brand-campaigns/creative-direction";
 import type { PromotedProduct } from "../brand-campaigns/types";
 import { commissionSummary } from "@/lib/brand-campaigns/commission";
 import type { BrandCampaignGoalType } from "@/lib/brand-campaigns/types";
@@ -66,6 +67,7 @@ export interface MarketplaceListing {
   applicationDeadline: string;
   brief: string;
   deliverables: string;
+  creativeDirection?: CampaignCreativeDirection;
   exampleVideoLinks: string[];
   requirements: string[];
   files: MarketplaceFile[];

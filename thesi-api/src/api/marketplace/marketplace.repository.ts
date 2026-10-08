@@ -39,6 +39,7 @@ export type MarketplaceListingRecord = {
   applicationDeadline: string;
   brief: string;
   deliverables: string;
+  creativeDirection?: CampaignRecord['creativeDirection'];
   exampleVideoLinks: string[];
   requirements: string[];
   files: Array<{ id: string; name: string; sizeLabel: string }>;

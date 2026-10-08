@@ -53,9 +53,16 @@ export type CreatorDirectoryProfile = {
   ugcPosts: CreatorUgcPost[];
 };
 
+export type CreatorNotificationRecipient = {
+  id: string;
+  email: string;
+  name: string;
+};
+
 export interface CreatorsDirectoryRepository {
   getUser(userId: string): Promise<DirectoryUser | null>;
   listCreators(): Promise<CreatorDirectoryProfile[]>;
+  listActiveCreatorRecipients(): Promise<CreatorNotificationRecipient[]>;
   getCreator(creatorUserId: string): Promise<CreatorDirectoryProfile | null>;
   listFavoriteIds(brandUserId: string): Promise<string[]>;
   addFavorite(brandUserId: string, creatorUserId: string): Promise<void>;

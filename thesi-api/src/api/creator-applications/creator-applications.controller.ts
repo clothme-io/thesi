@@ -54,11 +54,29 @@ export class CreatorApplicationsController {
   @UseGuards(AdminApiKeyGuard)
   @ApiHeader({ name: 'X-Admin-Api-Key', required: true })
   @ApiOperation({
-    summary: 'Approve application and create creator account (admin)',
+    summary:
+      'Approve application, activate the creator account, and email a temporary password (admin)',
   })
   @ApiResponse({ status: 200, type: CreatorApplicationResponse })
   async approve(@Param('id') id: string): Promise<CreatorApplicationResponse> {
     const data = await this.service.approve(id);
+    return {
+      status: HttpStatus.OK,
+      error: null,
+      data,
+    };
+  }
+
+  @Patch(':id/reject')
+  @UseGuards(AdminApiKeyGuard)
+  @ApiHeader({ name: 'X-Admin-Api-Key', required: true })
+  @ApiOperation({
+    summary:
+      'Reject application and disable its pending creator account (admin)',
+  })
+  @ApiResponse({ status: 200, type: CreatorApplicationResponse })
+  async reject(@Param('id') id: string): Promise<CreatorApplicationResponse> {
+    const data = await this.service.reject(id);
     return {
       status: HttpStatus.OK,
       error: null,

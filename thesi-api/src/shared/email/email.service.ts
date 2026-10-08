@@ -220,10 +220,10 @@ export class EmailService {
           <li><strong>Payment:</strong> ${paymentSummary}</li>
         </ul>
         <p><a href="${listingUrl}">View campaign in Thesi</a></p>
-        <p>You are receiving this because you have a Thesi creator account and match this campaign's creator criteria.</p>
+        <p>Open the campaign to see if you are interested.</p>
         <p>— The Thesi Team</p>
       `,
-      text: `Hi ${input.creatorName || 'there'}, ${input.brandName} just published a new creator campaign on Thesi: ${input.campaignName}. Content: ${contentTypes || 'Creator content'}. Timeline: ${input.startDate} to ${input.endDate}. Payment: ${input.paymentSummary}. View it here: ${input.listingUrl}`,
+      text: `Hi ${input.creatorName || 'there'}, ${input.brandName} just published a new creator campaign on Thesi: ${input.campaignName}. Content: ${contentTypes || 'Creator content'}. Timeline: ${input.startDate} to ${input.endDate}. Payment: ${input.paymentSummary}. Open the campaign to see if you are interested: ${input.listingUrl}`,
     });
   }
 }

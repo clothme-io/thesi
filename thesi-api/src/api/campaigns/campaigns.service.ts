@@ -45,6 +45,7 @@ import {
   termsFromCampaign,
   termsToCampaignPatch,
 } from './campaign-revision';
+import { normalizeCreativeDirection } from './creative-direction';
 import type {
   CampaignPaymentDto,
   UpsertCampaignDto,
@@ -855,6 +856,10 @@ export class CampaignsService {
       endDate: dto.endDate ?? defaultEndDate,
       brief: dto.brief ?? existing?.brief ?? '',
       deliverables: dto.deliverables ?? existing?.deliverables ?? '',
+      creativeDirection:
+        dto.creativeDirection !== undefined
+          ? normalizeCreativeDirection(dto.creativeDirection)
+          : normalizeCreativeDirection(existing?.creativeDirection),
       exampleVideoLinks:
         dto.exampleVideoLinks ?? existing?.exampleVideoLinks ?? [],
       requirements: {

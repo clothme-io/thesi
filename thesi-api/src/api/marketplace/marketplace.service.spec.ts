@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { CampaignRecord } from '../campaigns/campaign.repository';
+import { emptyCreativeDirection } from '../campaigns/creative-direction';
 import type {
   MarketplaceApplicationRecord,
   MarketplaceBrandApplicationRecord,
@@ -989,5 +990,6 @@ function sampleCampaign(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     ...overrides,
+    creativeDirection: overrides.creativeDirection ?? emptyCreativeDirection(),
   };
 }

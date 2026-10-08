@@ -1,3 +1,4 @@
+import type { CampaignCreativeDirection } from './creative-direction';
 import type { CampaignRevisionTerms } from './campaign-revision';
 import type {
   CampaignContentRightsDto,
@@ -40,6 +41,7 @@ export type CampaignRecord = {
   endDate: string;
   brief: string;
   deliverables: string;
+  creativeDirection: CampaignCreativeDirection;
   exampleVideoLinks: string[];
   requirements: UpsertCampaignDto['requirements'];
   files: CampaignFileMeta[];

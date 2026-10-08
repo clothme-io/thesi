@@ -9,6 +9,7 @@ export type CampaignRevisionTerms = Pick<
   | "endDate"
   | "brief"
   | "deliverables"
+  | "creativeDirection"
   | "exampleVideoLinks"
   | "requirements"
   | "files"

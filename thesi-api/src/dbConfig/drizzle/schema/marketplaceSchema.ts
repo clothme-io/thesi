@@ -10,6 +10,7 @@ import {
   primaryKey,
 } from 'drizzle-orm/pg-core';
 import { campaign } from './campaignSchema';
+import type { CampaignCreativeDirection } from 'src/api/campaigns/creative-direction';
 import type { CampaignPaymentJson } from './campaignSchema';
 import { thesiUser } from './userSchema';
 
@@ -102,6 +103,27 @@ export const marketplaceListing = thesiSchema.table('marketplace_listing', {
   applicationDeadline: date('application_deadline').notNull(),
   brief: text('brief').notNull().default(''),
   deliverables: text('deliverables').notNull().default(''),
+  creativeDirection: jsonb('creative_direction')
+    .$type<CampaignCreativeDirection>()
+    .notNull()
+    .default({
+      audience: {
+        ageRanges: [],
+        genders: [],
+        lifeStages: [],
+        workRoles: [],
+        shopperStyles: [],
+        note: '',
+      },
+      video: {
+        styles: [],
+        face: '',
+        settings: [],
+        length: '',
+        mustInclude: [],
+        avoid: [],
+      },
+    }),
   exampleVideoLinks: jsonb('example_video_links')
     .$type<string[]>()
     .notNull()

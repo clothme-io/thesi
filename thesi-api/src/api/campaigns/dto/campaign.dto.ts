@@ -1,4 +1,15 @@
 import type { PromotedProduct } from '../campaign-products.service';
+import {
+  AUDIENCE_AGE_RANGES,
+  AUDIENCE_GENDERS,
+  AUDIENCE_LIFE_STAGES,
+  AUDIENCE_WORK_ROLES,
+  SHOPPER_STYLES,
+  VIDEO_FACE,
+  VIDEO_LENGTHS,
+  VIDEO_SETTINGS,
+  VIDEO_STYLES,
+} from '../creative-direction';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -612,6 +623,98 @@ export class CampaignProductProvidedDto {
   creatorKeeps: boolean;
 }
 
+export class CampaignAudienceDto {
+  @ApiPropertyOptional({ enum: AUDIENCE_AGE_RANGES, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(AUDIENCE_AGE_RANGES, { each: true })
+  ageRanges?: string[];
+
+  @ApiPropertyOptional({ enum: AUDIENCE_GENDERS, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(AUDIENCE_GENDERS, { each: true })
+  genders?: string[];
+
+  @ApiPropertyOptional({ enum: AUDIENCE_LIFE_STAGES, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(AUDIENCE_LIFE_STAGES, { each: true })
+  lifeStages?: string[];
+
+  @ApiPropertyOptional({ enum: AUDIENCE_WORK_ROLES, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(AUDIENCE_WORK_ROLES, { each: true })
+  workRoles?: string[];
+
+  @ApiPropertyOptional({ enum: SHOPPER_STYLES, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(SHOPPER_STYLES, { each: true })
+  shopperStyles?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
+
+export class CampaignVideoDirectionDto {
+  @ApiPropertyOptional({ enum: VIDEO_STYLES, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(VIDEO_STYLES, { each: true })
+  styles?: string[];
+
+  @ApiPropertyOptional({ enum: VIDEO_FACE })
+  @IsOptional()
+  @IsIn(['', ...VIDEO_FACE])
+  face?: string;
+
+  @ApiPropertyOptional({ enum: VIDEO_SETTINGS, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(VIDEO_SETTINGS, { each: true })
+  settings?: string[];
+
+  @ApiPropertyOptional({ enum: VIDEO_LENGTHS })
+  @IsOptional()
+  @IsIn(['', ...VIDEO_LENGTHS])
+  length?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(160, { each: true })
+  mustInclude?: string[];
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(160, { each: true })
+  avoid?: string[];
+}
+
+export class CampaignCreativeDirectionDto {
+  @ApiPropertyOptional({ type: CampaignAudienceDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignAudienceDto)
+  audience?: CampaignAudienceDto;
+
+  @ApiPropertyOptional({ type: CampaignVideoDirectionDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignVideoDirectionDto)
+  video?: CampaignVideoDirectionDto;
+}
+
 export class PreviewPlatformFeeDto {
   @ApiProperty({ type: CampaignPaymentDto })
   @ValidateNested()
@@ -700,6 +803,16 @@ export class UpsertCampaignDto {
   @IsString()
   @MaxLength(4000)
   deliverables: string;
+
+  @ApiPropertyOptional({
+    type: CampaignCreativeDirectionDto,
+    description:
+      'Optional audience and video direction. Drafts and published campaigns can omit it.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CampaignCreativeDirectionDto)
+  creativeDirection?: CampaignCreativeDirectionDto;
 
   @ApiProperty({
     type: [String],

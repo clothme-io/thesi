@@ -1,3 +1,4 @@
+import type { CampaignCreativeDirection } from "./creative-direction";
 import type { CommissionRules } from './commission-rules';
 import { commissionSummary } from "@/lib/brand-campaigns/commission";
 import type {
@@ -182,6 +183,7 @@ export interface BrandCampaign {
   endDate: string;
   brief: string;
   deliverables: string;
+  creativeDirection?: CampaignCreativeDirection;
   exampleVideoLinks: string[];
   requirements: {
     niches: string[];

@@ -1,22 +1,23 @@
 import type { ConfigService } from '@nestjs/config';
 import type {
-  CreatorDirectoryProfile,
+  CreatorNotificationRecipient,
   CreatorsDirectoryRepository,
 } from 'src/api/creators/creators-directory.repository';
 import type { EmailService } from 'src/shared/email/email.service';
 import type { AnalyticsService } from 'src/shared/analytics/analytics.service';
 import { CampaignPublicationNotifier } from './campaign-publication-notifier.service';
 import type { CampaignRecord } from './campaign.repository';
+import { emptyCreativeDirection } from './creative-direction';
 import type { MarketplaceListingRecord } from '../marketplace/marketplace.repository';
 
 describe('CampaignPublicationNotifier', () => {
-  let creators: { listCreators: jest.Mock };
+  let creators: { listActiveCreatorRecipients: jest.Mock };
   let email: { sendCampaignPublishedToCreator: jest.Mock };
   let analytics: { track: jest.Mock };
   let notifier: CampaignPublicationNotifier;
 
   beforeEach(() => {
-    creators = { listCreators: jest.fn() };
+    creators = { listActiveCreatorRecipients: jest.fn() };
     email = { sendCampaignPublishedToCreator: jest.fn().mockResolvedValue(undefined) };
     analytics = { track: jest.fn() };
     notifier = new CampaignPublicationNotifier(
@@ -29,24 +30,24 @@ describe('CampaignPublicationNotifier', () => {
     );
   });
 
-  it('emails creators who match published marketplace campaign criteria', async () => {
-    creators.listCreators.mockResolvedValue([
-      creatorProfile({
+  it('emails every active creator for a published marketplace campaign', async () => {
+    creators.listActiveCreatorRecipients.mockResolvedValue([
+      recipient({
         id: 'creator-match',
         email: 'match@example.com',
-        niches: ['Fitness'],
-        location: 'US',
-        platforms: ['TikTok'],
-        totalFollowers: 12_000,
+        name: 'Creator Match',
       }),
-      creatorProfile({
-        id: 'creator-skip',
-        email: 'skip@example.com',
-        niches: ['Food'],
-        location: 'US',
-        platforms: ['TikTok'],
-        totalFollowers: 12_000,
+      recipient({
+        id: 'creator-other',
+        email: 'other@example.com',
+        name: 'Other Creator',
       }),
+      recipient({
+        id: 'creator-dup',
+        email: ' Match@example.com ',
+        name: 'Duplicate',
+      }),
+      recipient({ id: 'creator-blank', email: '   ', name: 'Blank' }),
     ]);
 
     await notifier.notifyCreatorsOfPublishedCampaign(
@@ -54,7 +55,7 @@ describe('CampaignPublicationNotifier', () => {
       marketplaceListing(),
     );
 
-    expect(email.sendCampaignPublishedToCreator).toHaveBeenCalledTimes(1);
+    expect(email.sendCampaignPublishedToCreator).toHaveBeenCalledTimes(2);
     expect(email.sendCampaignPublishedToCreator).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'match@example.com',
@@ -62,6 +63,12 @@ describe('CampaignPublicationNotifier', () => {
         campaignName: 'Launch Campaign',
         brandName: 'Acme',
         listingUrl: 'https://app.get-thesi.test/app/marketplace/listing-1',
+      }),
+    );
+    expect(email.sendCampaignPublishedToCreator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'other@example.com',
+        creatorName: 'Other Creator',
       }),
     );
     expect(analytics.track).toHaveBeenCalledWith(
@@ -75,7 +82,7 @@ describe('CampaignPublicationNotifier', () => {
   });
 
   it('does not email for draft or private campaigns', async () => {
-    creators.listCreators.mockResolvedValue([creatorProfile()]);
+    creators.listActiveCreatorRecipients.mockResolvedValue([recipient()]);
 
     await notifier.notifyCreatorsOfPublishedCampaign(
       campaignRecord({ status: 'draft' }),
@@ -86,12 +93,12 @@ describe('CampaignPublicationNotifier', () => {
       marketplaceListing(),
     );
 
-    expect(creators.listCreators).not.toHaveBeenCalled();
+    expect(creators.listActiveCreatorRecipients).not.toHaveBeenCalled();
     expect(email.sendCampaignPublishedToCreator).not.toHaveBeenCalled();
   });
 
   it('logs analytics failures without throwing publish flow errors', async () => {
-    creators.listCreators.mockResolvedValue([creatorProfile()]);
+    creators.listActiveCreatorRecipients.mockResolvedValue([recipient()]);
     email.sendCampaignPublishedToCreator.mockRejectedValueOnce(
       new Error('MailerSend unavailable'),
     );
@@ -160,6 +167,7 @@ function campaignRecord(
     createdAt: '2026-10-03T00:00:00.000Z',
     updatedAt: '2026-10-03T00:00:00.000Z',
     ...overrides,
+    creativeDirection: overrides.creativeDirection ?? emptyCreativeDirection(),
   };
 }
 
@@ -173,29 +181,13 @@ function marketplaceListing(): MarketplaceListingRecord {
   } as MarketplaceListingRecord;
 }
 
-function creatorProfile(
-  overrides: Partial<CreatorDirectoryProfile> & { totalFollowers?: number } = {},
-): CreatorDirectoryProfile {
-  const totalFollowers = overrides.totalFollowers ?? 10_000;
+function recipient(
+  overrides: Partial<CreatorNotificationRecipient> = {},
+): CreatorNotificationRecipient {
   return {
     id: 'creator-1',
     name: 'Creator Match',
     email: 'creator@example.com',
-    niches: ['Fitness'],
-    location: 'United States',
-    platforms: ['TikTok'],
-    followerRange: '10k+',
-    bio: '',
-    statsSyncedAt: null,
-    stats: {
-      totalFollowers,
-      avgViews: 0,
-      avgEngagementRate: 0,
-      completedCampaigns: 0,
-      responseRate: 0,
-      platforms: [],
-    },
-    ugcPosts: [],
     ...overrides,
   };
 }

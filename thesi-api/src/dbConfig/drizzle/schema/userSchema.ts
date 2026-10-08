@@ -7,6 +7,7 @@ export const thesiUser = pgTable('thesi_users', {
   fullName: text('full_name').notNull(),
   companyName: text('company_name'),
   role: text('role').notNull(), // creator | brand | admin
+  accountStatus: text('account_status').notNull().default('active'), // pending | active | disabled
   mustChangePassword: boolean('must_change_password').notNull().default(false),
   onboardingCompleted: boolean('onboarding_completed').notNull().default(false),
   onboardingStep: text('onboarding_step').notNull().default('welcome'),

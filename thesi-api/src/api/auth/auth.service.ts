@@ -17,6 +17,12 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { v4 as uuidv4 } from 'uuid';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
+import {
+  PENDING_PASSWORD_HASH,
+  canRequestPasswordReset,
+  signInDenial,
+  signInDeniedMessage,
+} from 'src/api/auth/account-access';
 import { PasswordService } from 'src/shared/auth/password.service';
 import { generateRefreshToken, hashToken } from 'src/shared/auth/token.util';
 import { NovuService } from 'src/shared/novu/novu.service';
@@ -96,8 +102,9 @@ export class AuthService {
   async signIn(dto: SignInDto): Promise<AuthSessionDto> {
     const email = dto.email.trim().toLowerCase();
     const user = await this.findUserByEmail(email);
-    if (!user || user.passwordHash.startsWith('$external$')) {
-      throw new UnauthorizedException('Invalid email or password');
+    const denial = signInDenial(user);
+    if (denial || !user) {
+      throw new UnauthorizedException(signInDeniedMessage(denial ?? 'invalid'));
     }
 
     const valid = await this.passwordService.compare(
@@ -197,7 +204,7 @@ export class AuthService {
   async requestPasswordReset(emailRaw: string): Promise<void> {
     const email = emailRaw.trim().toLowerCase();
     const user = await this.findUserByEmail(email);
-    if (!user || user.passwordHash.startsWith('$external$')) {
+    if (!canRequestPasswordReset(user) || !user) {
       return;
     }
 
@@ -399,6 +406,7 @@ export class AuthService {
         passwordHash,
         fullName: input.fullName.trim(),
         role: 'creator',
+        accountStatus: 'active',
         mustChangePassword: forcePasswordChange,
         onboardingCompleted: !forcePasswordChange,
         onboardingStep: forcePasswordChange ? 'change-password' : 'complete',
@@ -407,6 +415,104 @@ export class AuthService {
       .returning();
 
     return user;
+  }
+
+  async createPendingCreatorAccount(
+    input: {
+      email: string;
+      fullName: string;
+      creatorApplicationId: string;
+    },
+    db: DbExecutor = this.db,
+  ): Promise<UserRow> {
+    const email = input.email.trim().toLowerCase();
+    const existing = await this.findUserByEmail(email, db);
+    if (existing) {
+      throw new ConflictException(
+        'A user account already exists for this email',
+      );
+    }
+
+    const [user] = await db
+      .insert(schema.thesiUser)
+      .values({
+        id: uuidv4(),
+        email,
+        passwordHash: PENDING_PASSWORD_HASH,
+        fullName: input.fullName.trim(),
+        role: 'creator',
+        accountStatus: 'pending',
+        mustChangePassword: false,
+        onboardingCompleted: false,
+        onboardingStep: 'welcome',
+        creatorApplicationId: input.creatorApplicationId,
+      })
+      .returning();
+
+    return user;
+  }
+
+  async activateCreatorAccount(
+    input: {
+      email: string;
+      fullName: string;
+      creatorApplicationId: string;
+      tempPassword: string;
+    },
+    db: DbExecutor = this.db,
+  ): Promise<UserRow> {
+    const existing = await this.findUserByApplicationId(
+      input.creatorApplicationId,
+      db,
+    );
+    if (existing?.accountStatus === 'disabled') {
+      throw new ConflictException('This creator account is disabled');
+    }
+
+    const passwordHash = await this.passwordService.hash(input.tempPassword);
+    const forcePasswordChange = this.isForcePasswordChangeEnabled();
+    const next = {
+      passwordHash,
+      accountStatus: 'active' as const,
+      mustChangePassword: forcePasswordChange,
+      onboardingCompleted: !forcePasswordChange,
+      onboardingStep: forcePasswordChange ? 'change-password' : 'complete',
+      updatedAt: new Date(),
+    };
+
+    if (existing) {
+      const [user] = await db
+        .update(schema.thesiUser)
+        .set(next)
+        .where(eq(schema.thesiUser.id, existing.id))
+        .returning();
+      return user;
+    }
+
+    return this.createUserFromApplication(
+      {
+        email: input.email,
+        fullName: input.fullName,
+        creatorApplicationId: input.creatorApplicationId,
+        tempPassword: input.tempPassword,
+      },
+      db,
+    );
+  }
+
+  async disableCreatorAccount(
+    creatorApplicationId: string,
+    db: DbExecutor = this.db,
+  ): Promise<void> {
+    await db
+      .update(schema.thesiUser)
+      .set({
+        accountStatus: 'disabled',
+        passwordHash: PENDING_PASSWORD_HASH,
+        mustChangePassword: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.thesiUser.creatorApplicationId, creatorApplicationId));
   }
 
   async resetCreatorTemporaryPassword(
@@ -419,6 +525,7 @@ export class AuthService {
       .update(schema.thesiUser)
       .set({
         passwordHash,
+        accountStatus: 'active',
         mustChangePassword: forcePasswordChange,
         onboardingCompleted: !forcePasswordChange,
         onboardingStep: forcePasswordChange ? 'change-password' : 'complete',
@@ -522,6 +629,18 @@ export class AuthService {
       return step;
     }
     return 'welcome';
+  }
+
+  private async findUserByApplicationId(
+    creatorApplicationId: string,
+    db: DbExecutor = this.db,
+  ): Promise<UserRow | undefined> {
+    const [user] = await db
+      .select()
+      .from(schema.thesiUser)
+      .where(eq(schema.thesiUser.creatorApplicationId, creatorApplicationId))
+      .limit(1);
+    return user;
   }
 
   private async findUserByEmail(

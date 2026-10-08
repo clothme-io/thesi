@@ -14,6 +14,7 @@ import type {
   UpsertListingFromCampaignInput,
 } from './marketplace.repository';
 import { buildListingPayload } from './marketplace-listing.mapper';
+import { normalizeCreativeDirection } from '../campaigns/creative-direction';
 
 @Injectable()
 export class PostgresMarketplaceRepository implements MarketplaceRepository {
@@ -450,6 +451,7 @@ export class PostgresMarketplaceRepository implements MarketplaceRepository {
       applicationDeadline: row.applicationDeadline,
       brief: row.brief,
       deliverables: row.deliverables,
+      creativeDirection: normalizeCreativeDirection(row.creativeDirection),
       exampleVideoLinks: Array.isArray(row.exampleVideoLinks)
         ? row.exampleVideoLinks.filter(
             (item): item is string => typeof item === 'string',

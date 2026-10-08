@@ -253,6 +253,7 @@ export class ProductCampaignService {
       endDate: campaign.endDate,
       brief: campaign.brief,
       deliverables: campaign.deliverables,
+      creativeDirection: campaign.creativeDirection,
       exampleVideoLinks: campaign.exampleVideoLinks,
       requirements: campaign.requirements,
       files: campaign.files,

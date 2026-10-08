@@ -19,6 +19,18 @@ class FakeCreatorsDirectoryRepository implements CreatorsDirectoryRepository {
     return this.creators;
   }
 
+  listActiveCreatorRecipients() {
+    return Promise.resolve(
+      this.creators
+        .filter((creator) => creator.email.trim())
+        .map((creator) => ({
+          id: creator.id,
+          email: creator.email,
+          name: creator.name,
+        })),
+    );
+  }
+
   async getCreator(creatorUserId: string) {
     return this.creators.find((creator) => creator.id === creatorUserId) ?? null;
   }
