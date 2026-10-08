@@ -1,3 +1,4 @@
+import type { CampaignCreativeDirection } from 'src/api/campaigns/creative-direction';
 import type { CommissionRules } from 'src/api/campaigns/commission-rules';
 import type { PromotedProduct } from '../../../api/campaigns/campaign-products.service';
 import {
@@ -186,6 +187,27 @@ export const campaign = thesiSchema.table('campaign', {
   endDate: date('end_date').notNull(),
   brief: text('brief').notNull().default(''),
   deliverables: text('deliverables').notNull().default(''),
+  creativeDirection: jsonb('creative_direction')
+    .$type<CampaignCreativeDirection>()
+    .notNull()
+    .default({
+      audience: {
+        ageRanges: [],
+        genders: [],
+        lifeStages: [],
+        workRoles: [],
+        shopperStyles: [],
+        note: '',
+      },
+      video: {
+        styles: [],
+        face: '',
+        settings: [],
+        length: '',
+        mustInclude: [],
+        avoid: [],
+      },
+    }),
   exampleVideoLinks: jsonb('example_video_links')
     .$type<string[]>()
     .notNull()
@@ -258,6 +280,7 @@ export type CampaignRevisionTermsJson = {
   endDate: string;
   brief: string;
   deliverables: string;
+  creativeDirection?: CampaignCreativeDirection;
   exampleVideoLinks: string[];
   requirements: CampaignRequirementsJson;
   files: CampaignFileJson[];

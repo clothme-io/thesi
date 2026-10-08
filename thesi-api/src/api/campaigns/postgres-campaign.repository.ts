@@ -8,6 +8,7 @@ import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { toFileMeta } from './campaign-file.mapper';
 import type { UpsertCampaignDto } from './dto/campaign.dto';
+import { normalizeCreativeDirection } from './creative-direction';
 import type {
   CampaignFileMeta,
   CampaignFileRow,
@@ -166,6 +167,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         endDate: input.endDate,
         brief: input.brief,
         deliverables: input.deliverables,
+        creativeDirection: normalizeCreativeDirection(input.creativeDirection),
         exampleVideoLinks: normalizeExampleVideoLinks(input.exampleVideoLinks),
         requirements: input.requirements,
         files: [],
@@ -200,6 +202,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
         endDate: input.endDate,
         brief: input.brief,
         deliverables: input.deliverables,
+        creativeDirection: normalizeCreativeDirection(input.creativeDirection),
         exampleVideoLinks: normalizeExampleVideoLinks(input.exampleVideoLinks),
         requirements: input.requirements,
         // files are managed via /campaigns/:id/files — do not clobber
@@ -542,6 +545,7 @@ export class PostgresCampaignRepository implements CampaignRepository {
       endDate: row.endDate,
       brief: row.brief,
       deliverables: row.deliverables,
+      creativeDirection: normalizeCreativeDirection(row.creativeDirection),
       exampleVideoLinks: normalizeExampleVideoLinks(row.exampleVideoLinks),
       requirements: normalizeRequirements(row.requirements),
       files: fileRows.map(toFileMeta),
@@ -729,7 +733,10 @@ export class PostgresCampaignRepository implements CampaignRepository {
       id: row.id,
       campaignId: row.campaignId,
       version: row.version,
-      terms: row.terms,
+      terms: {
+        ...row.terms,
+        creativeDirection: normalizeCreativeDirection(row.terms.creativeDirection),
+      },
       createdByUserId: row.createdByUserId,
       createdAt: row.createdAt.toISOString(),
     };

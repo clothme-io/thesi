@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   ConflictException,
-  HttpStatus,
   Inject,
   Injectable,
   Logger,
@@ -11,15 +10,17 @@ import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { v4 as uuidv4 } from 'uuid';
 import { AuthService } from 'src/api/auth/auth.service';
+import { creatorProfileSeedFromApplication } from 'src/api/profiles/follower-range.util';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
 import { generateTempPassword } from 'src/shared/auth/token.util';
 import { NovuService } from 'src/shared/novu/novu.service';
-import { creatorProfileSeedFromApplication } from 'src/api/profiles/follower-range.util';
 import {
   CreateCreatorApplicationDto,
   CreatorApplicationData,
 } from './dto/creator-application.dto';
+
+type ApplicationRow = typeof schema.thesiCreatorApplication.$inferSelect;
 
 @Injectable()
 export class CreatorApplicationsService {
@@ -36,42 +37,67 @@ export class CreatorApplicationsService {
     dto: CreateCreatorApplicationDto,
   ): Promise<CreatorApplicationData> {
     const id = uuidv4();
+    const email = dto.email.trim().toLowerCase();
 
-    const [inserted] = await this.db
-      .insert(schema.thesiCreatorApplication)
-      .values({
-        id,
-        fullName: dto.fullName,
-        email: dto.email,
-        country: dto.country,
-        city: dto.city,
-        creatorType: dto.creatorType,
-        tiktokUrl: dto.tiktokUrl,
-        instagramUrl: dto.instagramUrl,
-        followerCountRange: dto.followerCountRange,
-        hasUgcExperience: dto.hasUgcExperience,
-        portfolioLink: dto.portfolioLink,
-        whyClothme: dto.whyClothme,
-        interestedCreatorStore: dto.interestedCreatorStore,
-        interestedAffiliate: dto.interestedAffiliate,
-        phoneNumber: dto.phoneNumber ?? null,
-        youtubeUrl: dto.youtubeUrl ?? null,
-        otherLinks: dto.otherLinks ?? null,
-        status: 'applied',
-      })
-      .returning();
+    let inserted: ApplicationRow;
+    try {
+      inserted = await this.db.transaction(async (tx) => {
+        const [application] = await tx
+          .insert(schema.thesiCreatorApplication)
+          .values({
+            id,
+            fullName: dto.fullName,
+            email,
+            country: dto.country,
+            city: dto.city,
+            creatorType: dto.creatorType,
+            tiktokUrl: dto.tiktokUrl,
+            instagramUrl: dto.instagramUrl,
+            followerCountRange: dto.followerCountRange,
+            hasUgcExperience: dto.hasUgcExperience,
+            portfolioLink: dto.portfolioLink,
+            whyClothme: dto.whyClothme,
+            interestedCreatorStore: dto.interestedCreatorStore,
+            interestedAffiliate: dto.interestedAffiliate,
+            phoneNumber: dto.phoneNumber ?? null,
+            youtubeUrl: dto.youtubeUrl ?? null,
+            otherLinks: dto.otherLinks ?? null,
+            status: 'applied',
+          })
+          .returning();
+
+        await this.authService.createPendingCreatorAccount(
+          {
+            email,
+            fullName: dto.fullName,
+            creatorApplicationId: id,
+          },
+          tx,
+        );
+
+        return application;
+      });
+    } catch (error) {
+      if (error instanceof ConflictException) throw error;
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(
+          'A user account already exists for this email',
+        );
+      }
+      throw error;
+    }
 
     this.novu
       .trigger({
         type: 'creator_application_received',
-        toEmail: dto.email,
+        toEmail: email,
         firstName: this.firstName(dto.fullName),
       })
-      .catch((err) =>
+      .catch((err: { message?: string }) =>
         this.logger.warn(`Failed to send confirmation email: ${err?.message}`),
       );
 
-    return inserted as CreatorApplicationData;
+    return inserted;
   }
 
   async list(status?: string): Promise<CreatorApplicationData[]> {
@@ -82,7 +108,7 @@ export class CreatorApplicationsService {
           .where(eq(schema.thesiCreatorApplication.status, status))
       : await this.db.select().from(schema.thesiCreatorApplication);
 
-    return rows as CreatorApplicationData[];
+    return rows;
   }
 
   async approve(id: string): Promise<CreatorApplicationData> {
@@ -102,8 +128,11 @@ export class CreatorApplicationsService {
         if (current.status === 'approved') {
           return { application: current, alreadyApproved: true };
         }
+        if (current.status === 'rejected') {
+          throw new ConflictException('Creator application was rejected');
+        }
 
-        const user = await this.authService.createUserFromApplication(
+        const user = await this.authService.activateCreatorAccount(
           {
             email: current.email,
             fullName: current.fullName,
@@ -142,11 +171,47 @@ export class CreatorApplicationsService {
     );
 
     if (alreadyApproved) {
-      return application as CreatorApplicationData;
+      return application;
     }
 
     await this.sendAccountReadyOrThrow(application, tempPassword);
-    return application as CreatorApplicationData;
+    return application;
+  }
+
+  async reject(id: string): Promise<CreatorApplicationData> {
+    const application = await this.db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(schema.thesiCreatorApplication)
+        .where(eq(schema.thesiCreatorApplication.id, id))
+        .limit(1);
+
+      if (!current) {
+        throw new NotFoundException('Creator application not found');
+      }
+      if (current.status === 'approved') {
+        throw new ConflictException(
+          'Approved creator applications cannot be rejected',
+        );
+      }
+      if (current.status === 'rejected') {
+        return current;
+      }
+
+      await this.authService.disableCreatorAccount(current.id, tx);
+      const [updated] = await tx
+        .update(schema.thesiCreatorApplication)
+        .set({
+          status: 'rejected',
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.thesiCreatorApplication.id, id))
+        .returning();
+
+      return updated;
+    });
+
+    return application;
   }
 
   async resendInvite(id: string): Promise<CreatorApplicationData> {
@@ -169,11 +234,11 @@ export class CreatorApplicationsService {
     await this.authService.resetCreatorTemporaryPassword(id, tempPassword);
     await this.sendAccountReadyOrThrow(application, tempPassword);
 
-    return application as CreatorApplicationData;
+    return application;
   }
 
   private async sendAccountReadyOrThrow(
-    application: typeof schema.thesiCreatorApplication.$inferSelect,
+    application: ApplicationRow,
     tempPassword: string,
   ): Promise<void> {
     try {
@@ -197,4 +262,18 @@ export class CreatorApplicationsService {
   private firstName(fullName: string): string {
     return fullName.trim().split(/\s+/)[0] || 'there';
   }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    seen.add(current);
+    if ('code' in current && (current as { code?: string }).code === '23505') {
+      return true;
+    }
+    current =
+      'cause' in current ? (current as { cause?: unknown }).cause : undefined;
+  }
+  return false;
 }

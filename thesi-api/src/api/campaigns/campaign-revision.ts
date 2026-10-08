@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { normalizeCreativeDirection } from './creative-direction';
 import type { CampaignRevisionTermsJson } from 'src/dbConfig/drizzle/schema/campaignSchema';
 import type { CampaignRecord } from './campaign.repository';
 import type { UpsertCampaignDto } from './dto/campaign.dto';
@@ -22,6 +23,7 @@ export function termsFromCampaign(
     | 'endDate'
     | 'brief'
     | 'deliverables'
+    | 'creativeDirection'
     | 'exampleVideoLinks'
     | 'requirements'
     | 'files'
@@ -42,6 +44,7 @@ export function termsFromCampaign(
     endDate: campaign.endDate,
     brief: campaign.brief,
     deliverables: campaign.deliverables,
+    creativeDirection: normalizeCreativeDirection(campaign.creativeDirection),
     exampleVideoLinks: campaign.exampleVideoLinks,
     requirements: campaign.requirements,
     files: campaign.files,
@@ -73,6 +76,7 @@ export function termsToCampaignPatch(
   | 'endDate'
   | 'brief'
   | 'deliverables'
+  | 'creativeDirection'
   | 'exampleVideoLinks'
   | 'requirements'
   | 'files'
@@ -92,6 +96,7 @@ export function termsToCampaignPatch(
     endDate: terms.endDate,
     brief: terms.brief,
     deliverables: terms.deliverables,
+    creativeDirection: normalizeCreativeDirection(terms.creativeDirection),
     exampleVideoLinks: terms.exampleVideoLinks,
     requirements: terms.requirements,
     files: terms.files,

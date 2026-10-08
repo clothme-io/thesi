@@ -91,6 +91,13 @@ services:
       MERCHANT_API_URL: http://localhost:3011
       MERCHANT_LINK_SERVICE_KEY: local-thesi-merchant-link-key-32b
       MERCHANT_IDENTITY_SERVICE_KEY: local-thesi-merchant-id-key-32byt
+      CAMPAIGN_FUNDING_ENABLED: "true"
+      COMMISSION_SETTLEMENT_ENABLED: "true"
+      COMMISSION_EARNINGS_ENABLED: "true"
+      COMMERCE_SETTLEMENT_API_URL: http://127.0.0.1:5020
+      COMMERCE_SETTLEMENT_SERVICE_KEY: local-thesi-commerce-settle-key32
+      EARNINGS_SERVICE_KEY: local-thesi-earnings-ingest-key-32
+      EARNINGS_REPORT_SERVICE_KEY: local-thesi-earnings-report-key32
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,12 +130,15 @@ services:
       target: development
     ports:
       - "3010:3000"
+    env_file:
+      - ./thesi-web/.env.local
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:5010
       THESI_API_URL: http://thesi-api:5000
       NEXT_PUBLIC_AUTH_DEV_MODE: "false"
       NEXT_PUBLIC_MERCHANT_SSO_ENABLED: "true"
       NEXT_PUBLIC_BRAND_WORKSPACES_ENABLED: "true"
+      NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED: "true"
       NODE_ENV: development
     depends_on:
       thesi-api:

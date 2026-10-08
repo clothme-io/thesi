@@ -8,8 +8,10 @@ import {
   averageUgcViews,
   nativeStatsFromInvites,
 } from 'src/api/profiles/follower-range.util';
+import { activeCreatorRecipients } from './creator-notification-recipients';
 import type {
   CreatorDirectoryProfile,
+  CreatorNotificationRecipient,
   CreatorPlatformStats,
   CreatorUgcPost,
   CreatorsDirectoryRepository,
@@ -62,6 +64,27 @@ export class PostgresCreatorsDirectoryRepository
       .orderBy(schema.creatorProfile.displayName);
 
     return Promise.all(rows.map((row) => this.hydrateCreator(row)));
+  }
+
+  async listActiveCreatorRecipients(): Promise<CreatorNotificationRecipient[]> {
+    const rows = await this.db
+      .select({
+        id: schema.thesiUser.id,
+        email: schema.thesiUser.email,
+        fullName: schema.thesiUser.fullName,
+        role: schema.thesiUser.role,
+        accountStatus: schema.thesiUser.accountStatus,
+      })
+      .from(schema.thesiUser)
+      .where(
+        and(
+          eq(schema.thesiUser.role, 'creator'),
+          eq(schema.thesiUser.accountStatus, 'active'),
+        ),
+      )
+      .orderBy(schema.thesiUser.email);
+
+    return activeCreatorRecipients(rows);
   }
 
   async getCreator(

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { FileStoragePort } from 'src/shared/storage/file-storage.port';
 import type { UpsertCampaignDto } from './dto/campaign.dto';
+import { normalizeCreativeDirection } from './creative-direction';
 import type { BillingService } from 'src/api/billing/billing.service';
 import type { StripeService } from 'src/shared/stripe/stripe.service';
 import type { ConnectService } from 'src/api/connect/connect.service';
@@ -70,6 +71,7 @@ class FakeCampaignRepository implements CampaignRepository {
     const row: CampaignRecord = {
       id: `${ownerUserId}-campaign-${this.rows.length + 1}`,
       ...input,
+      creativeDirection: normalizeCreativeDirection(input.creativeDirection),
       contentRights: input.contentRights ?? DEFAULT_CONTENT_RIGHTS,
       creatorDisclosureEnabled: input.creatorDisclosureEnabled ?? false,
       files: [],
@@ -90,6 +92,9 @@ class FakeCampaignRepository implements CampaignRepository {
     const updated: CampaignRecord = {
       ...this.rows[index],
       ...input,
+      creativeDirection: input.creativeDirection
+        ? normalizeCreativeDirection(input.creativeDirection)
+        : this.rows[index].creativeDirection,
       contentRights: input.contentRights ?? this.rows[index].contentRights,
       creatorDisclosureEnabled:
         input.creatorDisclosureEnabled ??

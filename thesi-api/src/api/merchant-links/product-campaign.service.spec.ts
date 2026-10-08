@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { ProductCampaignService, type ProductCampaignInput } from './product-campaign.service';
 import type { CampaignRecord } from '../campaigns/campaign.repository';
+import { emptyCreativeDirection } from '../campaigns/creative-direction';
 
 const productId = '22222222-2222-4222-8222-222222222222';
 const input: ProductCampaignInput = {
@@ -55,6 +56,7 @@ function campaign(id: string, status: CampaignRecord['status'], updatedAt: strin
     creatorCapacity: 5,
     creatorDisclosureEnabled: false,
     postToMarketplace: status === 'active',
+    creativeDirection: emptyCreativeDirection(),
     createdAt: updatedAt,
     updatedAt,
   };

@@ -51,6 +51,7 @@ import {
   campaignFromRevision,
   type CampaignRevision,
 } from "@/lib/brand-campaigns/revisions";
+import { CreativeDirectionSummary } from "./CreativeDirectionFields";
 
 function toCampaignInput(campaign: BrandCampaign): CampaignInput {
   return {
@@ -62,6 +63,7 @@ function toCampaignInput(campaign: BrandCampaign): CampaignInput {
     endDate: toDateInputValue(campaign.endDate),
     brief: campaign.brief,
     deliverables: campaign.deliverables,
+    creativeDirection: campaign.creativeDirection,
     exampleVideoLinks: campaign.exampleVideoLinks,
     requirements: campaign.requirements,
     files: campaign.files,
@@ -903,6 +905,9 @@ export function CampaignDetailContent() {
               <p>{(displayedCampaign ?? campaign).brief}</p>
               <h3 style={{ marginTop: 24 }}>Deliverables</h3>
               <p>{(displayedCampaign ?? campaign).deliverables}</p>
+              <CreativeDirectionSummary
+                value={(displayedCampaign ?? campaign).creativeDirection}
+              />
               {requiredTasks.length > 0 && (
                 <>
                   <h3 style={{ marginTop: 24 }}>Required tasks</h3>

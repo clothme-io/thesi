@@ -40,6 +40,8 @@ services:
       args:
         NEXT_PUBLIC_API_URL: http://localhost:5010
         NEXT_PUBLIC_AUTH_DEV_MODE: "false"
+        NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED: "true"
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
     ports:
       - "3010:3000"
     environment:

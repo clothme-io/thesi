@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   CREATORS_DIRECTORY_REPOSITORY,
-  type CreatorDirectoryProfile,
+  type CreatorNotificationRecipient,
   type CreatorsDirectoryRepository,
 } from 'src/api/creators/creators-directory.repository';
 import { EmailService } from 'src/shared/email/email.service';
@@ -37,9 +37,8 @@ export class CampaignPublicationNotifier {
       return;
     }
 
-    const creators = await this.creators.listCreators();
-    const recipients = creators.filter((creator) =>
-      this.matchesCampaign(creator, campaign),
+    const recipients = uniqueRecipients(
+      await this.creators.listActiveCreatorRecipients(),
     );
     const listingUrl = `${this.webUrl}/app/marketplace/${listing.id}`;
 
@@ -54,7 +53,7 @@ export class CampaignPublicationNotifier {
   }
 
   private async sendToCreator(
-    creator: CreatorDirectoryProfile,
+    creator: CreatorNotificationRecipient,
     campaign: CampaignRecord,
     listing: MarketplaceListingRecord,
     listingUrl: string,
@@ -89,86 +88,21 @@ export class CampaignPublicationNotifier {
       });
     }
   }
+}
 
-  private matchesCampaign(
-    creator: CreatorDirectoryProfile,
-    campaign: CampaignRecord,
-  ): boolean {
-    const requirements = campaign.requirements;
-    if (
-      requirements.niches.length > 0 &&
-      !hasOverlap(requirements.niches, creator.niches)
-    ) {
-      return false;
-    }
-    if (
-      requirements.platforms.length > 0 &&
-      !hasOverlap(requirements.platforms, creator.platforms)
-    ) {
-      return false;
-    }
-    if (
-      requirements.location &&
-      !locationMatches(requirements.location, creator.location)
-    ) {
-      return false;
-    }
-    const minimumFollowers = parseFollowerFloor(requirements.minFollowersRange);
-    if (
-      minimumFollowers > 0 &&
-      creator.stats.totalFollowers > 0 &&
-      creator.stats.totalFollowers < minimumFollowers
-    ) {
-      return false;
-    }
-    return Boolean(creator.email);
+function uniqueRecipients(
+  creators: CreatorNotificationRecipient[],
+): CreatorNotificationRecipient[] {
+  const seen = new Set<string>();
+  const recipients: CreatorNotificationRecipient[] = [];
+  for (const creator of creators) {
+    const email = creator.email.trim();
+    const key = email.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    recipients.push({ ...creator, email });
   }
-}
-
-function hasOverlap(left: string[], right: string[]): boolean {
-  const normalizedRight = new Set(right.map(normalizeToken).filter(Boolean));
-  return left
-    .map(normalizeToken)
-    .filter(Boolean)
-    .some((value) => normalizedRight.has(value));
-}
-
-function locationMatches(requirement: string, creatorLocation: string): boolean {
-  const creator = normalizeLocation(creatorLocation);
-  if (!creator) return false;
-  return requirement
-    .split(',')
-    .map(normalizeLocation)
-    .filter(Boolean)
-    .some((value) => creator.includes(value) || value.includes(creator));
-}
-
-function normalizeToken(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function normalizeLocation(value: string): string {
-  const normalized = normalizeToken(value);
-  if (['us', 'usa', 'u.s.', 'u.s.a.', 'united states'].includes(normalized)) {
-    return 'united states';
-  }
-  if (['ca', 'can'].includes(normalized)) {
-    return 'canada';
-  }
-  return normalized;
-}
-
-function parseFollowerFloor(value: string): number {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return 0;
-  const match = normalized.match(/(\d+(?:\.\d+)?)\s*([km])?/);
-  if (!match) return 0;
-  const amount = Number(match[1]);
-  if (!Number.isFinite(amount)) return 0;
-  const suffix = match[2];
-  if (suffix === 'm') return Math.floor(amount * 1_000_000);
-  if (suffix === 'k') return Math.floor(amount * 1_000);
-  return Math.floor(amount);
+  return recipients;
 }
 
 function summarizePayment(payment: CampaignRecord['payment']): string {

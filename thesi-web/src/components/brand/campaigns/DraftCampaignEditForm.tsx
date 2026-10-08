@@ -1,6 +1,12 @@
 "use client";
 
 import {CampaignProductSelection,campaignProducts,productSelections,productInput,type ProductSelection} from "./CampaignProductSelection";
+import { CreativeDirectionFields } from "./CreativeDirectionFields";
+import {
+  creativeDirectionFormFrom,
+  creativeDirectionFromForm,
+  type CreativeDirectionFormState,
+} from "@/lib/brand-campaigns/creative-direction";
 import { useEffect, useState } from "react";
 import { toDateInputValue } from "@/lib/brand-campaigns/date";
 import type { CampaignInput } from "@/lib/brand-campaigns/storage";
@@ -160,6 +166,7 @@ export type DraftCampaignFormState = {
   endDate: string;
   brief: string;
   deliverables: string;
+  creativeDirection: CreativeDirectionFormState;
   exampleVideoLinks: string[];
   niches: string;
   minFollowersRange: string;
@@ -192,6 +199,7 @@ export function draftFormFromCampaign(
     endDate: toDateInputValue(campaign.endDate),
     brief: campaign.brief,
     deliverables: campaign.deliverables,
+    creativeDirection: creativeDirectionFormFrom(campaign.creativeDirection),
     exampleVideoLinks:
       campaign.exampleVideoLinks.length > 0
         ? [...campaign.exampleVideoLinks]
@@ -232,6 +240,7 @@ export function draftFormToInput(form: DraftCampaignFormState): CampaignInput {
     endDate: form.endDate,
     brief: form.brief,
     deliverables: form.deliverables,
+    creativeDirection: creativeDirectionFromForm(form.creativeDirection),
     exampleVideoLinks: form.exampleVideoLinks
       .map((link) => link.trim())
       .filter(Boolean),
@@ -452,6 +461,10 @@ export function DraftCampaignEditForm({
               Use each bullet or numbered item on its own line for easier creator reading.
             </span>
           </label>
+          <CreativeDirectionFields
+            value={form.creativeDirection}
+            onChange={(creativeDirection) => set("creativeDirection", creativeDirection)}
+          />
           <div className="workspace-field workspace-field--full">
             <span>Example video links</span>
             {form.exampleVideoLinks.map((link, index) => (

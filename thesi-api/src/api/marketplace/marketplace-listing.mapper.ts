@@ -22,6 +22,7 @@ export function buildListingPayload(
     applicationDeadline: campaign.endDate,
     brief: campaign.brief,
     deliverables: campaign.deliverables,
+    creativeDirection: campaign.creativeDirection,
     exampleVideoLinks: campaign.exampleVideoLinks ?? [],
     requirements: buildRequirements(campaign),
     files: campaign.files.map((file) => ({

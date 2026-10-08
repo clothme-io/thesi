@@ -1,6 +1,12 @@
 "use client";
 
 import {CampaignProductSelection,campaignProducts,productSelections,productInput,type ProductSelection} from "./CampaignProductSelection";
+import { CreativeDirectionFields } from "./CreativeDirectionFields";
+import {
+  creativeDirectionFormFrom,
+  creativeDirectionFromForm,
+  type CreativeDirectionFormState,
+} from "@/lib/brand-campaigns/creative-direction";
 import Link from "next/link";
 import { formPaymentModel, isInstallCommission } from "@/lib/brand-campaigns/commission";
 import {DEFAULT_COMMISSION_RULES} from "@/lib/brand-campaigns/commission-rules";
@@ -187,6 +193,9 @@ export function CampaignCreateContent() {
   const [endDate, setEndDate] = useState(dates.end);
   const [brief, setBrief] = useState("");
   const [deliverables, setDeliverables] = useState("");
+  const [creativeDirection, setCreativeDirection] = useState<CreativeDirectionFormState>(
+    creativeDirectionFormFrom(),
+  );
   const [exampleVideoLinks, setExampleVideoLinks] = useState<string[]>([""]);
   const [niches, setNiches] = useState("Fitness, Lifestyle");
   const [minFollowersRange, setMinFollowersRange] = useState("5k+");
@@ -242,6 +251,7 @@ export function CampaignCreateContent() {
     setEndDate(oneMonthFromDateInputValue(nextStartDate));
     setBrief(source.brief);
     setDeliverables(source.deliverables);
+    setCreativeDirection(creativeDirectionFormFrom(source.creativeDirection));
     setExampleVideoLinks(
       source.exampleVideoLinks.length > 0 ? source.exampleVideoLinks : [""],
     );
@@ -321,6 +331,7 @@ export function CampaignCreateContent() {
     endDate,
     brief,
     deliverables,
+    creativeDirection: creativeDirectionFromForm(creativeDirection),
     exampleVideoLinks: exampleVideoLinks.map((link) => link.trim()).filter(Boolean),
     requirements: {
       niches: parseList(niches),
@@ -703,6 +714,10 @@ export function CampaignCreateContent() {
                   onChange={(e) => setDeliverables(e.target.value)}
                 />
               </label>
+              <CreativeDirectionFields
+                value={creativeDirection}
+                onChange={setCreativeDirection}
+              />
               <div className="workspace-field workspace-field--full">
                 <span>Example video links</span>
                 <p className="workspace-hint" style={{ marginTop: 4 }}>

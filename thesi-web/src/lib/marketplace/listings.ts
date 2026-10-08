@@ -79,6 +79,7 @@ export function campaignToListing(
     applicationDeadline: deadline,
     brief: campaign.brief,
     deliverables: campaign.deliverables,
+    creativeDirection: campaign.creativeDirection,
     exampleVideoLinks: campaign.exampleVideoLinks ?? [],
     requirements: buildRequirements(campaign),
     files: campaign.files.map((f) => ({ id: f.id, name: f.name, sizeLabel: f.sizeLabel })),
