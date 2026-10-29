@@ -309,7 +309,7 @@ export class StripeService {
 
   /**
    * Verify a Stripe webhook signature when configured.
-   * Without STRIPE_WEBHOOK_SECRET (local), parse the JSON payload directly.
+   * Without Stripe configured, parse unsigned payloads for local fixtures only.
    */
   constructWebhookEvent(
     rawBody: Buffer | undefined,
@@ -323,13 +323,19 @@ export class StripeService {
       .get<string>('STRIPE_WEBHOOK_SECRET')
       ?.trim();
 
-    if (this.stripe && secret) {
+    if (this.stripe) {
+      if (!secret) {
+        throw new Error('STRIPE_WEBHOOK_SECRET is required when Stripe is configured');
+      }
       if (!signature) {
         throw new Error('Stripe-Signature header is required');
       }
       return this.stripe.webhooks.constructEvent(rawBody, signature, secret);
     }
 
+    if (this.configService.get<string>('NODE_ENV') === 'production') {
+      throw new Error('Unsigned Stripe webhooks are disabled in production');
+    }
     this.logger.warn(
       '[STRIPE] webhook secret unset — accepting unsigned local payload',
     );

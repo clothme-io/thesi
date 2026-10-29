@@ -112,7 +112,7 @@ export function AddPaymentMethodModal({
       >
         <h2>Add payment method</h2>
         <p className="workspace-hint" style={{ marginBottom: 16 }}>
-          Your card is saved securely with Stripe for subscriptions and invoices.
+          Your card is saved securely with Stripe for campaign base deposits.
         </p>
         <Elements
           stripe={getStripe()}

@@ -8,11 +8,9 @@ import { BrandSettingsSection } from "./BrandSettingsSection";
 
 export function BrandSettingsPaymentHistoryContent() {
   const { authenticatedRequest, authenticatedBinaryRequest } = useAuth();
-  const { data, ready, error, createPlanInvoice } =
-    useBrandBilling(authenticatedRequest);
+  const { data, ready, error } = useBrandBilling(authenticatedRequest);
   const [actionError, setActionError] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
 
   if (!ready) return null;
 
@@ -41,41 +39,16 @@ export function BrandSettingsPaymentHistoryContent() {
   };
 
   return (
-    <BrandSettingsSection title="Payment history" subtitle="Invoices and past charges">
+    <BrandSettingsSection title="Payment history" subtitle="Available Stripe invoices">
       <section className="workspace-section">
         {(error || actionError) && (
           <p className="workspace-hint" style={{ marginBottom: 12 }}>
             {actionError || error}
           </p>
         )}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-          <button
-            type="button"
-            className="crm-btn-secondary"
-            disabled={creating}
-            onClick={async () => {
-              setCreating(true);
-              setActionError("");
-              try {
-                await createPlanInvoice();
-              } catch (requestError) {
-                setActionError(
-                  requestError instanceof Error
-                    ? requestError.message
-                    : "Could not create invoice",
-                );
-              } finally {
-                setCreating(false);
-              }
-            }}
-          >
-            {creating ? "Creating…" : "Record plan invoice"}
-          </button>
-        </div>
         {data.paymentHistory.length === 0 ? (
           <p className="workspace-hint">
-            No invoices yet. Stripe invoices sync automatically when configured, or record a
-            plan invoice to generate a PDF.
+            No Stripe invoices on this account. Campaign deposits appear on each campaign.
           </p>
         ) : (
           <div className="brand-ugc-table-wrap">

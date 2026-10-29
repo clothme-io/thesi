@@ -1,5 +1,6 @@
 import { FundingGateway } from './funding.gateway';
 const stripe = {
+  accounts: { retrieve: jest.fn() },
   paymentIntents: { create: jest.fn(), retrieve: jest.fn() },
   charges: { retrieve: jest.fn() },
   transfers: { create: jest.fn() },
@@ -19,9 +20,20 @@ const operation = {
 const gateway = () =>
   new FundingGateway({
     get: () => true,
-    getOrThrow: () => 'sk_test_fixture',
+    getOrThrow: (key: string) =>
+      key === 'STRIPE_PLATFORM_ACCOUNT_ID' ? 'acct_clothme' : 'sk_test_fixture',
   } as any);
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  stripe.accounts.retrieve.mockResolvedValue({ id: 'acct_clothme' });
+});
+it('blocks funding when the API key belongs to another Stripe platform', async () => {
+  stripe.accounts.retrieve.mockResolvedValue({ id: 'acct_other' });
+  await expect(gateway().execute(operation)).rejects.toThrow(
+    'Thesi Stripe account needs verification',
+  );
+  expect(stripe.paymentIntents.create).not.toHaveBeenCalled();
+});
 it('verifies captured deposit and uses the persisted operation id for provider idempotency', async () => {
   stripe.paymentIntents.create.mockResolvedValue({
     id: 'pi_1',

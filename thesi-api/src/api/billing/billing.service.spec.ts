@@ -269,26 +269,6 @@ describe('BillingService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('creates a local invoice from the current plan', async () => {
-    repository.profile = {
-      planName: 'Brand Pro',
-      planPriceCents: 14900,
-      billingCycle: 'monthly',
-      billingEmail: 'ap@acme.com',
-      companyName: 'Acme',
-      addressLine1: '1 Main',
-      city: 'SF',
-      state: 'CA',
-      postalCode: '94103',
-      country: 'US',
-      nextInvoiceDate: '2026-08-01',
-    };
-    const data = await service.createInvoiceFromPlan('brand-1');
-    expect(data.paymentHistory).toHaveLength(1);
-    expect(data.paymentHistory[0].amountCents).toBe(14900);
-    expect(data.paymentHistory[0].invoiceNumber).toMatch(/^INV-TEST-/);
-  });
-
   it('builds a PDF for an invoice', async () => {
     repository.invoices.push({
       id: '11111111-1111-1111-1111-111111111111',

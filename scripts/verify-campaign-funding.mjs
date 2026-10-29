@@ -99,6 +99,12 @@ export async function verifyFunding({
     let state = await service.deposit("owner", c.id, 30000);
     assert.equal(state.depositedCents, 0);
     assert.equal(state.fund.state, "awaiting_deposit");
+    // The service backs off for five minutes after an uncertain provider response.
+    // Advance only this disposable fixture's retry clock.
+    await query(
+      "UPDATE thesi.campaign_fund_operation SET next_attempt_at=now() WHERE campaign_id=$1 AND kind='deposit'",
+      [c.id],
+    );
     await assert.rejects(
       query("UPDATE thesi.campaign SET status='completed' WHERE id=$1", [c.id]),
       /pending deposit/,

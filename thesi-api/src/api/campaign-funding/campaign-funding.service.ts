@@ -502,7 +502,7 @@ export class CampaignFundingService
           }
         }
         const lease = await tx.execute(
-          sql`UPDATE thesi.campaign_fund_operation SET args=${JSON.stringify(args)}::jsonb,state='processing',first_attempt_at=coalesce(first_attempt_at,now()),lease_until=now()+interval '2 minutes' WHERE id=${id}::uuid RETURNING lease_until`,
+          sql`UPDATE thesi.campaign_fund_operation SET args=${JSON.stringify(args)}::jsonb,state='processing',first_attempt_at=coalesce(first_attempt_at,now()),lease_until=now()+interval '2 minutes' WHERE id=${id}::uuid RETURNING lease_until::text AS lease_until`,
         );
         return { ...op, args, lease_until: lease.rows[0].lease_until };
       });
@@ -540,7 +540,7 @@ export class CampaignFundingService
         e instanceof Error ? e.message : 'Funding operation needs retry';
       // Retain the first attempt and immutable arguments even if the remote outcome is uncertain.
       await this.db.execute(
-        sql`UPDATE thesi.campaign_fund_operation SET state=CASE WHEN state='provider_pending' THEN state ELSE 'pending' END,lease_until=NULL,next_attempt_at=now()+interval '5 minutes',last_error=${message.slice(0, 250)} WHERE id=${id}::uuid AND state NOT IN ('succeeded','review') AND ${prepared ? sql`lease_until=${new Date(prepared.lease_until).toISOString()}::timestamptz` : sql`(lease_until IS NULL OR lease_until<=now())`}`,
+        sql`UPDATE thesi.campaign_fund_operation SET state=CASE WHEN state='provider_pending' THEN state ELSE 'pending' END,lease_until=NULL,next_attempt_at=now()+interval '5 minutes',last_error=${message.slice(0, 250)} WHERE id=${id}::uuid AND state NOT IN ('succeeded','review') AND ${prepared ? sql`lease_until=${prepared.lease_until}::timestamptz` : sql`(lease_until IS NULL OR lease_until<=now())`}`,
       );
     }
   }

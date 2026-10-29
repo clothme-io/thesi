@@ -58,7 +58,7 @@ export function BrandSettingsPaymentMethodsContent() {
   return (
     <BrandSettingsSection
       title="Payment methods"
-      subtitle="Cards on file for subscriptions and invoices"
+      subtitle="Cards on file for campaign base deposits"
     >
       <section className="workspace-section">
         {(error || actionError) && (
@@ -70,9 +70,8 @@ export function BrandSettingsPaymentMethodsContent() {
           <div>
             <strong>Stripe card setup</strong>
             <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
-              Add a card with Stripe so campaign base deposits and future
-              invoices can charge the brand’s default payment method. Thesi only
-              stores Stripe ids and card metadata.
+              Add a card with Stripe for approved campaign base deposits. Thesi
+              stores only Stripe IDs and card metadata.
             </p>
           </div>
           <span className="crm-tag">

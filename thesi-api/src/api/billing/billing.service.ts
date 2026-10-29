@@ -177,23 +177,6 @@ export class BillingService {
     };
   }
 
-  async createInvoiceFromPlan(userId: string): Promise<BrandBillingData> {
-    const user = await this.requireBrand(userId);
-    const profile =
-      (await this.billing.getProfile(userId)) ?? defaultProfile(user);
-    const invoiceNumber = await this.billing.nextInvoiceNumber(userId);
-    const now = new Date().toISOString().slice(0, 10);
-    await this.billing.createInvoice({
-      brandUserId: userId,
-      invoiceNumber,
-      description: `${profile.planName} — ${now.slice(0, 7)}`,
-      amountCents: profile.planPriceCents,
-      status: 'paid',
-      invoiceDate: now,
-    });
-    return this.getBilling(userId);
-  }
-
   async getInvoicePdf(
     userId: string,
     invoiceId: string,
