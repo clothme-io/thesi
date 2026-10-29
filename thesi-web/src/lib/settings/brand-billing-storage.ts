@@ -104,16 +104,6 @@ export function useBrandBilling(authenticatedRequest: AuthenticatedRequest) {
     [authenticatedRequest],
   );
 
-  const createPlanInvoice = useCallback(async () => {
-    setError("");
-    const next = await authenticatedRequest<BrandBillingData>(
-      "/api/billing/invoices",
-      { method: "POST", body: {} },
-    );
-    setData(next);
-    return next;
-  }, [authenticatedRequest]);
-
   const refreshBilling = useCallback(async () => {
     setError("");
     const next = await authenticatedRequest<BrandBillingData>("/api/billing");
@@ -138,7 +128,6 @@ export function useBrandBilling(authenticatedRequest: AuthenticatedRequest) {
     updateBilling,
     persistBilling,
     setDefaultPaymentMethod,
-    createPlanInvoice,
     refreshBilling,
     createSetupIntent,
   };

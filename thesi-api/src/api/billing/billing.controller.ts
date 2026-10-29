@@ -70,15 +70,6 @@ export class BillingController {
     return { status: HttpStatus.CREATED, error: null, data };
   }
 
-  @Post('invoices')
-  @ApiOperation({
-    summary: 'Create a local invoice from the current plan (no Stripe charge)',
-  })
-  async createInvoice(@CurrentUser() user: AuthJwtPayload) {
-    const data = await this.billing.createInvoiceFromPlan(user.sub);
-    return { status: HttpStatus.CREATED, error: null, data };
-  }
-
   @Get('invoices/:id/pdf')
   @ApiOperation({ summary: 'Download an invoice PDF' })
   @Header('Content-Type', 'application/pdf')

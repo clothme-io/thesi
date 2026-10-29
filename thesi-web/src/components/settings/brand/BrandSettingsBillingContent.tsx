@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { useBrandBilling } from "@/lib/settings/brand-billing-storage";
-import { formatBillingMoney } from "@/lib/settings/brand-billing-types";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 
 export function BrandSettingsBillingContent() {
@@ -35,30 +34,13 @@ export function BrandSettingsBillingContent() {
   };
 
   return (
-    <BrandSettingsSection title="Billing" subtitle="Plan and billing details" saved={saved}>
+    <BrandSettingsSection title="Billing" subtitle="Contact details for campaign payments" saved={saved}>
       <form className="workspace-form" onSubmit={handleSave}>
         {(error || actionError) && (
           <p className="workspace-hint" style={{ marginBottom: 12 }}>
             {actionError || error}
           </p>
         )}
-        <section className="workspace-section">
-          <h3>Current plan</h3>
-          <div className="brand-billing-plan">
-            <div>
-              <strong>{billing.planName}</strong>
-              <p className="workspace-hint" style={{ margin: "4px 0 0" }}>
-                {formatBillingMoney(billing.planPriceCents)} / {billing.billingCycle}
-              </p>
-            </div>
-            <span className="crm-tag">Active</span>
-          </div>
-          <div className="crm-meta-row" style={{ marginTop: 16 }}>
-            <span>Next invoice</span>
-            <span>{billing.nextInvoiceDate || "—"}</span>
-          </div>
-        </section>
-
         <section className="workspace-section">
           <h3>Billing contact</h3>
           <div className="workspace-grid">

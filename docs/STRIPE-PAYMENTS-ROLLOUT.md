@@ -4,18 +4,21 @@ Status: test-key wiring is in place. Campaign funding and commission settlement 
 
 ## Recommended platform
 
-Use Stripe Connect Express as Thesi's first payment platform.
+Use ClothME's existing Stripe platform account for Thesi, under the confirmed shared legal entity. Use Stripe Connect Express for creator payouts. Thesi and Commerce must independently verify the same `acct_...` platform ID; a different account blocks commission settlement and campaign funding now verifies its configured platform ID before provider operations.
 
 - Brands pay the Thesi platform account.
 - Creators onboard with Stripe Express connected accounts.
 - Thesi owns the campaign funding, commission, refund and settlement ledgers.
 - Stripe handles payment collection, Connect verification, transfers, payouts and tax-reporting support.
 
+Thesi does not charge a recurring Brand Pro subscription. Brand cards are used for approved campaign base deposits. The former local plan-invoice action was removed because it could mark an invoice paid without a Stripe charge. Existing invoice records remain available for historical review; campaign funding status is shown on each campaign.
+
 Use separate charges and transfers for campaign base deposits, creator base releases and commission settlement. This keeps Thesi in control of review windows, refund holds, multi-creator payouts and immutable ledger records.
 
 ## Keys to add
 
 Use **test mode** (`sk_test_`, `pk_test_`). Do not put live keys here yet.
+Verify that the test secret key resolves to the configured `STRIPE_PLATFORM_ACCOUNT_ID` in Stripe before enabling funding. A live dashboard account ID and a sandbox account ID may differ; do not replace one with the other based on the dashboard URL alone. Verify Commerce's test key and platform ID independently against the same intended platform.
 
 ### Local
 
@@ -49,7 +52,9 @@ Paste the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`. Restart the API afte
 |---|---|
 | `thesi-api-secrets` (SOPS) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PLATFORM_ACCOUNT_ID` |
 | GitHub Actions secret | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (baked into thesi-web) |
-| Stripe Dashboard endpoint | `https://dv.get-thesi.com/v1/stripe/webhooks` |
+| Stripe Dashboard endpoint | `https://dv.get-thesi.com/v1/stripe/webhooks` with a dedicated Thesi signing secret |
+
+For Connect onboarding in dev, set API `THESI_WEB_URL=https://dv-app.get-thesi.com`. The return and refresh links must target the **web** origin; `dv.get-thesi.com` is the API origin and returns 404 for `/app/settings`.
 
 `CAMPAIGN_FUNDING_ENABLED` and `COMMISSION_SETTLEMENT_ENABLED` stay `false`. Creator payouts UI is on (`NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED=true`); Connect still no-ops until `STRIPE_SECRET_KEY` is set on the API.
 
@@ -66,7 +71,7 @@ Do not enable creator payout setup in the web app before the API has a real Stri
 
 ## Webhook endpoint
 
-Point Stripe test-mode webhooks at:
+Create a Stripe **account** (not Connect) test-mode webhook endpoint at:
 
 ```text
 POST /v1/stripe/webhooks
@@ -78,12 +83,13 @@ Subscribe at minimum to:
 - `payment_intent.payment_failed`
 - `charge.refunded`
 - `charge.dispute.created`
-- `account.updated`
 - `transfer.created`
 - `transfer.updated`
 - `transfer.reversed`
 
-`STRIPE_WEBHOOK_SECRET` is required before enabling campaign funding or commission settlement. Local unsigned webhook payloads are accepted only while money-movement flags remain off.
+Stripe sends connected-account `account.updated` events only to a separate Connect webhook destination with its own signing secret. Thesi reads creator readiness directly from Stripe, so the campaign payment rollout does not require that destination. The single `STRIPE_WEBHOOK_SECRET` here belongs to the account endpoint above.
+
+`STRIPE_WEBHOOK_SECRET` is required whenever `STRIPE_SECRET_KEY` is configured. Unsigned webhook payloads are accepted only for local fixtures without a Stripe API key and are always rejected in production.
 
 ## Enablement order
 

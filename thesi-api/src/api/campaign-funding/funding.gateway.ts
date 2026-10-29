@@ -1,21 +1,25 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 @Injectable()
 export class FundingGateway {
   constructor(private readonly config: ConfigService) {}
-  protected stripe() {
+  protected async stripe() {
     if (this.config.get('CAMPAIGN_FUNDING_ENABLED') !== true)
       throw new ServiceUnavailableException('Campaign funding is disabled');
-    return new Stripe(this.config.getOrThrow<string>('STRIPE_SECRET_KEY'), {
+    const stripe = new Stripe(this.config.getOrThrow<string>('STRIPE_SECRET_KEY'), {
       timeout: 15000,
       maxNetworkRetries: 0,
     });
+    const account = await stripe.accounts.retrieve(null);
+    if (account.id !== this.config.getOrThrow<string>('STRIPE_PLATFORM_ACCOUNT_ID'))
+      throw new ConflictException('Thesi Stripe account needs verification');
+    return stripe;
   }
   async execute(
     op: any,
   ): Promise<{ id: string; chargeId?: string; pending?: boolean }> {
-    const stripe = this.stripe();
+    const stripe = await this.stripe();
     const key = `thesi-fund:${op.id}${op.args.refundRetryId ? `:${op.args.refundRetryId}` : ''}`;
     if (op.kind === 'deposit') {
       let pi: Stripe.PaymentIntent;
@@ -126,7 +130,7 @@ export class FundingGateway {
   async depositAction(op: any, paymentMethodId: string) {
     if (op.kind !== 'deposit' || !op.provider_id)
       throw new Error('Deposit outcome needs reconciliation first');
-    const pi = await this.stripe().paymentIntents.retrieve(op.provider_id);
+    const pi = await (await this.stripe()).paymentIntents.retrieve(op.provider_id);
     if (
       pi.amount !== Number(op.amount_cents) ||
       pi.customer !== op.args.customerId ||
@@ -148,7 +152,7 @@ export class FundingGateway {
     };
   }
   async verifyRecovery(op: any, providerId: string) {
-    const stripe = this.stripe();
+    const stripe = await this.stripe();
     if (op.kind === 'deposit') {
       const pi = await stripe.paymentIntents.retrieve(providerId);
       if (
@@ -203,7 +207,7 @@ export class FundingGateway {
       !op.provider_id
     )
       throw new Error('Known failed refund required');
-    const r = await this.stripe().refunds.retrieve(op.provider_id);
+    const r = await (await this.stripe()).refunds.retrieve(op.provider_id);
     if (
       !['failed', 'canceled'].includes(r.status ?? '') ||
       r.payment_intent !== op.args.paymentIntentId ||
