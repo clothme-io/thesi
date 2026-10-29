@@ -71,7 +71,7 @@ Do not enable creator payout setup in the web app before the API has a real Stri
 
 ## Webhook endpoint
 
-Point Stripe test-mode webhooks at:
+Create a Stripe **account** (not Connect) test-mode webhook endpoint at:
 
 ```text
 POST /v1/stripe/webhooks
@@ -83,10 +83,11 @@ Subscribe at minimum to:
 - `payment_intent.payment_failed`
 - `charge.refunded`
 - `charge.dispute.created`
-- `account.updated`
 - `transfer.created`
 - `transfer.updated`
 - `transfer.reversed`
+
+Stripe sends connected-account `account.updated` events only to a separate Connect webhook destination with its own signing secret. Thesi reads creator readiness directly from Stripe, so the campaign payment rollout does not require that destination. The single `STRIPE_WEBHOOK_SECRET` here belongs to the account endpoint above.
 
 `STRIPE_WEBHOOK_SECRET` is required whenever `STRIPE_SECRET_KEY` is configured. Unsigned webhook payloads are accepted only for local fixtures without a Stripe API key and are always rejected in production.
 
