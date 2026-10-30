@@ -11,11 +11,12 @@ import { getStripe } from "@/lib/stripe/stripe-client";
 
 type Props = {
   clientSecret: string;
+  publishableKey: string;
   onClose: () => void;
   onSuccess: () => Promise<void> | void;
 };
 
-function AddCardForm({ onClose, onSuccess }: Omit<Props, "clientSecret">) {
+function AddCardForm({ onClose, onSuccess }: Omit<Props, "clientSecret" | "publishableKey">) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -94,6 +95,7 @@ function AddCardForm({ onClose, onSuccess }: Omit<Props, "clientSecret">) {
 
 export function AddPaymentMethodModal({
   clientSecret,
+  publishableKey,
   onClose,
   onSuccess,
 }: Props) {
@@ -115,7 +117,7 @@ export function AddPaymentMethodModal({
           Your card is saved securely with Stripe for campaign base deposits.
         </p>
         <Elements
-          stripe={getStripe()}
+          stripe={getStripe(publishableKey)}
           options={{
             clientSecret,
             appearance: {

@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { StripeService } from 'src/shared/stripe/stripe.service';
 import type {
   BillingProfileRecord,
@@ -151,6 +151,7 @@ describe('BillingService', () => {
   let repository: FakeBillingRepository;
   let stripe: {
     isConfigured: jest.Mock;
+    getPublishableKey: jest.Mock;
     createCustomer: jest.Mock;
     updateCustomer: jest.Mock;
     listCardPaymentMethods: jest.Mock;
@@ -164,8 +165,9 @@ describe('BillingService', () => {
     repository = new FakeBillingRepository();
     stripe = {
       isConfigured: jest.fn().mockReturnValue(false),
+      getPublishableKey: jest.fn().mockReturnValue(null),
       createCustomer: jest.fn().mockResolvedValue('cus_test'),
-      updateCustomer: jest.fn().mockResolvedValue(undefined),
+      updateCustomer: jest.fn().mockResolvedValue(true),
       listCardPaymentMethods: jest.fn().mockResolvedValue([]),
       setDefaultPaymentMethod: jest.fn().mockResolvedValue(undefined),
       createSetupIntent: jest.fn().mockResolvedValue({
@@ -214,6 +216,51 @@ describe('BillingService', () => {
     });
     expect(stripe.createCustomer).toHaveBeenCalled();
     expect(repository.stripeCustomerId).toBe('cus_test');
+  });
+
+  it('replaces a local placeholder before creating a card setup intent', async () => {
+    repository.stripeCustomerId = 'cus_local_123';
+    stripe.isConfigured.mockReturnValue(true);
+    stripe.updateCustomer.mockResolvedValue(false);
+    stripe.getPublishableKey.mockReturnValue('pk_test_fixture');
+    stripe.createSetupIntent.mockResolvedValue({
+      clientSecret: 'seti_secret_test',
+      setupIntentId: 'seti_test',
+    });
+
+    const intent = await service.createSetupIntent('brand-1');
+
+    expect(stripe.createCustomer).toHaveBeenCalledTimes(1);
+    expect(repository.stripeCustomerId).toBe('cus_test');
+    expect(stripe.createSetupIntent).toHaveBeenCalledWith('cus_test');
+    expect(intent).toEqual({
+      clientSecret: 'seti_secret_test',
+      setupIntentId: 'seti_test',
+      stripeConfigured: true,
+      publishableKey: 'pk_test_fixture',
+    });
+  });
+
+  it('replaces a customer missing from the configured Stripe mode', async () => {
+    repository.stripeCustomerId = 'cus_from_other_mode';
+    stripe.isConfigured.mockReturnValue(true);
+    stripe.updateCustomer.mockResolvedValue(false);
+    stripe.getPublishableKey.mockReturnValue('pk_test_fixture');
+
+    await service.createSetupIntent('brand-1');
+
+    expect(repository.stripeCustomerId).toBe('cus_test');
+    expect(stripe.createSetupIntent).toHaveBeenCalledWith('cus_test');
+  });
+
+  it('does not create a setup intent with mismatched or missing publishable key', async () => {
+    stripe.isConfigured.mockReturnValue(true);
+
+    await expect(service.createSetupIntent('brand-1')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(stripe.createCustomer).not.toHaveBeenCalled();
+    expect(stripe.createSetupIntent).not.toHaveBeenCalled();
   });
 
   it('sets the default payment method', async () => {

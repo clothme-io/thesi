@@ -7,6 +7,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { StripeService } from 'src/shared/stripe/stripe.service';
 import type { ConnectRepository, ConnectUser } from './connect.repository';
 import { ConnectService } from './connect.service';
+import Stripe from 'stripe';
 
 class FakeConnectRepository implements ConnectRepository {
   user: ConnectUser | null = {
@@ -81,6 +82,25 @@ describe('ConnectService', () => {
     const link = await service.createAccountLink('creator-1', {});
     expect(link.accountId).toBe('acct_test_1');
     expect(link.url).toContain('stripe.com');
+    expect(repository.user?.stripeConnectAccountId).toBe('acct_test_1');
+  });
+
+  it('replaces a local placeholder Connect account before onboarding', async () => {
+    repository.user!.stripeConnectAccountId = 'acct_local_creator1';
+    const link = await service.createAccountLink('creator-1', {});
+    expect(link.accountId).toBe('acct_test_1');
+    expect(repository.user?.stripeConnectAccountId).toBe('acct_test_1');
+    expect(stripe.retrieveConnectAccount).not.toHaveBeenCalled();
+  });
+
+  it('replaces a Connect account missing from the current Stripe mode', async () => {
+    repository.user!.stripeConnectAccountId = 'acct_from_other_mode';
+    stripe.retrieveConnectAccount.mockRejectedValue(
+      new Stripe.errors.StripeInvalidRequestError({ statusCode: 404, code: 'resource_missing' }),
+    );
+    expect((await service.getStatus('creator-1')).status).toBe('not_started');
+    const link = await service.createAccountLink('creator-1', {});
+    expect(link.accountId).toBe('acct_test_1');
     expect(repository.user?.stripeConnectAccountId).toBe('acct_test_1');
   });
 

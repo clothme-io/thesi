@@ -76,6 +76,7 @@ describe('automatic commission settlement activation', () => {
     EARNINGS_REPORT_SERVICE_KEY: 'r'.repeat(32),
     COMMISSION_SETTLEMENT_ENABLED: true,
     STRIPE_SECRET_KEY: 'sk_test_local',
+    STRIPE_PUBLISHABLE_KEY: 'pk_test_local',
     STRIPE_WEBHOOK_SECRET: 'whsec_local',
     STRIPE_PLATFORM_ACCOUNT_ID: 'acct_local123',
     SETTLEMENT_PLATFORM_ACCOUNT_ID: 'acct_local123',
@@ -123,6 +124,7 @@ describe('automatic commission settlement activation', () => {
         BRAND_WORKSPACE_ACCESS_ENABLED: true,
         CAMPAIGN_FUNDING_ENABLED: true,
         STRIPE_SECRET_KEY: 'sk_test_local',
+        STRIPE_PUBLISHABLE_KEY: 'pk_test_local',
         STRIPE_PLATFORM_ACCOUNT_ID: 'acct_local123',
       }),
     ).toThrow('STRIPE_WEBHOOK_SECRET');

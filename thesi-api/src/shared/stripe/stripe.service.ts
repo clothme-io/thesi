@@ -24,6 +24,11 @@ export type StripeCardPaymentMethod = {
   expYear: number;
 };
 
+export function isStripeMissingResource(error: unknown): boolean {
+  return error instanceof Stripe.errors.StripeInvalidRequestError &&
+    error.statusCode === 404 && error.code === 'resource_missing';
+}
+
 @Injectable()
 export class StripeService {
   private readonly logger = new Logger(StripeService.name);
@@ -45,6 +50,15 @@ export class StripeService {
     return this.stripe !== null;
   }
 
+  getPublishableKey(): string | null {
+    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY')?.trim();
+    const publishableKey = this.configService.get<string>('STRIPE_PUBLISHABLE_KEY')?.trim();
+    const mode = secretKey?.match(/^(?:sk|rk)_(test|live)_/)?.[1];
+    return mode && publishableKey?.startsWith(`pk_${mode}_`)
+      ? publishableKey
+      : null;
+  }
+
   async createCustomer(input: StripeCustomerInput): Promise<string> {
     if (!this.stripe) {
       const fakeId = `cus_local_${Date.now()}`;
@@ -63,22 +77,31 @@ export class StripeService {
   async updateCustomer(
     customerId: string,
     input: StripeCustomerInput,
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (!this.stripe) {
       this.logger.log(
         `[STRIPE] updateCustomer ${customerId} ${JSON.stringify(input)}`,
       );
-      return;
+      return true;
     }
     if (customerId.startsWith('cus_local_')) {
-      return;
+      return false;
     }
-    await this.stripe.customers.update(customerId, {
-      email: input.email || undefined,
-      name: input.name || undefined,
-      metadata: input.metadata,
-      address: input.address,
-    });
+    try {
+      await this.stripe.customers.update(customerId, {
+        email: input.email || undefined,
+        name: input.name || undefined,
+        metadata: input.metadata,
+        address: input.address,
+      });
+    } catch (error) {
+      // A customer saved under a test key cannot be used after switching to live mode.
+      if (isStripeMissingResource(error)) {
+        return false;
+      }
+      throw error;
+    }
+    return true;
   }
 
   async listCardPaymentMethods(
