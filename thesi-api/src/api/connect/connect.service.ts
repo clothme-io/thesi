@@ -7,7 +7,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { StripeService } from 'src/shared/stripe/stripe.service';
+import { isStripeMissingResource, StripeService } from 'src/shared/stripe/stripe.service';
 import {
   CONNECT_REPOSITORY,
   type ConnectRepository,
@@ -68,9 +68,10 @@ export class ConnectService {
       };
     }
 
-    const live = await this.stripe.retrieveConnectAccount(
-      user.stripeConnectAccountId,
-    );
+    const live = await this.retrieveCurrentAccount(user.stripeConnectAccountId);
+    if (!live) {
+      return { ready: false, accountId: null, reason: 'Creator must restart Stripe payout setup' };
+    }
     const ready = live.payoutsEnabled && live.detailsSubmitted;
     return {
       ready,
@@ -110,9 +111,18 @@ export class ConnectService {
       };
     }
 
-    const live = await this.stripe.retrieveConnectAccount(
-      user.stripeConnectAccountId,
-    );
+    const live = await this.retrieveCurrentAccount(user.stripeConnectAccountId);
+    if (!live) {
+      return {
+        stripeConfigured: true,
+        status: 'not_started',
+        accountId: null,
+        detailsSubmitted: false,
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        readyForPayouts: false,
+      };
+    }
     const readyForPayouts = live.payoutsEnabled && live.detailsSubmitted;
     return {
       stripeConfigured: true,
@@ -163,9 +173,10 @@ export class ConnectService {
         'Connect onboarding has not been started',
       );
     }
-    const live = await this.stripe.retrieveConnectAccount(
-      user.stripeConnectAccountId,
-    );
+    const live = await this.retrieveCurrentAccount(user.stripeConnectAccountId);
+    if (!live) {
+      throw new BadRequestException('Restart Stripe payout setup first');
+    }
     if (!live.detailsSubmitted) {
       throw new BadRequestException(
         'Finish Stripe onboarding before opening the dashboard',
@@ -181,7 +192,7 @@ export class ConnectService {
   }
 
   private async ensureAccount(user: ConnectUser): Promise<string> {
-    if (user.stripeConnectAccountId) {
+    if (user.stripeConnectAccountId && await this.retrieveCurrentAccount(user.stripeConnectAccountId)) {
       return user.stripeConnectAccountId;
     }
     const accountId = await this.stripe.createExpressAccount({
@@ -190,6 +201,16 @@ export class ConnectService {
     });
     await this.connect.saveStripeConnectAccountId(user.id, accountId);
     return accountId;
+  }
+
+  private async retrieveCurrentAccount(accountId: string) {
+    if (accountId.startsWith('acct_local_')) return null;
+    try {
+      return await this.stripe.retrieveConnectAccount(accountId);
+    } catch (error) {
+      if (isStripeMissingResource(error)) return null;
+      throw error;
+    }
   }
 
   private defaultUrls() {

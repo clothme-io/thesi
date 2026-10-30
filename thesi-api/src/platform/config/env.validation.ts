@@ -57,6 +57,11 @@ function requireNonEmptyString(
 
 function requireStripeMoneyMovement(config: Record<string, unknown>, reason: string) {
   requireNonEmptyString(config, 'STRIPE_SECRET_KEY', reason);
+  requireNonEmptyString(config, 'STRIPE_PUBLISHABLE_KEY', reason);
+  const mode = String(config.STRIPE_SECRET_KEY).match(/^(?:sk|rk)_(test|live)_/)?.[1];
+  if (!mode || !String(config.STRIPE_PUBLISHABLE_KEY).startsWith(`pk_${mode}_`)) {
+    throw new Error(`${reason} requires matching Stripe key modes`);
+  }
   requireNonEmptyString(config, 'STRIPE_WEBHOOK_SECRET', reason);
   requireNonEmptyString(config, 'STRIPE_PLATFORM_ACCOUNT_ID', reason);
   if (!/^acct_[A-Za-z0-9]+$/.test(String(config.STRIPE_PLATFORM_ACCOUNT_ID))) {

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
 import { useBrandBilling } from "@/lib/settings/brand-billing-storage";
-import { getStripePublishableKey } from "@/lib/stripe/publishable-key";
 import { BrandSettingsSection } from "./BrandSettingsSection";
 import { AddPaymentMethodModal } from "./AddPaymentMethodModal";
 
@@ -19,31 +18,32 @@ export function BrandSettingsPaymentMethodsContent() {
   } = useBrandBilling(authenticatedRequest);
   const [actionError, setActionError] = useState("");
   const [opening, setOpening] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [cardSetup, setCardSetup] = useState<{
+    clientSecret: string;
+    publishableKey: string;
+  } | null>(null);
 
   if (!ready) return null;
 
-  const publishableKey = getStripePublishableKey();
-
   const handleAdd = async () => {
     setActionError("");
-    if (!publishableKey) {
-      setActionError(
-        "Set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in thesi-web to add cards.",
-      );
-      return;
-    }
-
     setOpening(true);
     try {
       const intent = await createSetupIntent();
-      if (!intent.stripeConfigured || !intent.clientSecret) {
+      if (!intent.stripeConfigured) {
         setActionError(
           "Stripe is not configured on the API (STRIPE_SECRET_KEY). Cards cannot be captured yet.",
         );
         return;
       }
-      setClientSecret(intent.clientSecret);
+      if (!intent.clientSecret || !intent.publishableKey) {
+        setActionError("Stripe could not start card setup. Please try again or contact support.");
+        return;
+      }
+      setCardSetup({
+        clientSecret: intent.clientSecret,
+        publishableKey: intent.publishableKey,
+      });
     } catch (requestError) {
       setActionError(
         requestError instanceof Error
@@ -74,9 +74,6 @@ export function BrandSettingsPaymentMethodsContent() {
               stores only Stripe IDs and card metadata.
             </p>
           </div>
-          <span className="crm-tag">
-            {publishableKey ? "Ready" : "Needs web key"}
-          </span>
         </div>
         {data.paymentMethods.length === 0 ? (
           <p className="workspace-hint">No payment methods on file yet.</p>
@@ -136,10 +133,11 @@ export function BrandSettingsPaymentMethodsContent() {
         </p>
       </section>
 
-      {clientSecret ? (
+      {cardSetup ? (
         <AddPaymentMethodModal
-          clientSecret={clientSecret}
-          onClose={() => setClientSecret(null)}
+          clientSecret={cardSetup.clientSecret}
+          publishableKey={cardSetup.publishableKey}
+          onClose={() => setCardSetup(null)}
           onSuccess={async () => {
             await refreshBilling();
           }}

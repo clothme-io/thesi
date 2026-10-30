@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { StripeService } from 'src/shared/stripe/stripe.service';
 import {
@@ -165,8 +166,13 @@ export class BillingService {
     clientSecret: string | null;
     setupIntentId: string;
     stripeConfigured: boolean;
+    publishableKey: string | null;
   }> {
     const user = await this.requireBrand(userId);
+    const publishableKey = this.stripe.getPublishableKey();
+    if (this.stripe.isConfigured() && !publishableKey) {
+      throw new ServiceUnavailableException('Stripe card setup is unavailable');
+    }
     const profile =
       (await this.billing.getProfile(userId)) ?? defaultProfile(user);
     const customerId = await this.ensureStripeCustomer(userId, profile);
@@ -174,6 +180,7 @@ export class BillingService {
     return {
       ...intent,
       stripeConfigured: this.stripe.isConfigured(),
+      publishableKey,
     };
   }
 
@@ -273,8 +280,9 @@ export class BillingService {
     };
 
     if (existing) {
-      await this.stripe.updateCustomer(existing, payload);
-      return existing;
+      if (!this.stripe.isConfigured() || await this.stripe.updateCustomer(existing, payload)) {
+        return existing;
+      }
     }
 
     const customerId = await this.stripe.createCustomer(payload);

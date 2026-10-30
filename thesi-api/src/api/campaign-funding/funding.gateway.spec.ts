@@ -21,7 +21,8 @@ const gateway = () =>
   new FundingGateway({
     get: () => true,
     getOrThrow: (key: string) =>
-      key === 'STRIPE_PLATFORM_ACCOUNT_ID' ? 'acct_clothme' : 'sk_test_fixture',
+      key === 'STRIPE_PLATFORM_ACCOUNT_ID' ? 'acct_clothme' :
+      key === 'STRIPE_PUBLISHABLE_KEY' ? 'pk_test_fixture' : 'sk_test_fixture',
   } as any);
 beforeEach(() => {
   jest.clearAllMocks();
@@ -189,6 +190,7 @@ it('only exposes authentication for a verified existing deposit and current save
     status: 'requires_action',
     clientSecret: 'demo_secret',
     paymentMethodId: 'pm_new',
+    publishableKey: 'pk_test_fixture',
   });
   await expect(
     gateway().depositAction(

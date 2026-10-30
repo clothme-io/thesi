@@ -1,4 +1,5 @@
 import { StripeService } from './stripe.service';
+import Stripe from 'stripe';
 
 function service(config: Record<string, string> = {}) {
   return new StripeService({
@@ -28,5 +29,32 @@ describe('StripeService webhook verification', () => {
 
   it('accepts local fixture webhooks when Stripe is not configured', () => {
     expect(service().constructWebhookEvent(event, undefined).id).toBe('evt_local');
+  });
+});
+
+describe('StripeService customer setup', () => {
+  it('returns only a publishable key matching the API key mode', () => {
+    expect(service({ STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_PUBLISHABLE_KEY: 'pk_test_fixture' }).getPublishableKey()).toBe('pk_test_fixture');
+    expect(service({ STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_PUBLISHABLE_KEY: 'pk_live_fixture' }).getPublishableKey()).toBeNull();
+  });
+
+  it('replaces a local customer without calling Stripe update', async () => {
+    const stripeService = service({ STRIPE_SECRET_KEY: 'sk_test_fixture' });
+    const customerUpdate = jest.spyOn((stripeService as any).stripe.customers, 'update');
+
+    await expect(stripeService.updateCustomer('cus_local_123', {})).resolves.toBe(false);
+    expect(customerUpdate).not.toHaveBeenCalled();
+  });
+
+  it('replaces a customer missing from the current Stripe mode', async () => {
+    const stripeService = service({ STRIPE_SECRET_KEY: 'sk_test_fixture' });
+    jest.spyOn((stripeService as any).stripe.customers, 'update').mockRejectedValue(
+      new Stripe.errors.StripeInvalidRequestError({
+        statusCode: 404,
+        code: 'resource_missing',
+      }),
+    );
+
+    await expect(stripeService.updateCustomer('cus_from_other_mode', {})).resolves.toBe(false);
   });
 });

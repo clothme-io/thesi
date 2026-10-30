@@ -31,12 +31,7 @@ STRIPE_PLATFORM_ACCOUNT_ID=acct_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
-`thesi-web/.env.local` (gitignored):
-
-```sh
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED=true
-```
+The web app receives the publishable key from the API's card setup and deposit authentication responses. Keep `NEXT_PUBLIC_CREATOR_PAYOUTS_ENABLED=true` only in environments where Connect is ready.
 
 Local webhook forwarding:
 
@@ -50,8 +45,7 @@ Paste the printed `whsec_...` into `STRIPE_WEBHOOK_SECRET`. Restart the API afte
 
 | Place | Keys |
 |---|---|
-| `thesi-api-secrets` (SOPS) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PLATFORM_ACCOUNT_ID` |
-| GitHub Actions secret | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (baked into thesi-web) |
+| `thesi-api-secrets` (SOPS) | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PLATFORM_ACCOUNT_ID` |
 | Stripe Dashboard endpoint | `https://dv.get-thesi.com/v1/stripe/webhooks` with a dedicated Thesi signing secret |
 
 For Connect onboarding in dev, set API `THESI_WEB_URL=https://dv-app.get-thesi.com`. The return and refresh links must target the **web** origin; `dv.get-thesi.com` is the API origin and returns 404 for `/app/settings`.
@@ -66,6 +60,8 @@ COMMERCE_SETTLEMENT_SERVICE_KEY=...
 SETTLEMENT_PLATFORM_ACCOUNT_ID=$STRIPE_PLATFORM_ACCOUNT_ID
 SETTLEMENT_OPERATOR_USER_IDS=...
 ```
+
+The API rejects card setup if its secret and publishable keys have different test/live modes. Existing `cus_local_` customer IDs are replaced on first use after Stripe is configured; IDs from a different Stripe mode are replaced when Stripe reports that customer missing.
 
 Do not enable creator payout setup in the web app before the API has a real Stripe secret key, webhook secret and platform account id.
 

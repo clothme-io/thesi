@@ -145,10 +145,16 @@ export class FundingGateway {
       ].includes(pi.status)
     )
       return { status: pi.status };
+    const secretKey = this.config.getOrThrow<string>('STRIPE_SECRET_KEY');
+    const publishableKey = this.config.getOrThrow<string>('STRIPE_PUBLISHABLE_KEY');
+    const mode = secretKey.match(/^(?:sk|rk)_(test|live)_/)?.[1];
+    if (!mode || !publishableKey.startsWith(`pk_${mode}_`))
+      throw new ServiceUnavailableException('Stripe card authentication is unavailable');
     return {
       status: pi.status,
       clientSecret: pi.client_secret,
       paymentMethodId,
+      publishableKey,
     };
   }
   async verifyRecovery(op: any, providerId: string) {

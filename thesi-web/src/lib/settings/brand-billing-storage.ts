@@ -117,6 +117,7 @@ export function useBrandBilling(authenticatedRequest: AuthenticatedRequest) {
       clientSecret: string | null;
       setupIntentId: string;
       stripeConfigured: boolean;
+      publishableKey: string | null;
     }>("/api/billing/setup-intent", { method: "POST", body: {} });
   }, [authenticatedRequest]);
 

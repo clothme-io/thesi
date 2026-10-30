@@ -110,12 +110,15 @@ export function CampaignFundingPanel({
         status: string;
         clientSecret?: string;
         paymentMethodId?: string;
+        publishableKey?: string;
       }>(`/api/campaign-funding/${campaign.id}/deposit-action`, {
         method: "POST",
         body: {},
       });
       if (action.clientSecret) {
-        const stripe = await getStripe();
+        if (!action.publishableKey)
+          throw new Error("Stripe checkout configuration is unavailable");
+        const stripe = await getStripe(action.publishableKey);
         if (!stripe)
           throw new Error("Stripe checkout configuration is unavailable");
         const result = await stripe.confirmCardPayment(action.clientSecret, {

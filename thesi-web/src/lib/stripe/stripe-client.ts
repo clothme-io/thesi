@@ -1,15 +1,13 @@
 "use client";
 
 import { loadStripe, type Stripe } from "@stripe/stripe-js";
-import { getStripePublishableKey } from "./publishable-key";
+const stripePromises = new Map<string, Promise<Stripe | null>>();
 
-let stripePromise: Promise<Stripe | null> | null = null;
-
-export function getStripe(): Promise<Stripe | null> {
-  const key = getStripePublishableKey();
-  if (!key) return Promise.resolve(null);
+export function getStripe(publishableKey: string): Promise<Stripe | null> {
+  let stripePromise = stripePromises.get(publishableKey);
   if (!stripePromise) {
-    stripePromise = loadStripe(key);
+    stripePromise = loadStripe(publishableKey);
+    stripePromises.set(publishableKey, stripePromise);
   }
   return stripePromise;
 }
