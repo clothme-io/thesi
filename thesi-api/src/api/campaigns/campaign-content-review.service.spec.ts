@@ -3,6 +3,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import type { FileStoragePort } from 'src/shared/storage/file-storage.port';
+import { workspaceContext } from '../brand-workspaces/workspace-context';
 import { CampaignContentReviewService } from './campaign-content-review.service';
 import type {
   CampaignContentReviewEventRow,
@@ -257,6 +258,17 @@ describe('CampaignContentReviewService', () => {
         audience: 'creator',
       }),
     );
+  });
+
+  it('attributes a delegated review to the staff member who made it', async () => {
+    repository.users.set('staff-1', { id: 'staff-1', role: 'brand', fullName: 'Campaign Manager' });
+    const { item } = await service.upload('creator-1', 'creator', campaignId, mp4(), {});
+    await service.submit('creator-1', 'creator', campaignId, item.id);
+    const access = { workspaceId: '10000000-0000-4000-8000-000000000001', actorUserId: 'staff-1', ownerUserId: 'brand-1', role: 'member' };
+    const decided = await workspaceContext.run(access, () => service.approve('brand-1', 'brand', campaignId, item.id));
+    expect(decided.item.status).toBe('approved');
+    expect(repository.submissions[0].reviewedByUserId).toBe('staff-1');
+    expect(repository.events.at(-1)).toMatchObject({ actorUserId: 'staff-1', actorName: 'Campaign Manager', type: 'approved' });
   });
 
   it('requires a comment to reject', async () => {

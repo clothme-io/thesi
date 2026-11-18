@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { InboxService } from '../inbox/inbox.service';
+import { workspaceContext } from '../brand-workspaces/workspace-context';
 import {
   FILE_STORAGE,
   type FileStoragePort,
@@ -267,7 +268,7 @@ export class CampaignContentReviewService {
     const row = await this.requireReadable(userId, role, campaignId, submissionId);
     await this.reviews.addEvent({
       submissionId: row.id,
-      actorUserId: userId,
+      actorUserId: workspaceContext.getStore()?.actorUserId ?? userId,
       type: 'comment',
       comment: comment.trim().slice(0, 4000),
       version: row.version,
@@ -317,12 +318,12 @@ export class CampaignContentReviewService {
           : 'changes_requested';
     const updated = await this.reviews.updateStatus(row.id, {
       status,
-      reviewedByUserId: userId,
+      reviewedByUserId: workspaceContext.getStore()?.actorUserId ?? userId,
       reviewedAt: new Date(),
     });
     await this.reviews.addEvent({
       submissionId: row.id,
-      actorUserId: userId,
+      actorUserId: workspaceContext.getStore()?.actorUserId ?? userId,
       type: eventType,
       comment: comment.trim().slice(0, 4000),
       version: row.version,
