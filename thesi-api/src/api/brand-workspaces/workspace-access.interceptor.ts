@@ -7,7 +7,7 @@ import { workspaceContext } from './workspace-context';
 
 const WORKSPACE_CONTROLLERS = new Set([
   'CommissionSettlementController', 'CampaignFundingController', 'CommissionEarningsController', 'CampaignsController', 'MarketplaceController', 'ProfilesController',
-  'InboxController', 'InvitesController', 'CreatorsController', 'BillingController',
+  'InboxController', 'InvitesController', 'CreatorsController', 'BillingController', 'CampaignContentReviewController',
 ]);
 const FINANCIAL_HANDLERS = new Set(['getPlatformFee', 'payPlatformFee', 'listPayouts', 'payCreator']);
 
@@ -32,9 +32,9 @@ export class WorkspaceAccessInterceptor implements NestInterceptor {
     const access = await this.workspaces.resolveLegacyAccess(req.user.sub, (selected as string | undefined)??req.user.merchantWorkspaceId);
     const mutation=!['GET','HEAD','OPTIONS'].includes(req.method);
     if(access.role!=='owner'){
-      const allowed=new Set(['CampaignsController','MarketplaceController','InvitesController','InboxController','CreatorsController','ProfilesController','CommissionEarningsController']);
+      const allowed=new Set(['CampaignsController','CampaignContentReviewController','MarketplaceController','InvitesController','InboxController','CreatorsController','ProfilesController','CommissionEarningsController']);
       if(!allowed.has(controller))throw new ForbiddenException('Only the account owner can manage campaign funds and payments');
-      if(mutation && !new Set(['CampaignsController','MarketplaceController','InvitesController','InboxController','CreatorsController']).has(controller))throw new ForbiddenException('Only the owner can change brand settings');
+      if(mutation && !new Set(['CampaignsController','CampaignContentReviewController','MarketplaceController','InvitesController','InboxController','CreatorsController']).has(controller))throw new ForbiddenException('Only the owner can change brand settings');
     }
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && access.role === 'viewer') {
       throw new ForbiddenException('Workspace is read-only');

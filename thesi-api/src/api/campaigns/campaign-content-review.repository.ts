@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DrizzleAsyncProvider } from 'src/dbConfig/drizzle/drizzle.provider';
 import * as schema from 'src/dbConfig/drizzle/schema';
+import { workspaceFilter } from '../brand-workspaces/workspace-context';
 import type {
   CampaignContentReviewEventType,
   CampaignContentReviewStatus,
@@ -134,7 +135,7 @@ export class PostgresCampaignContentReviewRepository
         ownerUserId: schema.campaign.ownerUserId,
       })
       .from(schema.campaign)
-      .where(eq(schema.campaign.id, campaignId))
+      .where(and(workspaceFilter(schema.campaign), eq(schema.campaign.id, campaignId)))
       .limit(1);
     return row ?? null;
   }

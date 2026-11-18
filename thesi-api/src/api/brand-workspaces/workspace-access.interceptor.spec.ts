@@ -31,6 +31,19 @@ describe('WorkspaceAccessInterceptor', () => {
     expect(await firstValueFrom(await interceptor.intercept(context({actor:'staff-user',method:'POST',handler:'create'}),next))).toEqual({actor:'staff-user',owner:'brand-owner'});
     expect(resolver.auditDelegatedAction).toHaveBeenCalledWith(expect.objectContaining({actorUserId:'staff-user',workspaceId:id}),'CampaignsController','create');
   });
+  it('scopes content reviews to the selected workspace and enforces review permissions', async () => {
+    const member = setup(true, 'member');
+    const request = context({ controller: 'CampaignContentReviewController', handler: 'approve', method: 'POST', selected: id, actor: 'staff-user' });
+    expect(await firstValueFrom(await member.interceptor.intercept(request, member.next))).toMatchObject({ workspaceId: id, actorUserId: 'staff-user', ownerUserId: 'brand-owner' });
+    expect(member.resolver.auditDelegatedAction).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: 'staff-user', workspaceId: id }), 'CampaignContentReviewController', 'approve');
+
+    const viewer = setup(true, 'viewer');
+    await expect(viewer.interceptor.intercept(request, viewer.next)).rejects.toThrow('read-only');
+    expect(viewer.next.handle).not.toHaveBeenCalled();
+
+    const creator = setup();
+    expect(await firstValueFrom(await creator.interceptor.intercept(context({ controller: 'CampaignContentReviewController', role: 'creator' }), creator.next))).toBeUndefined();
+  });
   it('blocks profile changes for campaign managers',async()=>{
     const {interceptor,next}=setup(true,'member');
     await expect(interceptor.intercept(context({controller:'ProfilesController',method:'PATCH'}),next)).rejects.toThrow('brand settings');

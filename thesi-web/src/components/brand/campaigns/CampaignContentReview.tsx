@@ -63,6 +63,7 @@ export function CampaignContentReview({ campaignId, canSubmit }: Props) {
   const { authenticatedRequest, authenticatedBinaryRequest, session } = useAuth();
   const isBrand = session?.user.role === "brand";
   const [items, setItems] = useState<CampaignContentReviewItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<CampaignContentReviewItem | null>(null);
   const [mediaUrl, setMediaUrl] = useState("");
   const [error, setError] = useState("");
@@ -77,9 +78,12 @@ export function CampaignContentReview({ campaignId, canSubmit }: Props) {
       { method: "GET" },
     );
     setItems(next?.items ?? []);
+    setLoaded(true);
   }, [authenticatedRequest, campaignId]);
 
   useEffect(() => {
+    setLoaded(false);
+    setError("");
     void load().catch((requestError) => {
       setError(
         requestError instanceof Error
@@ -213,9 +217,11 @@ export function CampaignContentReview({ campaignId, canSubmit }: Props) {
         </div>
       ) : null}
 
-      {items.length === 0 ? (
+      {items.length === 0 && !error ? (
         <p className="workspace-hint">
-          {canSubmit
+          {!loaded
+            ? "Loading drafts…"
+            : canSubmit
             ? "No drafts yet. Upload a file, then submit it for review."
             : "No drafts submitted yet."}
         </p>
